@@ -1,0 +1,564 @@
+{
+  "manualEntries": [
+    {
+      "regionId": "qoraqalpogiston",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 1,
+      "fileName": "Comp.xlsx",
+      "fileUrl": "/uploads/savdosi-toxtatilgan/qoraqalpogiston-1784467902873.xlsx",
+      "updatedAt": "2026-07-19T13:31:55.921Z"
+    },
+    {
+      "regionId": "qoraqalpogiston",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "qoraqalpogiston",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "qoraqalpogiston",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "qoraqalpogiston",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "andijon",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "andijon",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "andijon",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "andijon",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "andijon",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "buxoro",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "buxoro",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "buxoro",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "buxoro",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "buxoro",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "jizzax",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "jizzax",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "jizzax",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "jizzax",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "jizzax",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "qashqadaryo",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "qashqadaryo",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "qashqadaryo",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "qashqadaryo",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "qashqadaryo",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "navoiy",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "navoiy",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "navoiy",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "navoiy",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "navoiy",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "namangan",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "namangan",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "namangan",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "namangan",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "namangan",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "samarqand",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "samarqand",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "samarqand",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "samarqand",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "samarqand",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "surxondaryo",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "surxondaryo",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "surxondaryo",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "surxondaryo",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "surxondaryo",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "sirdaryo",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "sirdaryo",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "sirdaryo",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "sirdaryo",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "sirdaryo",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "toshkent-viloyati",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "toshkent-viloyati",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "toshkent-viloyati",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "toshkent-viloyati",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "toshkent-viloyati",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "fargona",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "fargona",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "fargona",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "fargona",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "fargona",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "xorazm",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "xorazm",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "xorazm",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "xorazm",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "xorazm",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "toshkent-shahri",
+      "categoryId": "savdosi-toxtatilgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "toshkent-shahri",
+      "categoryId": "yaroqsiz",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "toshkent-shahri",
+      "categoryId": "chekka-hudud",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "toshkent-shahri",
+      "categoryId": "bosh-turgan",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    },
+    {
+      "regionId": "toshkent-shahri",
+      "categoryId": "bosh-maydon",
+      "count": 0,
+      "fileName": null,
+      "fileUrl": null,
+      "updatedAt": null
+    }
+  ]
+}
