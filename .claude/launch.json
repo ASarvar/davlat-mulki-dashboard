@@ -1,0 +1,22 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "dev"],
+      "port": 3000
+    },
+    {
+      "name": "prisma-studio",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["prisma", "studio", "--port", "5555"],
+      "port": 5555
+    },
+    {
+      "name": "worker",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": ["run", "worker:dev"]
+    }
+  ]
+}

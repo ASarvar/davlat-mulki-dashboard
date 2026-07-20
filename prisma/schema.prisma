@@ -1,0 +1,243 @@
+// Davlat mulki monitoring platformasi — Prisma schema
+// PostgreSQL 15 + pg_trgm (GIN trigram indekslari qo'lda migratsiyada, migrations/*/pg_trgm)
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── Auth & Rollar ───────────────────────────
+enum Role {
+  SUPER_ADMIN
+  REGION_USER
+  VIEWER
+}
+
+model User {
+  id           String  @id @default(cuid())
+  email        String  @unique
+  fullName     String
+  passwordHash String
+  role         Role    @default(VIEWER)
+  isActive     Boolean @default(true)
+  regionId     String? // REGION_USER uchun majburiy (app-level tekshiruv)
+  region       Region? @relation(fields: [regionId], references: [id])
+
+  documents   Document[]                   @relation("UploadedBy")
+  assignments PropertyCategoryAssignment[] @relation("AssignedBy")
+  syncRuns    SyncRun[]                    @relation("TriggeredBy")
+  auditLogs   AuditLog[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([regionId])
+  @@index([role])
+}
+
+// ─────────────────────── Hudud & Manba (source) ──────────────────────
+model Region {
+  id         String               @id @default(cuid())
+  code       String               @unique // masalan "TAS", "SAM"
+  name       String // "Toshkent shahri" ...
+  properties Property[]
+  users      User[]
+  sources    OrganizationSource[]
+  createdAt  DateTime             @default(now())
+  updatedAt  DateTime             @updatedAt
+}
+
+// Har bir hudud+organizatsiya uchun STIR va API config (kelajakda kengayadi)
+model OrganizationSource {
+  id         String     @id @default(cuid())
+  name       String // "Ijara markazi", "Sog'liqni saqlash"...
+  stir       String // API 1 uchun kalit
+  regionId   String
+  region     Region     @relation(fields: [regionId], references: [id])
+  isActive   Boolean    @default(true)
+  properties Property[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@unique([regionId, stir])
+  @@index([stir])
+}
+
+// ─────────────────────────── Kategoriyalar ───────────────────────────
+enum CategorySource {
+  INTEGRATION // 1–4: API'dan aniqlanadi
+  MANUAL // 5–10: user qo'lda tanlaydi
+}
+
+model Category {
+  code               Int            @id // 1..10
+  nameUz             String
+  source             CategorySource
+  // 1–8 samaradorlik hisobidan CHIQARIB tashlanadi; qolganlari samarasiz.
+  excludeInefficient Boolean        @default(false)
+  requiresDocument   Boolean        @default(false) // MANUAL kategoriyalar uchun PDF majburiy
+
+  assignments             PropertyCategoryAssignment[]
+  integrationOfProperties Property[]                   @relation("IntegrationCategory")
+  manualOfProperties      Property[]                   @relation("ManualCategory")
+}
+
+// ─────────────────────────── Obyekt (Property) ───────────────────────
+enum SyncStatus {
+  PENDING
+  SYNCING
+  SYNCED
+  FAILED
+}
+
+model Property {
+  id String @id @default(cuid())
+
+  // Kadastr raqamlari — eng muhim qidiruv/filtr maydonlari
+  cadNumber    String  @unique // yangi kadastr (API 2)
+  cadNumberOld String? // eski kadastr (API 2 javobidan, fallback uchun)
+
+  regionId String
+  region   Region             @relation(fields: [regionId], references: [id])
+  sourceId String
+  source   OrganizationSource @relation(fields: [sourceId], references: [id])
+
+  // API 2 dan keladigan asosiy ma'lumotlar
+  name         String?
+  address      String?
+  area         Decimal? @db.Decimal(14, 2)
+  buildingArea Decimal? @db.Decimal(14, 2)
+  rawApi2      Json? // to'liq javob (audit/kelajak uchun)
+
+  // Hisoblangan holat (materialized — dashboard tezligi uchun)
+  integrationCategoryCode Int? // 1–4 (integratsiyadan)
+  integrationCategory     Category? @relation("IntegrationCategory", fields: [integrationCategoryCode], references: [code])
+  manualCategoryCode      Int? // 5–10 (qo'lda)
+  manualCategory          Category? @relation("ManualCategory", fields: [manualCategoryCode], references: [code])
+  isInefficient           Boolean   @default(false) // 1–8 dan tashqarida => true
+
+  // Sinxronizatsiya holati
+  syncStatus    SyncStatus @default(PENDING)
+  lastSyncedAt  DateTime?
+  lastSyncError String?
+
+  statusChecks ObjectStatusCheck[]
+  assignments  PropertyCategoryAssignment[]
+  documents    Document[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // ── Indekslar (80k+ uchun) ──
+  @@index([cadNumberOld])
+  @@index([regionId, isInefficient])
+  @@index([sourceId])
+  @@index([syncStatus])
+  @@index([integrationCategoryCode])
+  @@index([manualCategoryCode])
+  // pg_trgm GIN indekslari migratsiyada qo'lda qo'shiladi (prisma/migrations/*_pg_trgm)
+}
+
+// API 3–8 natijalari (har bir manba uchun bitta qator)
+model ObjectStatusCheck {
+  id              String   @id @default(cuid())
+  propertyId      String
+  property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  apiSource       String // "API3".."API8"
+  found           Boolean  @default(false)
+  matchedByOldCad Boolean  @default(false) // fallback ishga tushdimi
+  status          String? // API qaytargan holat
+  rawResponse     Json?
+  checkedAt       DateTime @default(now())
+
+  @@unique([propertyId, apiSource])
+  @@index([apiSource, status])
+}
+
+// Kategoriya biriktirish (asosan MANUAL 5–10 uchun, tarix bilan)
+model PropertyCategoryAssignment {
+  id           String    @id @default(cuid())
+  propertyId   String
+  property     Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  categoryCode Int
+  category     Category  @relation(fields: [categoryCode], references: [code])
+  assignedById String
+  assignedBy   User      @relation("AssignedBy", fields: [assignedById], references: [id])
+  documentId   String? // asoslovchi PDF
+  document     Document? @relation(fields: [documentId], references: [id])
+  note         String?
+  createdAt    DateTime  @default(now())
+
+  @@index([propertyId])
+  @@index([categoryCode])
+}
+
+// PDF hujjatlar (local filesystem'da saqlanadi, DB'da faqat metadata)
+model Document {
+  id           String                       @id @default(cuid())
+  propertyId   String
+  property     Property                     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  uploadedById String
+  uploadedBy   User                         @relation("UploadedBy", fields: [uploadedById], references: [id])
+  storageKey   String // nisbiy yo'l: region/<id>/property/<cad>/<uuid>.pdf
+  fileName     String
+  fileSize     Int
+  mimeType     String                       @default("application/pdf")
+  assignments  PropertyCategoryAssignment[]
+  createdAt    DateTime                     @default(now())
+
+  @@index([propertyId])
+}
+
+// ─────────────────────── Sinxronizatsiya jurnali ─────────────────────
+enum SyncRunType {
+  FULL_ALL
+  REGION
+  SINGLE
+}
+
+enum SyncRunStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  PARTIAL
+}
+
+model SyncRun {
+  id            String        @id @default(cuid())
+  type          SyncRunType
+  status        SyncRunStatus @default(QUEUED)
+  triggeredById String?
+  triggeredBy   User?         @relation("TriggeredBy", fields: [triggeredById], references: [id])
+  regionId      String?
+  totalCount    Int           @default(0)
+  successCount  Int           @default(0)
+  failCount     Int           @default(0)
+  startedAt     DateTime?
+  finishedAt    DateTime?
+  createdAt     DateTime      @default(now())
+
+  @@index([status])
+  @@index([createdAt])
+}
+
+// Audit (kim, nima, qachon)
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  user       User?    @relation(fields: [userId], references: [id])
+  action     String // "ASSIGN_CATEGORY", "UPLOAD_DOC", "TRIGGER_SYNC"...
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}

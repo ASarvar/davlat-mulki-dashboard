@@ -1,0 +1,86 @@
+import { signIn } from "@/auth";
+import { AuthError } from "next-auth";
+import { redirect } from "next/navigation";
+import { Landmark, LogIn } from "lucide-react";
+
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  const { error } = await searchParams;
+
+  async function authenticate(formData: FormData) {
+    "use server";
+    try {
+      await signIn("credentials", {
+        email: formData.get("email"),
+        password: formData.get("password"),
+        redirectTo: "/dashboard",
+      });
+    } catch (err) {
+      // Login xatosi => login sahifasiga qaytamiz. Redirect (muvaffaqiyat) uzatiladi.
+      if (err instanceof AuthError) redirect("/login?error=1");
+      throw err;
+    }
+  }
+
+  return (
+    <main
+      className="flex min-h-screen items-center justify-center p-4"
+      style={{ background: "linear-gradient(135deg, var(--navy) 0%, var(--navy-mid) 60%, var(--cobalt) 100%)" }}
+    >
+      <div className="w-full max-w-sm rounded-xl bg-white/95 p-8 shadow-2xl backdrop-blur">
+        <div className="mb-6 text-center">
+          <div
+            className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-xl shadow-lg"
+            style={{ background: "var(--gold)" }}
+          >
+            <Landmark className="h-6 w-6" style={{ color: "var(--navy)" }} />
+          </div>
+          <h1 className="text-lg font-semibold" style={{ color: "var(--navy)" }}>
+            Davlat mulki monitoringi
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">Tizimga kirish</p>
+        </div>
+
+        {error ? (
+          <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            Email yoki parol noto'g'ri
+          </p>
+        ) : null}
+
+        <form action={authenticate} className="space-y-4">
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
+            <input
+              name="email"
+              type="email"
+              required
+              autoComplete="username"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-cobalt focus:ring-2 focus:ring-cobalt/30"
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Parol</label>
+            <input
+              name="password"
+              type="password"
+              required
+              autoComplete="current-password"
+              className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-cobalt focus:ring-2 focus:ring-cobalt/30"
+            />
+          </div>
+          <button
+            type="submit"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold text-white shadow-md transition hover:opacity-90"
+            style={{ background: "var(--navy)" }}
+          >
+            <LogIn className="h-4 w-4" />
+            Kirish
+          </button>
+        </form>
+      </div>
+    </main>
+  );
+}
