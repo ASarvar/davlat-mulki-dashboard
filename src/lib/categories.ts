@@ -14,10 +14,11 @@ export interface CategoryMeta {
 export const CATEGORIES: CategoryMeta[] = [
   { code: 1, nameUz: "Sotilgan (Bo'lib to'lash sharti bilan)", short: "Sotilgan (bo'lib to'lash)", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
   { code: 2, nameUz: "Sotilgan", short: "Sotilgan", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 3, nameUz: "Tekin foydalanish", short: "Tekin foydalanish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 4, nameUz: "Savdoda xususiylashtirish", short: "Savdoda xususiylashtirish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 5, nameUz: "Savdoda ijara", short: "Savdoda ijara", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 3, nameUz: "Savdoda xususiylashtirish", short: "Savdoda xususiylashtirish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 4, nameUz: "Savdoda ijara", short: "Savdoda ijara", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 5, nameUz: "Tekin foydalanish", short: "Tekin foydalanish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
   { code: 6, nameUz: "Ijara shartnomasi bor", short: "Ijara shartnomasi bor", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  // 7 — qo'lda ham tanlanadi, API 3 status_name ("Экспертиза"/"Баҳолашда"/"Хатловда") ham beradi.
   { code: 7, nameUz: "Savdoga chiqarish jarayonida", short: "Savdoga chiqmoqda", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
   { code: 8, nameUz: "Savdosi to'xtatilgan", short: "Savdo to'xtatilgan", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
   { code: 9, nameUz: "Foydalanishga yaroqsiz holatda", short: "Yaroqsiz holat", source: "MANUAL", excludeInefficient: true, requiresDocument: true },

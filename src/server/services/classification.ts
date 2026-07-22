@@ -13,13 +13,24 @@ export const EXCLUDED_CATEGORY_CODES: ReadonlySet<number> = new Set([1, 2, 3, 4,
 
 export const CAT_INSTALLMENT_SOLD = 1; // Sotilgan (bo'lib to'lash sharti bilan)
 export const CAT_SOLD = 2; // Sotilgan
-export const CAT_FREE_USE = 3; // Tekin foydalanish (ijara shartnomasi summasi 0)
-export const CAT_ON_AUCTION = 4; // Savdoda xususiylashtirish
-export const CAT_ON_AUCTION_RENT = 5; // Savdoda ijara
+export const CAT_ON_AUCTION = 3; // Savdoda xususiylashtirish
+export const CAT_ON_AUCTION_RENT = 4; // Savdoda ijara
+export const CAT_FREE_USE = 5; // Tekin foydalanish (ijara shartnomasi summasi 0)
 export const CAT_HAS_RENT = 6; // Ijara shartnomasi bor
+export const CAT_PRE_AUCTION = 7; // Savdoga chiqarish jarayonida (qo'lda ham, API 3 ham)
 
 /** API 4 dagi `group_name` shu bo'lsa — savdo IJARA uchun, aks holda xususiylashtirish. */
 export const AUCTION_GROUP_RENT = "Davlat mulkini ijaraga berish";
+
+/**
+ * API 3 `status_name` — savdoga tayyorgarlik bosqichlari (kirillcha keladi).
+ * Bu holatda lot hali yaratilmagan, shuning uchun obyekt 7-kategoriyaga tushadi.
+ */
+export const PRE_AUCTION_STATUSES: ReadonlySet<string> = new Set([
+  "Экспертиза",
+  "Баҳолашда",
+  "Хатловда",
+]);
 
 // Auksion (API 3+4) natijasidan integratsiya kategoriyasini aniqlaydi.
 //   order_statuses_id === 6 => SOTILGAN
@@ -38,14 +49,20 @@ export function deriveAuctionCategory(a: {
   termPayment: number | null;
   lotNumber: string | null;
   groupName: string | null;
+  /** API 3 dagi xom `status_name` (lot yaratilgunga qadar shu yagona signal). */
+  assetStatus?: string | null;
 }): number | null {
   if (!a.found) return null;
   if (a.isSold) {
     return a.termPayment === 1 ? CAT_INSTALLMENT_SOLD : CAT_SOLD;
   }
   // Savdoda turgan: group_name ijara savdosini xususiylashtirishdan ajratadi.
-  if (!a.lotNumber) return null;
-  return a.groupName === AUCTION_GROUP_RENT ? CAT_ON_AUCTION_RENT : CAT_ON_AUCTION;
+  if (a.lotNumber) {
+    return a.groupName === AUCTION_GROUP_RENT ? CAT_ON_AUCTION_RENT : CAT_ON_AUCTION;
+  }
+  // Lot yo'q, lekin savdoga tayyorgarlik bosqichida (ekspertiza/baholash/xatlov).
+  if (a.assetStatus && PRE_AUCTION_STATUSES.has(a.assetStatus.trim())) return CAT_PRE_AUCTION;
+  return null;
 }
 
 // API 5 (ijara shartnomalari) natijasidan kategoriya.

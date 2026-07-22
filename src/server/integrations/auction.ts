@@ -72,6 +72,8 @@ export interface AuctionInfo {
   isSold: boolean;
   /** API 4 javobidagi group_name — savdo ijara uchunmi yoki xususiylashtirishmi. */
   groupName: string | null;
+  /** API 3 dagi xom `status_name` (kirillcha): "Савдода", "Экспертиза", "Муаммоли" ... */
+  assetStatus: string | null;
   raw: unknown;
 }
 
@@ -89,6 +91,7 @@ export const EMPTY_AUCTION: AuctionInfo = {
   paymentTermMonths: null,
   isSold: false,
   groupName: null,
+  assetStatus: null,
   raw: null,
 };
 
@@ -104,6 +107,16 @@ const str = (v: unknown): string | null => {
   if (v === null || v === undefined) return null;
   const s = String(v).trim();
   return s.length > 0 ? s : null;
+};
+
+/**
+ * Lot raqami uchun: API `0` yoki `"0"` qaytarishi mumkin — bu lot YO'Q degani.
+ * `str()` ni to'g'ridan-to'g'ri ishlatsak "0" satri "lot bor" deb qabul qilinardi
+ * va obyekt noto'g'ri "savdoda" kategoriyasiga tushardi.
+ */
+const lotStr = (v: unknown): string | null => {
+  const s = str(v);
+  return s && s !== "0" ? s : null;
 };
 
 const int = (v: unknown): number | null => {
@@ -178,8 +191,9 @@ export async function checkAuction(cadNumber: string): Promise<AuctionInfo> {
     return {
       ...EMPTY_AUCTION,
       found: true,
-      lotNumber: str(asset.lot_number),
+      lotNumber: lotStr(asset.lot_number),
       lotStatus: str(asset.status_name),
+      assetStatus: str(asset.status_name),
       raw: { api3: asset },
     };
   }
@@ -189,8 +203,9 @@ export async function checkAuction(cadNumber: string): Promise<AuctionInfo> {
     return {
       ...EMPTY_AUCTION,
       found: true,
-      lotNumber: str(asset.lot_number),
+      lotNumber: lotStr(asset.lot_number),
       lotStatus: str(asset.status_name),
+      assetStatus: str(asset.status_name),
       orderId,
       raw: { api3: asset },
     };
@@ -204,7 +219,7 @@ export async function checkAuction(cadNumber: string): Promise<AuctionInfo> {
   return {
     found: true,
     // Havola API 4 dagi lot raqamiga quriladi; yo'q bo'lsa API 3 dagisi.
-    lotNumber: str(order.lot_number) ?? str(asset.lot_number),
+    lotNumber: lotStr(order.lot_number) ?? lotStr(asset.lot_number),
     lotStatus: str(order.lot_status) ?? str(asset.status_name),
     orderId: int(order.order_id) ?? orderId,
     orderStatusId,
@@ -213,6 +228,7 @@ export async function checkAuction(cadNumber: string): Promise<AuctionInfo> {
     paymentTermMonths: months && months > 0 ? months : null,
     isSold: orderStatusId === ORDER_STATUS_SOLD,
     groupName,
+    assetStatus: str(asset.status_name),
     // group_name'ni ham saqlaymiz — keyinchalik API'siz qayta hisoblash uchun kerak.
     raw: { api3: asset, api4: order, group_name: groupName },
   };

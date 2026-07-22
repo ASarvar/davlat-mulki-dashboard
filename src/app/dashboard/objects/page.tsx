@@ -100,7 +100,6 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
               <th className="px-4 py-3 font-medium">Lot</th>
               <th className="px-4 py-3 font-medium">Kategoriya</th>
               <th className="px-4 py-3 font-medium">Samaradorlik</th>
-              <th className="px-4 py-3 font-medium">Holat</th>
             </tr>
           </thead>
           <tbody>
@@ -144,9 +143,6 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
                   </td>
                   <td className="px-4 py-3">
                     <InefficientBadge value={p.isInefficient} />
-                  </td>
-                  <td className="px-4 py-3">
-                    <SyncStatusBadge status={p.syncStatus} />
                   </td>
                 </tr>
               ))

@@ -55,7 +55,7 @@ export function Sidebar({ user }: { user: SidebarUser }) {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-dm-light.svg" alt="Davlat mulki" className="h-10 w-auto shrink-0" />
         <div className="min-w-0">
-          <p className="truncate text-[16px] text-white/50">Monitoring</p>
+          <p className="truncate text-[16px] font-bold pl-10" style={{ color: "var(--gold)"}}>Monitoring</p>
         </div>
       </div>
 

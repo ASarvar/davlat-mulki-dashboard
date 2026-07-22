@@ -16,9 +16,9 @@ const CATEGORIES: {
 }[] = [
   { code: 1, nameUz: "Sotilgan (Bo'lib to'lash sharti bilan)", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
   { code: 2, nameUz: "Sotilgan", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 3, nameUz: "Tekin foydalanish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 4, nameUz: "Savdoda xususiylashtirish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 5, nameUz: "Savdoda ijara", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 3, nameUz: "Savdoda xususiylashtirish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 4, nameUz: "Savdoda ijara", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 5, nameUz: "Tekin foydalanish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
   { code: 6, nameUz: "Ijara shartnomasi bor", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
   { code: 7, nameUz: "Savdoga chiqarish jarayonida", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
   { code: 8, nameUz: "Savdosi to'xtatilgan", source: "MANUAL", excludeInefficient: true, requiresDocument: true },

@@ -75,21 +75,26 @@ sozlanadi (`API3_PARAM`, `API4_PARAM`, `API5_PARAM`). API 1 da javobda `inn`, so
 |---|---|---|
 | 1 | Sotilgan (bo'lib to'lash sharti bilan) | integratsiya |
 | 2 | Sotilgan | integratsiya |
-| 3 | Tekin foydalanish | integratsiya |
-| 4 | Savdoda xususiylashtirish | integratsiya |
-| 5 | Savdoda ijara | integratsiya |
+| 3 | Savdoda xususiylashtirish | integratsiya |
+| 4 | Savdoda ijara | integratsiya |
+| 5 | Tekin foydalanish | integratsiya |
 | 6 | Ijara shartnomasi bor | integratsiya |
-| 7–10 | Savdoga chiqmoqda / to'xtatilgan / yaroqsiz / chekka hudud | **qo'lda + PDF** |
+| 7 | Savdoga chiqarish jarayonida | **qo'lda + PDF** va integratsiya (API 3 statusi) |
+| 8–10 | Savdo to'xtatilgan / yaroqsiz / chekka hudud | **qo'lda + PDF** |
 | 11–12 | Bo'sh turgan / bo'sh maydoni bor | **qo'lda + PDF** |
 
 **Faqat 11–12 va kategoriyasiz = SAMARASIZ.** `EXCLUDED_CATEGORY_CODES = {1..10}`.
 
-Aniqlash qoidalari (`classification.ts`):
-- `order_statuses_id === 6` ⇒ sotilgan; `term_payment === 1` ⇒ kat 1, aks holda kat 2
-  (⚠️ mezon `term_payment`, `details.tulov_muddati` **emas** — u sotuv bo'lib to'lash bo'lsa ham bo'sh keladi)
-- lot bor, sotilmagan ⇒ `group_name === "Davlat mulkini ijaraga berish"` ? kat 5 : kat 4
-- ijara shartnomasi bor ⇒ jami summa 0 ? kat 3 : kat 6
+Aniqlash qoidalari (`classification.ts` → `deriveAuctionCategory`, tartib muhim):
+1. `order_statuses_id === 6` ⇒ sotilgan; `term_payment === 1` ⇒ kat 1, aks holda kat 2
+   (⚠️ mezon `term_payment`, `details.tulov_muddati` **emas** — u sotuv bo'lib to'lash bo'lsa ham bo'sh keladi)
+2. **haqiqiy** lot bor, sotilmagan ⇒ `group_name === "Davlat mulkini ijaraga berish"` ? kat 4 : kat 3
+3. lot yo'q, API 3 `status_name` ∈ {`Экспертиза`, `Баҳолашда`, `Хатловда`} ⇒ kat 7
+4. ijara shartnomasi bor ⇒ jami summa 0 ? kat 5 : kat 6
 - **Ustuvorlik:** auksion > ijara > boshqa
+
+⚠️ **`lot_number: 0` — lot YO'Q degani.** `lotStr()` uni null'ga aylantiradi; oddiy `String()` ishlatilsa
+`"0"` truthy bo'lib, obyekt noto'g'ri "savdoda" kategoriyasiga tushadi (bir marta 92 ta obyektni buzgan).
 
 Kategoriya kodini o'zgartirishdan oldin `manualCategoryCode` ishlatilganini tekshiring.
 
