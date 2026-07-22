@@ -16,7 +16,7 @@ export default async function SyncPage() {
   const user = await requireUser();
 
   const [regions, runs] = await Promise.all([
-    prisma.region.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
     prisma.syncRun.findMany({
       orderBy: { createdAt: "desc" },
       take: 20,

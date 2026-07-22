@@ -25,12 +25,18 @@ interface RequestOptions {
   // Query parametrlari (to'g'ri encode qilinadi). undefined qiymatlar tushib qoladi.
   query?: Record<string, string | number | undefined>;
   token?: string;
+  /** Basic auth (API 3/4). token bilan birga berilsa, basic ustun turadi. */
+  basicAuth?: { user: string; password: string };
   method?: "GET" | "POST";
   body?: unknown;
   timeoutMs?: number;
   maxAttempts?: number;
   // Per-API global rate-limit kaliti (masalan "API3"). Berilsa, so'rovdan oldin slot olinadi.
   rateKey?: string;
+  // Ba'zi API'lar vaqtinchalik xatoni HTTP 200 + body ichida qaytaradi
+  // (masalan API 2: code=90000 "Message throttled out"). Shu callback true qaytarsa,
+  // javob muvaffaqiyatli hisoblanmaydi va backoff bilan qayta uriniladi.
+  shouldRetry?: (data: unknown) => boolean;
 }
 
 // baseUrl + path + query -> to'liq URL. path bo'sh bo'lishi mumkin.
@@ -54,11 +60,13 @@ export async function httpJson<T>(opts: RequestOptions): Promise<T> {
     path,
     query,
     token,
+    basicAuth,
     method = "GET",
     body,
     timeoutMs = env.API_TIMEOUT_MS,
     maxAttempts = env.API_MAX_ATTEMPTS,
     rateKey,
+    shouldRetry,
   } = opts;
 
   const url = buildUrl(baseUrl, path, query);
@@ -71,15 +79,26 @@ export async function httpJson<T>(opts: RequestOptions): Promise<T> {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
+      const authHeader = basicAuth
+        ? `Basic ${Buffer.from(`${basicAuth.user}:${basicAuth.password}`).toString("base64")}`
+        : token
+          ? `Bearer ${token}`
+          : undefined;
+
       const res = await fetch(url, {
         method,
         headers: {
           "content-type": "application/json",
-          ...(token ? { authorization: `Bearer ${token}` } : {}),
+          ...(authHeader ? { authorization: authHeader } : {}),
         },
-        body: body ? JSON.stringify(body) : undefined,
+        body: body !== undefined ? JSON.stringify(body) : undefined,
         signal: controller.signal,
       });
+
+      // 401/403 — noto'g'ri login/parol. Retry qilish ma'nosiz, aniq xabar beramiz.
+      if (res.status === 401 || res.status === 403) {
+        throw new HttpError(res.status, `Avtorizatsiya rad etildi (HTTP ${res.status}) — login/parolni tekshiring`);
+      }
 
       if (res.status === 404) throw new NotFoundError();
 
@@ -98,7 +117,19 @@ export async function httpJson<T>(opts: RequestOptions): Promise<T> {
 
       if (!res.ok) throw new HttpError(res.status, `HTTP ${res.status}`);
 
-      return (await res.json()) as T;
+      const data = (await res.json()) as T;
+
+      // HTTP 200 bo'lsa ham body ichida vaqtinchalik xato bo'lishi mumkin (throttle).
+      if (shouldRetry?.(data)) {
+        lastErr = new Error("Vaqtinchalik xato (body): qayta urinilmoqda");
+        if (attempt < maxAttempts) {
+          await sleep(baseBackoff(attempt));
+          continue;
+        }
+        throw lastErr;
+      }
+
+      return data;
     } catch (err) {
       // 404 va boshqa retry qilinmaydigan HTTP xatolarni yuqoriga uzatamiz.
       if (err instanceof NotFoundError) throw err;

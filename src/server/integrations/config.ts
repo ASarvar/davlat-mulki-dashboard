@@ -27,11 +27,11 @@ function isConfigured(url: string | undefined): boolean {
   }
 }
 
+// DIQQAT: API 3 va API 4 bu ro'yxatda YO'Q — ular generic GET emas, balki
+// Basic auth + POST zanjiri (API3 -> order_id -> API4). Ular `auction.ts` da.
+// API 5 ham bu ro'yxatda YO'Q — u Basic auth + POST, o'z mijozi `rentApi.ts` da.
 const ALL_STATUS_APIS: StatusApiConfig[] = [
-  { source: "API3", baseUrl: env.API3_BASE_URL, token: env.API_STATUS_TOKEN, label: "Bo'lib to'lash bilan sotilgan", impliesCategoryCode: 1 },
-  { source: "API4", baseUrl: env.API4_BASE_URL, token: env.API_STATUS_TOKEN, label: "Sotilgan (hujjat rasmiylashtirilmagan)", impliesCategoryCode: 2 },
-  { source: "API5", baseUrl: env.API5_BASE_URL, token: env.API_STATUS_TOKEN, label: "Beg'araz foydalanish", impliesCategoryCode: 3 },
-  { source: "API6", baseUrl: env.API6_BASE_URL, token: env.API_STATUS_TOKEN, label: "Savdoda turgan (xususiylashtirish/ijara)", impliesCategoryCode: 4 },
+  { source: "API6", baseUrl: env.API6_BASE_URL, token: env.API_STATUS_TOKEN, label: "Qo'shimcha holat tekshiruvi", impliesCategoryCode: null },
   { source: "API7", baseUrl: env.API7_BASE_URL, token: env.API_STATUS_TOKEN, label: "Nol qiymatli ijara", impliesCategoryCode: null },
   { source: "API8", baseUrl: env.API8_BASE_URL, token: env.API_STATUS_TOKEN, label: "Qo'shimcha holat tekshiruvi", impliesCategoryCode: null },
 ];

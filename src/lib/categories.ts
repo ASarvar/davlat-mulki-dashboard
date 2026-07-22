@@ -9,17 +9,21 @@ export interface CategoryMeta {
   requiresDocument: boolean;
 }
 
+// Tartib foydalanuvchi tomonidan belgilangan: avval INTEGRATION (1–6), keyin MANUAL (7–12).
+// 11–12 (bo'sh turgan) — yagona SAMARASIZ kategoriyalar.
 export const CATEGORIES: CategoryMeta[] = [
-  { code: 1, nameUz: "Bo'lib to'lash sharti bilan sotilgan", short: "Bo'lib to'lash sotuv", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 2, nameUz: "Sotilgan - kadastr hujjati rasmiylashtirilmagan", short: "Sotilgan (hujjatsiz)", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 3, nameUz: "Beg'araz foydalanishga berilgan", short: "Beg'araz foydalanish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 4, nameUz: "Xususiylashtirish va ijaraga berish uchun savdoda turgan", short: "Savdoda (xus./ijara)", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 5, nameUz: "Savdoga chiqarish jarayonida", short: "Savdoga chiqmoqda", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
-  { code: 6, nameUz: "Savdosi to'xtatilgan", short: "Savdo to'xtatilgan", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
-  { code: 7, nameUz: "Foydalanishga yaroqsiz holatda", short: "Yaroqsiz holat", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
-  { code: 8, nameUz: "Chekka hududlarda joylashgan", short: "Chekka hudud", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
-  { code: 9, nameUz: "Bo'sh turgan", short: "Bo'sh turgan", source: "MANUAL", excludeInefficient: false, requiresDocument: true },
-  { code: 10, nameUz: "Bo'sh turgan maydoni mavjud", short: "Bo'sh maydon bor", source: "MANUAL", excludeInefficient: false, requiresDocument: true },
+  { code: 1, nameUz: "Sotilgan (Bo'lib to'lash sharti bilan)", short: "Sotilgan (bo'lib to'lash)", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 2, nameUz: "Sotilgan", short: "Sotilgan", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 3, nameUz: "Tekin foydalanish", short: "Tekin foydalanish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 4, nameUz: "Savdoda xususiylashtirish", short: "Savdoda xususiylashtirish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 5, nameUz: "Savdoda ijara", short: "Savdoda ijara", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 6, nameUz: "Ijara shartnomasi bor", short: "Ijara shartnomasi bor", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 7, nameUz: "Savdoga chiqarish jarayonida", short: "Savdoga chiqmoqda", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
+  { code: 8, nameUz: "Savdosi to'xtatilgan", short: "Savdo to'xtatilgan", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
+  { code: 9, nameUz: "Foydalanishga yaroqsiz holatda", short: "Yaroqsiz holat", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
+  { code: 10, nameUz: "Chekka hududlarda joylashgan", short: "Chekka hudud", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
+  { code: 11, nameUz: "Bo'sh turgan", short: "Bo'sh turgan", source: "MANUAL", excludeInefficient: false, requiresDocument: true },
+  { code: 12, nameUz: "Bo'sh turgan maydoni mavjud", short: "Bo'sh maydon bor", source: "MANUAL", excludeInefficient: false, requiresDocument: true },
 ];
 
 export const CATEGORY_BY_CODE = new Map<number, CategoryMeta>(CATEGORIES.map((c) => [c.code, c]));

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { Building2, Download } from "lucide-react";
+import { Building2, Download, ExternalLink } from "lucide-react";
+import { lotUrl } from "@/server/integrations/auction";
 import { SyncStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authz";
@@ -37,7 +38,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
 
   const canFilterRegion = user.role !== "REGION_USER";
   const [regions, sohaList, result] = await Promise.all([
-    canFilterRegion ? prisma.region.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }) : Promise.resolve([]),
+    canFilterRegion ? prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }) : Promise.resolve([]),
     listSourceNames(),
     listProperties(user, filters, requestedPage),
   ]);
@@ -96,6 +97,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
               <th className="px-4 py-3 font-medium">Hudud</th>
               <th className="px-4 py-3 font-medium">Manzil</th>
               <th className="px-4 py-3 font-medium">Maydon</th>
+              <th className="px-4 py-3 font-medium">Lot</th>
               <th className="px-4 py-3 font-medium">Kategoriya</th>
               <th className="px-4 py-3 font-medium">Samaradorlik</th>
               <th className="px-4 py-3 font-medium">Holat</th>
@@ -104,7 +106,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
           <tbody>
             {result.items.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
                   Obyekt topilmadi. Ma'lumot yuklash uchun sinxronizatsiyani ishga tushiring.
                 </td>
               </tr>
@@ -120,6 +122,23 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
                   <td className="px-4 py-3">{p.regionName}</td>
                   <td className="px-4 py-3 text-muted-foreground">{p.address ?? "—"}</td>
                   <td className="px-4 py-3">{p.area ? `${p.area} m²` : "—"}</td>
+                  <td className="px-4 py-3">
+                    {p.lotNumber ? (
+                      <a
+                        href={lotUrl(p.lotNumber)}
+                        target="_blank"
+                        rel="noreferrer"
+                        title={p.lotStatus ? `${p.lotStatus} — e-auksion.uz da ochish` : "e-auksion.uz da ochish"}
+                        className="inline-flex items-center gap-1 font-medium hover:underline"
+                        style={{ color: "var(--cobalt)" }}
+                      >
+                        {p.lotNumber}
+                        <ExternalLink className="h-3 w-3" />
+                      </a>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="px-4 py-3">
                     <CategoryBadge integrationCode={p.integrationCategoryCode} manualCode={p.manualCategoryCode} />
                   </td>

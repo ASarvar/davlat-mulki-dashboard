@@ -14,34 +14,37 @@ const CATEGORIES: {
   excludeInefficient: boolean;
   requiresDocument: boolean;
 }[] = [
-  { code: 1, nameUz: "Bo'lib to'lash sharti bilan sotilgan", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 2, nameUz: "Sotilgan - kadastr hujjati rasmiylashtirilmagan", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 3, nameUz: "Beg'araz foydalanishga berilgan", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 4, nameUz: "Xususiylashtirish va ijaraga berish uchun savdoda turgan", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
-  { code: 5, nameUz: "Savdoga chiqarish jarayonida", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
-  { code: 6, nameUz: "Savdosi to'xtatilgan", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
-  { code: 7, nameUz: "Foydalanishga yaroqsiz holatda", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
-  { code: 8, nameUz: "Chekka hududlarda joylashgan", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
-  { code: 9, nameUz: "Bo'sh turgan", source: "MANUAL", excludeInefficient: false, requiresDocument: true },
-  { code: 10, nameUz: "Bo'sh turgan maydoni mavjud", source: "MANUAL", excludeInefficient: false, requiresDocument: true },
+  { code: 1, nameUz: "Sotilgan (Bo'lib to'lash sharti bilan)", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 2, nameUz: "Sotilgan", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 3, nameUz: "Tekin foydalanish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 4, nameUz: "Savdoda xususiylashtirish", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 5, nameUz: "Savdoda ijara", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 6, nameUz: "Ijara shartnomasi bor", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
+  { code: 7, nameUz: "Savdoga chiqarish jarayonida", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
+  { code: 8, nameUz: "Savdosi to'xtatilgan", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
+  { code: 9, nameUz: "Foydalanishga yaroqsiz holatda", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
+  { code: 10, nameUz: "Chekka hududlarda joylashgan", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
+  { code: 11, nameUz: "Bo'sh turgan", source: "MANUAL", excludeInefficient: false, requiresDocument: true },
+  { code: 12, nameUz: "Bo'sh turgan maydoni mavjud", source: "MANUAL", excludeInefficient: false, requiresDocument: true },
 ];
 
 // ─── 14 hudud ───
-const REGIONS: { code: string; name: string }[] = [
-  { code: "TAS_CITY", name: "Toshkent shahri" },
-  { code: "TAS", name: "Toshkent viloyati" },
-  { code: "AND", name: "Andijon viloyati" },
-  { code: "FAR", name: "Farg'ona viloyati" },
-  { code: "NAM", name: "Namangan viloyati" },
-  { code: "SAM", name: "Samarqand viloyati" },
-  { code: "BUX", name: "Buxoro viloyati" },
-  { code: "NAV", name: "Navoiy viloyati" },
-  { code: "QAS", name: "Qashqadaryo viloyati" },
-  { code: "SUR", name: "Surxondaryo viloyati" },
-  { code: "JIZ", name: "Jizzax viloyati" },
-  { code: "SIR", name: "Sirdaryo viloyati" },
-  { code: "XOR", name: "Xorazm viloyati" },
-  { code: "QQR", name: "Qoraqalpog'iston Respublikasi" },
+// Tartib rasmiy hisobot shaklidagidek (foydalanuvchi belgilagan) — sortOrder shuni saqlaydi.
+const REGIONS: { code: string; name: string; sortOrder: number }[] = [
+  { code: "QQR", name: "Qoraqalpog'iston Respublikasi", sortOrder: 1 },
+  { code: "AND", name: "Andijon viloyati", sortOrder: 2 },
+  { code: "BUX", name: "Buxoro viloyati", sortOrder: 3 },
+  { code: "JIZ", name: "Jizzax viloyati", sortOrder: 4 },
+  { code: "QAS", name: "Qashqadaryo viloyati", sortOrder: 5 },
+  { code: "NAV", name: "Navoiy viloyati", sortOrder: 6 },
+  { code: "NAM", name: "Namangan viloyati", sortOrder: 7 },
+  { code: "SAM", name: "Samarqand viloyati", sortOrder: 8 },
+  { code: "SUR", name: "Surxondaryo viloyati", sortOrder: 9 },
+  { code: "SIR", name: "Sirdaryo viloyati", sortOrder: 10 },
+  { code: "TAS", name: "Toshkent viloyati", sortOrder: 11 },
+  { code: "FAR", name: "Farg'ona viloyati", sortOrder: 12 },
+  { code: "XOR", name: "Xorazm viloyati", sortOrder: 13 },
+  { code: "TAS_CITY", name: "Toshkent shahri", sortOrder: 14 },
 ];
 
 async function main() {
@@ -55,23 +58,28 @@ async function main() {
   }
   console.log(`✓ ${CATEGORIES.length} ta kategoriya`);
 
-  // Hududlar + har biriga "Ijara markazi" manbasi (placeholder STIR)
+  // Hududlar + (kerak bo'lsa) placeholder manba
+  let created = 0;
   for (const [i, r] of REGIONS.entries()) {
     const region = await prisma.region.upsert({
       where: { code: r.code },
-      update: { name: r.name },
+      update: { name: r.name, sortOrder: r.sortOrder },
       create: r,
     });
-    // Placeholder — real STIR keyin /dashboard/sources orqali kiritiladi.
-    // O'zbekiston STIR'i 9 xonali (validatsiya ham 9 ta raqam talab qiladi).
-    const stir = `300000${String(i + 1).padStart(3, "0")}`;
-    await prisma.organizationSource.upsert({
-      where: { regionId_stir: { regionId: region.id, stir } },
-      update: { name: "Ijara markazi" },
-      create: { name: "Ijara markazi", stir, regionId: region.id },
-    });
+    // Placeholder manba FAQAT hududda hech qanday manba bo'lmaganda yaratiladi.
+    // MUHIM: ilgari bu `upsert` edi va seed qayta ishga tushirilganda real STIR
+    // yonига soxta STIR bilan ikkinchi manba qo'shib yuborardi (sync xato berardi).
+    const existing = await prisma.organizationSource.count({ where: { regionId: region.id } });
+    if (existing === 0) {
+      // O'zbekiston STIR'i 9 xonali (validatsiya ham 9 ta raqam talab qiladi).
+      const stir = `300000${String(i + 1).padStart(3, "0")}`;
+      await prisma.organizationSource.create({
+        data: { name: "Ijara markazi", stir, regionId: region.id },
+      });
+      created++;
+    }
   }
-  console.log(`✓ ${REGIONS.length} ta hudud + ijara markazi manbalari`);
+  console.log(`✓ ${REGIONS.length} ta hudud (yangi placeholder manba: ${created})`);
 
   // Super-admin
   const email = process.env.SEED_ADMIN_EMAIL ?? "admin@davlatmulki.uz";

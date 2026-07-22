@@ -19,7 +19,7 @@ export default async function SourcesPage({ searchParams }: { searchParams: Prom
 
   const [sources, regions, sohaList] = await Promise.all([
     listSources({ regionId, name: soha }),
-    prisma.region.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
     listSourceNames(),
   ]);
 

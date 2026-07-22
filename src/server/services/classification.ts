@@ -5,9 +5,56 @@ export interface StatusResultBySource extends FallbackResult {
   source: StatusApiSource;
 }
 
-// 1–8 kategoriyalar samaradorlik hisobidan chiqariladi (excludeInefficient=true).
+// Samaradorlik hisobidan CHIQARILADIGAN kodlar (excludeInefficient=true).
+// 9–10 (bo'sh turgan) va kategoriyasizlar => SAMARASIZ.
 // Bu ro'yxat Category jadvali bilan mos (seed) — tezkorlik uchun konstanta.
-export const EXCLUDED_CATEGORY_CODES: ReadonlySet<number> = new Set([1, 2, 3, 4, 5, 6, 7, 8]);
+// 1–10 chiqariladi; 11–12 (bo'sh turgan) va kategoriyasizlar => SAMARASIZ.
+export const EXCLUDED_CATEGORY_CODES: ReadonlySet<number> = new Set([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+export const CAT_INSTALLMENT_SOLD = 1; // Sotilgan (bo'lib to'lash sharti bilan)
+export const CAT_SOLD = 2; // Sotilgan
+export const CAT_FREE_USE = 3; // Tekin foydalanish (ijara shartnomasi summasi 0)
+export const CAT_ON_AUCTION = 4; // Savdoda xususiylashtirish
+export const CAT_ON_AUCTION_RENT = 5; // Savdoda ijara
+export const CAT_HAS_RENT = 6; // Ijara shartnomasi bor
+
+/** API 4 dagi `group_name` shu bo'lsa — savdo IJARA uchun, aks holda xususiylashtirish. */
+export const AUCTION_GROUP_RENT = "Davlat mulkini ijaraga berish";
+
+// Auksion (API 3+4) natijasidan integratsiya kategoriyasini aniqlaydi.
+//   order_statuses_id === 6 => SOTILGAN
+//     - order.term_payment === 1 => 1 (bo'lib to'lash sharti bilan sotilgan)
+//     - aks holda                => 2 (sotilgan)
+//   DIQQAT: mezon `term_payment`, details'dagi "tulov_muddati" EMAS —
+//   u bo'lib to'lash bo'lsa ham "" bo'lishi mumkin (foydalanuvchi aniqlagan).
+//   Sotilmagan, lekin HAQIQIY lot mavjud => 4 (savdoda turgan)
+//
+// MUHIM: API 3 obyektni "topdim" (success=true) desa ham, lot_number/order_id null
+// bo'lishi mumkin — masalan status_name="Муаммоли". Bunday obyekt savdoda EMAS,
+// shuning uchun unga kategoriya bermaymiz (qo'lda ko'rib chiqiladi).
+export function deriveAuctionCategory(a: {
+  found: boolean;
+  isSold: boolean;
+  termPayment: number | null;
+  lotNumber: string | null;
+  groupName: string | null;
+}): number | null {
+  if (!a.found) return null;
+  if (a.isSold) {
+    return a.termPayment === 1 ? CAT_INSTALLMENT_SOLD : CAT_SOLD;
+  }
+  // Savdoda turgan: group_name ijara savdosini xususiylashtirishdan ajratadi.
+  if (!a.lotNumber) return null;
+  return a.groupName === AUCTION_GROUP_RENT ? CAT_ON_AUCTION_RENT : CAT_ON_AUCTION;
+}
+
+// API 5 (ijara shartnomalari) natijasidan kategoriya.
+//   shartnoma bor + jami summa 0  => 3  (Tekin foydalanish)
+//   shartnoma bor + summa > 0     => 11 (Ijara shartnomasi bor)
+export function deriveRentCategory(r: { found: boolean; totalSum: number }): number | null {
+  if (!r.found) return null;
+  return r.totalSum === 0 ? CAT_FREE_USE : CAT_HAS_RENT;
+}
 
 // API 3–8 natijalaridan integratsiya kategoriyasini (1–4) aniqlaydi.
 // Bir nechta tekshiruv ijobiy bo'lsa — eng kichik kod (eng yuqori ustuvorlik) tanlanadi.

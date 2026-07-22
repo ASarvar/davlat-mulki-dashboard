@@ -12,7 +12,6 @@ import {
   LogOut,
   Menu,
   X,
-  Landmark,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/app/dashboard/actions";
@@ -52,13 +51,11 @@ export function Sidebar({ user }: { user: SidebarUser }) {
   const inner = (
     <>
       {/* Brend */}
-      <div className="flex items-center gap-3 px-5 py-5">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl shadow-lg" style={{ background: "var(--gold)" }}>
-          <Landmark className="h-5 w-5" style={{ color: "var(--navy)" }} />
-        </div>
+      <div className="grid  place-items-start gap-3 px-5 py-5">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-dm-light.svg" alt="Davlat mulki" className="h-10 w-auto shrink-0" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold leading-tight text-white">Davlat mulki</p>
-          <p className="truncate text-[11px] text-white/50">Monitoring tizimi</p>
+          <p className="truncate text-[16px] text-white/50">Monitoring</p>
         </div>
       </div>
 
@@ -118,10 +115,9 @@ export function Sidebar({ user }: { user: SidebarUser }) {
         style={{ background: "var(--navy)" }}
       >
         <div className="flex items-center gap-2.5">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg" style={{ background: "var(--gold)" }}>
-            <Landmark className="h-4 w-4" style={{ color: "var(--navy)" }} />
-          </div>
-          <span className="text-sm font-semibold text-white">Davlat mulki</span>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/logo-short-light.svg" alt="Davlat mulki" className="h-8 w-auto" />
+          <span className="text-sm font-semibold text-white">Monitoring</span>
         </div>
         <button
           onClick={() => setOpen(true)}

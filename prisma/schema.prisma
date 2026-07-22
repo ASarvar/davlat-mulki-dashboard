@@ -45,6 +45,7 @@ model Region {
   id         String               @id @default(cuid())
   code       String               @unique // masalan "TAS", "SAM"
   name       String // "Toshkent shahri" ...
+  sortOrder  Int                  @default(0) // rasmiy hisobot shaklidagi tartib
   properties Property[]
   users      User[]
   sources    OrganizationSource[]
@@ -121,6 +122,26 @@ model Property {
   manualCategory          Category? @relation("ManualCategory", fields: [manualCategoryCode], references: [code])
   isInefficient           Boolean   @default(false) // 1–8 dan tashqarida => true
 
+  // ── Auksion ma'lumotlari (API 3 + API 4) ──
+  lotNumber          String? // e-auksion lot raqami (havola shu bo'yicha quriladi)
+  lotStatus          String? // "Lot yakunlandi", "Савдода" ...
+  auctionOrderId     Int? // API 4 dagi order_id
+  auctionStatusId    Int? // order_statuses_id (6 => sotilgan)
+  auctionStatus      String? // "Auksion muvaffaqiyatli yakunlandi" ...
+  termPayment        Int? // order.term_payment (1 => BO'LIB TO'LASH — asosiy mezon)
+  paymentTermMonths  Int? // order.term_month / details "tulov_muddati" (faqat ko'rsatish uchun)
+  auctionCheckedAt   DateTime?
+  auctionGroupName   String? // API 4 group_name (ijara savdosi / xususiylashtirish)
+
+  // ── Ijara shartnomalari (API 5) — tafsilotlar RentContract jadvalida ──
+  rentContractCount  Int? // nechta ijara shartnomasi bor
+  rentTotalSum       Decimal? @db.Decimal(18, 2) // jami summa (0 => tekin foydalanish)
+  rentTotalArea      Decimal? @db.Decimal(14, 2) // jami ijara maydoni (kv.m)
+  /** Ijara ma'lumoti ESKI kadastr raqami orqali topilganmi. */
+  rentMatchedByOldCad Boolean @default(false)
+  rentCheckedAt      DateTime?
+  rentContracts      RentContract[]
+
   // Sinxronizatsiya holati
   syncStatus    SyncStatus @default(PENDING)
   lastSyncedAt  DateTime?
@@ -140,7 +161,33 @@ model Property {
   @@index([syncStatus])
   @@index([integrationCategoryCode])
   @@index([manualCategoryCode])
+  @@index([lotNumber])
   // pg_trgm GIN indekslari migratsiyada qo'lda qo'shiladi (prisma/migrations/*_pg_trgm)
+}
+
+// Ijara shartnomalari (API 5). Bitta kadastrda bir nechta shartnoma bo'lishi mumkin
+// (real ma'lumotda maksimal 18 tagacha uchradi).
+model RentContract {
+  id             String    @id @default(cuid())
+  propertyId     String
+  property       Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  contractNumber String?
+  contractDate   DateTime?
+  contractSum    Decimal?  @db.Decimal(18, 2)
+  rentalArea     Decimal?  @db.Decimal(14, 2)
+  ownerTin       String?
+  ownerName      String?
+  tenantTin      String?
+  tenantName     String?
+  docLink        String?
+  regionName     String?
+  districtName   String?
+  /** Shu shartnoma ESKI kadastr raqami orqali topilganmi. */
+  matchedByOldCad Boolean  @default(false)
+  createdAt      DateTime  @default(now())
+
+  @@index([propertyId])
+  @@index([contractNumber])
 }
 
 // API 3–8 natijalari (har bir manba uchun bitta qator)

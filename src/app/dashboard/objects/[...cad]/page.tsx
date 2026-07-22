@@ -9,8 +9,11 @@ import {
   Tag,
   History,
   ExternalLink,
+  Gavel,
+  KeyRound,
   type LucideIcon,
 } from "lucide-react";
+import { lotUrl } from "@/server/integrations/auction";
 import { requireUser } from "@/lib/authz";
 import { getPropertyDetail } from "@/server/services/properties";
 import { pathToCad } from "@/lib/cadastre";
@@ -104,6 +107,142 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
               <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">Sync xatosi: {p.lastSyncError}</p>
             ) : null}
           </div>
+
+          {/* Auksion ma'lumotlari (API 3 + API 4) */}
+          {p.lotNumber || p.auctionStatus ? (
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <div className="mb-4">
+                <SectionTitle icon={Gavel}>Auksion ma'lumotlari</SectionTitle>
+              </div>
+              <dl className="grid grid-cols-2 gap-4 md:grid-cols-3">
+                <div>
+                  <dt className="text-xs text-muted-foreground">Lot raqami</dt>
+                  <dd className="mt-0.5 text-sm">
+                    {p.lotNumber ? (
+                      <a
+                        href={lotUrl(p.lotNumber)}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 font-medium hover:underline"
+                        style={{ color: "var(--cobalt)" }}
+                        title="e-auksion.uz da ochish"
+                      >
+                        {p.lotNumber}
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </a>
+                    ) : (
+                      "—"
+                    )}
+                  </dd>
+                </div>
+                <Field label="Lot holati" value={p.lotStatus} />
+                <Field label="Auksion holati" value={p.auctionStatus} />
+                <Field label="Savdo turi" value={p.auctionGroupName} />
+                <Field
+                  label="To'lov muddati"
+                  value={p.paymentTermMonths ? `${p.paymentTermMonths} oy (bo'lib to'lash)` : null}
+                />
+                <Field label="Order ID" value={p.auctionOrderId} />
+                <Field
+                  label="Tekshirilgan"
+                  value={p.auctionCheckedAt ? p.auctionCheckedAt.toLocaleString("uz") : null}
+                />
+              </dl>
+            </div>
+          ) : null}
+
+          {/* Ijara shartnomalari (API 5) — bitta kadastrda bir nechta bo'lishi mumkin */}
+          {p.rentContractCount != null ? (
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <SectionTitle icon={KeyRound}>
+                  Ijara shartnomalari ({p.rentContracts.length})
+                </SectionTitle>
+                {p.rentMatchedByOldCad ? (
+                  <span className="rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                    Eski kadastr orqali topilgan
+                  </span>
+                ) : null}
+              </div>
+
+              <dl className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+                <Field label="Shartnomalar soni" value={p.rentContractCount} />
+                <Field
+                  label="Jami summa"
+                  value={
+                    p.rentTotalSum != null
+                      ? Number(p.rentTotalSum) === 0
+                        ? "0 (tekin foydalanish)"
+                        : `${Number(p.rentTotalSum).toLocaleString("uz")} so'm`
+                      : null
+                  }
+                />
+                <Field
+                  label="Jami maydon"
+                  value={p.rentTotalArea != null ? `${Number(p.rentTotalArea).toLocaleString("uz")} m²` : null}
+                />
+                <Field label="Tekshirilgan" value={p.rentCheckedAt ? p.rentCheckedAt.toLocaleString("uz") : null} />
+              </dl>
+
+              {p.rentContracts.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-slate-50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                        <th className="px-3 py-2 font-medium">Shartnoma</th>
+                        <th className="px-3 py-2 font-medium">Sana</th>
+                        <th className="px-3 py-2 text-right font-medium">Summa</th>
+                        <th className="px-3 py-2 text-right font-medium">Maydon</th>
+                        <th className="px-3 py-2 font-medium">Ijarachi</th>
+                        <th className="px-3 py-2 font-medium">Hujjat</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {p.rentContracts.map((c) => (
+                        <tr key={c.id} className="border-b border-border last:border-0 hover:bg-slate-50/60">
+                          <td className="px-3 py-2 font-medium">
+                            {c.contractNumber ?? "—"}
+                            {c.matchedByOldCad ? (
+                              <span className="ml-1.5 rounded bg-amber-50 px-1 py-0.5 text-[10px] text-amber-700">
+                                eski kad.
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {c.contractDate ? c.contractDate.toLocaleDateString("uz") : "—"}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {c.contractSum != null ? Number(c.contractSum).toLocaleString("uz") : "—"}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {c.rentalArea != null ? `${Number(c.rentalArea).toLocaleString("uz")} m²` : "—"}
+                          </td>
+                          <td className="px-3 py-2">{c.tenantName ?? "—"}</td>
+                          <td className="px-3 py-2">
+                            {c.docLink ? (
+                              <a
+                                href={c.docLink}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 hover:underline"
+                                style={{ color: "var(--cobalt)" }}
+                              >
+                                Ko'rish <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : (
+                              "—"
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Shartnoma topilmadi.</p>
+              )}
+            </div>
+          ) : null}
 
           {/* Integratsiya holat tekshiruvlari (API 3–8) */}
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">

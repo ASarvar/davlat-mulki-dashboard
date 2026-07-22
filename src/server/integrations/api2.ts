@@ -31,6 +31,18 @@ export type Api2Result = { ok: true; data: PropertyBaseData } | { ok: false; rea
 
 const API2_SUCCESS_CODE = 1;
 
+// API 2 rate-limitga urilganda code=90000 "Message throttled out" qaytaradi.
+// Bu VAQTINCHALIK xato — uni "topilmadi" deb yozib qo'ysak, obyekt ma'lumotsiz qoladi.
+// Shuning uchun xato tashlaymiz: http.ts retry/backoff qiladi, job qayta uriniladi.
+const API2_THROTTLED_CODE = 90000;
+
+export class Api2ThrottledError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "Api2ThrottledError";
+  }
+}
+
 // Bo'sh satrni null'ga aylantiradi — cad_number_old uchun KRITIK:
 // aks holda fallback API 3–8 ga bo'sh kadastr bilan murojaat qilardi.
 function str(v: unknown): string | null {
@@ -58,10 +70,20 @@ export async function fetchPropertyBase(cadNumber: string): Promise<Api2Result> 
       path: API2.path,
       query: { num: cadNumber, token: API2.token },
       rateKey: "API2",
+      // Throttle => http.ts backoff bilan qayta uriniladi (fail deb yozilmaydi).
+      shouldRetry: (d) => {
+        const r = d as Api2Response | null;
+        return r?.code === API2_THROTTLED_CODE || /throttl/i.test(r?.message ?? "");
+      },
     });
   } catch (err) {
     if (err instanceof NotFoundError) return { ok: false, reason: "API2: obyekt topilmadi (404)" };
     throw err; // tarmoq/5xx — job xato bo'lib qayta urinadi
+  }
+
+  // Rate-limit => qayta urinish uchun xato tashlaymiz (fail deb yozmaymiz).
+  if (res.code === API2_THROTTLED_CODE || /throttl/i.test(res.message ?? "")) {
+    throw new Api2ThrottledError(`API2 rate-limit: [${res.code}] ${res.message ?? "throttled"}`);
   }
 
   if (res.code !== API2_SUCCESS_CODE) {

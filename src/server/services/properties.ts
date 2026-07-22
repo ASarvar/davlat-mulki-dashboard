@@ -68,6 +68,8 @@ export interface PropertyListItem {
   manualCategoryCode: number | null;
   isInefficient: boolean;
   syncStatus: SyncStatus;
+  lotNumber: string | null;
+  lotStatus: string | null;
 }
 
 export interface PropertyListResult {
@@ -106,6 +108,8 @@ export async function listProperties(
       manualCategoryCode: true,
       isInefficient: true,
       syncStatus: true,
+      lotNumber: true,
+      lotStatus: true,
       region: { select: { name: true } },
     },
   });
@@ -125,6 +129,8 @@ export async function listProperties(
       manualCategoryCode: r.manualCategoryCode,
       isInefficient: r.isInefficient,
       syncStatus: r.syncStatus,
+      lotNumber: r.lotNumber,
+      lotStatus: r.lotStatus,
     })),
   };
 }
@@ -143,6 +149,14 @@ export interface PropertyExportRow {
   isInefficient: boolean;
   syncStatus: string;
   lastSyncedAt: Date | null;
+  lotNumber: string | null;
+  lotStatus: string | null;
+  paymentTermMonths: number | null;
+  auctionGroupName: string | null;
+  rentContractCount: number | null;
+  rentTotalSum: number | null;
+  rentTotalArea: number | null;
+  rentMatchedByOldCad: boolean;
 }
 
 // Eksport uchun keyset bo'yicha bo'lak-bo'lak o'qish — 80k qatorni
@@ -174,6 +188,14 @@ export async function* iteratePropertiesForExport(
         isInefficient: true,
         syncStatus: true,
         lastSyncedAt: true,
+        lotNumber: true,
+        lotStatus: true,
+        paymentTermMonths: true,
+        auctionGroupName: true,
+        rentContractCount: true,
+        rentTotalSum: true,
+        rentTotalArea: true,
+        rentMatchedByOldCad: true,
         region: { select: { name: true } },
         source: { select: { name: true } },
       },
@@ -194,6 +216,14 @@ export async function* iteratePropertiesForExport(
       isInefficient: r.isInefficient,
       syncStatus: r.syncStatus,
       lastSyncedAt: r.lastSyncedAt,
+      lotNumber: r.lotNumber,
+      lotStatus: r.lotStatus,
+      paymentTermMonths: r.paymentTermMonths,
+      auctionGroupName: r.auctionGroupName,
+      rentContractCount: r.rentContractCount,
+      rentTotalSum: r.rentTotalSum ? Number(r.rentTotalSum) : null,
+      rentTotalArea: r.rentTotalArea ? Number(r.rentTotalArea) : null,
+      rentMatchedByOldCad: r.rentMatchedByOldCad,
     }));
 
     if (rows.length < batchSize) return;
@@ -211,6 +241,7 @@ export async function getPropertyDetail(user: SessionUser, cadNumber: string) {
       integrationCategory: true,
       manualCategory: true,
       statusChecks: { orderBy: { apiSource: "asc" } },
+      rentContracts: { orderBy: [{ contractDate: "desc" }, { contractNumber: "asc" }] },
       documents: { orderBy: { createdAt: "desc" } },
       assignments: {
         orderBy: { createdAt: "desc" },

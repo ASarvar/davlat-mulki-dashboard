@@ -25,9 +25,23 @@ const schema = z.object({
   API2_BASE_URL: z.string().url().optional(),
   API2_PATH: z.string().default(""),
   API2_TOKEN: z.string().optional(),
+  // API 3 va 4 — auksion zanjiri, ikkalasi ham BASIC AUTH (bir xil user/parol).
+  // API 3: kadastr -> lot + order_id (POST). API 4: order_id -> to'liq auksion ma'lumoti.
   API3_BASE_URL: z.string().url().optional(),
   API4_BASE_URL: z.string().url().optional(),
+  AUCTION_API_USER: z.string().optional(),
+  AUCTION_API_PASSWORD: z.string().optional(),
+  // So'rov parametrlari nomi — real API tasdiqlanmaguncha sozlanadigan qoldiramiz
+  // (API 1 da javobdagi `inn` emas, `num` bo'lib chiqqan edi — taxminga tayanmaymiz).
+  // Jonli tasdiqlangan: API 3 = POST body {cad_number}, API 4 = GET ?order=<order_id>
+  API3_PARAM: z.string().default("cad_number"),
+  API4_PARAM: z.string().default("order"),
+  // API 5 — ijara shartnomalari (Basic auth, POST + kadastr)
   API5_BASE_URL: z.string().url().optional(),
+  API5_USERNAME: z.string().optional(),
+  API5_PASSWORD: z.string().optional(),
+  // Jonli tasdiqlangan: API 5 POST body parametri `cadastre_number`
+  API5_PARAM: z.string().default("cadastre_number"),
   API6_BASE_URL: z.string().url().optional(),
   API7_BASE_URL: z.string().url().optional(),
   API8_BASE_URL: z.string().url().optional(),

@@ -28,7 +28,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
 
   const [users, regions, activeAdmins] = await Promise.all([
     listUsers({ regionId, role }),
-    prisma.region.findMany({ orderBy: { name: "asc" }, select: { id: true, name: true } }),
+    prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
     prisma.user.count({ where: { role: "SUPER_ADMIN", isActive: true } }),
   ]);
 
