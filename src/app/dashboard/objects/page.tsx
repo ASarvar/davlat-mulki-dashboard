@@ -26,7 +26,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   const inefficientStr = str(sp.inefficient);
   const fullyRentedStr = str(sp.fullyRented);
   const hasRentContractStr = str(sp.hasRentContract);
-  const bothAuctionsStr = str(sp.bothAuctions);
+  const onAnyAuctionStr = str(sp.onAnyAuction);
   const requestedPage = Number(str(sp.page) ?? 1);
   const statusRaw = str(sp.status);
   const syncStatus = statusRaw && statusRaw in SyncStatus ? (statusRaw as SyncStatus) : undefined;
@@ -40,7 +40,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     syncStatus,
     fullyRented: fullyRentedStr === "1" ? true : undefined,
     hasRentContract: hasRentContractStr === "1" ? true : undefined,
-    bothAuctions: bothAuctionsStr === "1" ? true : undefined,
+    onAnyAuction: onAnyAuctionStr === "1" ? true : undefined,
   };
 
   // "Bo'sh maydoni bor" (kat 12) filtri tanlansa, maydon ustunida bo'sh maydon ko'rsatiladi.
@@ -62,7 +62,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   if (inefficientStr) baseParams.set("inefficient", inefficientStr);
   if (fullyRentedStr) baseParams.set("fullyRented", fullyRentedStr);
   if (hasRentContractStr) baseParams.set("hasRentContract", hasRentContractStr);
-  if (bothAuctionsStr) baseParams.set("bothAuctions", bothAuctionsStr);
+  if (onAnyAuctionStr) baseParams.set("onAnyAuction", onAnyAuctionStr);
 
   const exportHref = `/api/export/objects?${baseParams.toString()}`;
 

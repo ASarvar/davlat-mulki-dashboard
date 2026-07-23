@@ -167,7 +167,7 @@ export default async function DashboardPage() {
                       <th
                         className="border-l border-border px-2 py-2 text-center align-bottom font-bold"
                         rowSpan={2}
-                        title="Bir vaqtda ham xususiylashtirish, ham ijara savdosida turgan obyektlar"
+                        title="Xususiylashtirish yoki ijara savdosida turgan obyektlar (ikkalasida ham bo'lgan obyekt faqat bir marta sanaladi)"
                       >
                         <span className="block text-[12px] font-medium normal-case leading-tight">Auksion savdolarida (Xususiy. va Ijara)</span>
                       </th>
@@ -226,7 +226,7 @@ export default async function DashboardPage() {
                     ))}
                     {c.code === 4 ? (
                       <td className="border-l border-border px-2 py-3 text-center tabular-nums" style={{ color: "#b91c1c" }}>
-                        {nf(s.byRegionCategory.reduce((a, r) => a + r.rentBreakdown.bothAuctions.count, 0))}
+                        {nf(s.byRegionCategory.reduce((a, r) => a + r.rentBreakdown.onAnyAuction.count, 0))}
                       </td>
                     ) : null}
                     {c.code === 6 ? (
@@ -283,15 +283,15 @@ export default async function DashboardPage() {
                       })}
                       {c.code === 4 ? (
                         <td className="border-l border-border px-2 py-2.5 text-center tabular-nums">
-                          {r.rentBreakdown.bothAuctions.count === 0 ? (
+                          {r.rentBreakdown.onAnyAuction.count === 0 ? (
                             <span className="text-slate-300">0</span>
                           ) : (
                             <Link
-                              href={`/dashboard/objects?region=${r.regionId}&bothAuctions=1`}
+                              href={`/dashboard/objects?region=${r.regionId}&onAnyAuction=1`}
                               className="hover:underline"
                               style={{ color: "var(--cobalt)" }}
                             >
-                              {nf(r.rentBreakdown.bothAuctions.count)}
+                              {nf(r.rentBreakdown.onAnyAuction.count)}
                             </Link>
                           )}
                         </td>
@@ -351,9 +351,9 @@ export default async function DashboardPage() {
           biriga tegishli obyektlar soni (ikkalasi bir-birini istisno qiladi).
         </p> */}
         <p className="mt-1 text-xs text-muted-foreground">
-          <strong>Auksion savdolarida</strong> — bir vaqtda ham{" "}
-          <strong>Savdoda xususiylashtirish</strong>, ham <strong>Savdoda ijara</strong> savdosida
-          turgan obyektlar soni.
+          <strong>Auksion savdolarida (Xususiy. va Ijara)</strong> — <strong>Savdoda xususiylashtirish</strong>{" "}
+          yoki <strong>Savdoda ijara</strong> savdosida turgan obyektlar soni; ikkalasida ham bo'lgan
+          obyekt faqat bir marta sanaladi.
         </p>
       </section>
 

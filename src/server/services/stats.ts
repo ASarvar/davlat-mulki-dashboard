@@ -59,8 +59,12 @@ export interface RegionCategoryRow {
     /** Savdodagi lotlar — obyekt ikkalasida ham bo'lishi mumkin (kat 3 va 4). */
     privatizationLot: { count: number; rentContracts: number; rentedObjects: number };
     rentLot: { count: number; area: number; rentContracts: number; rentedObjects: number };
-    /** Bir vaqtda HAM xususiylashtirish, HAM ijara savdosida (hasPrivatizationLot AND hasRentLot). */
-    bothAuctions: { count: number };
+    /**
+     * Xususiylashtirish YOKI ijara savdosida turgan obyektlar (hasPrivatizationLot OR hasRentLot) —
+     * ikkalasida ham bo'lgan obyekt FAQAT BIR marta sanaladi (kat3.count + kat4.count emas, chunki
+     * 44 ta obyekt ikkalasida ham bor — qo'shsak ikki marta hisoblanardi).
+     */
+    onAnyAuction: { count: number };
     /** Kat 1 (Sotilgan, bo'lib to'lash) obyektlaridan ijara shartnomasi borlari soni. */
     installmentSoldRented: { count: number };
     /** Kat 7 (Savdoga chiqarish jarayonida) obyektlaridan ijara shartnomasi borlari soni. */
@@ -160,7 +164,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
       fullyRentedCount: bigint;
       privLotRentedObjects: bigint; rentLotOnlyRentedObjects: bigint;
       cat1RentedObjects: bigint; cat7RentedObjects: bigint;
-      bothAuctionsCount: bigint;
+      onAnyAuctionCount: bigint;
     }[]
   >(`
     WITH r AS (
@@ -195,8 +199,8 @@ async function computeDashboardStats(): Promise<DashboardStats> {
            COUNT(*)      FILTER (WHERE priv)    AS "privLotCount",
            COUNT(*)      FILTER (WHERE rentlot) AS "rentLotCount",
            COALESCE(SUM(lotarea) FILTER (WHERE rentlot), 0) AS "rentLotArea",
-           -- Bir vaqtda HAM xususiylashtirish, HAM ijara savdosida (kat 3/4 kesishmasi).
-           COUNT(*)      FILTER (WHERE priv AND rentlot) AS "bothAuctionsCount",
+           -- Xususiylashtirish YOKI ijara savdosida (birlashma, takror sanalmaydi).
+           COUNT(*)      FILTER (WHERE priv OR rentlot) AS "onAnyAuctionCount",
            -- Ijara shartnoma soni kat 3/4 ustunlari uchun: xususiylashtirish lotida bo'lsa
            -- (ijara lotida ham bo'lsa ham) kat 3 ga, faqat ijara lotida bo'lsa kat 4 ga.
            COALESCE(SUM(cnt) FILTER (WHERE priv), 0) AS "privLotContracts",
@@ -277,7 +281,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
         },
         installmentSoldRented: { count: Number(rr?.cat1RentedObjects ?? 0) },
         onAuctionProcessRented: { count: Number(rr?.cat7RentedObjects ?? 0) },
-        bothAuctions: { count: Number(rr?.bothAuctionsCount ?? 0) },
+        onAnyAuction: { count: Number(rr?.onAnyAuctionCount ?? 0) },
       },
     };
   });

@@ -28,7 +28,9 @@ export async function GET() {
   for (const c of columns) {
     exportCols.push({ title: `${c.code}. ${c.nameUz}`, subs: c.subs });
     if (c.code === 4) {
-      exportCols.push(standaloneCol("Auksion savdolarida", (r) => r.rentBreakdown.bothAuctions.count));
+      exportCols.push(
+        standaloneCol("Auksion savdolarida (Xususiy. va Ijara)", (r) => r.rentBreakdown.onAnyAuction.count),
+      );
     }
     if (c.code === 6) {
       exportCols.push(

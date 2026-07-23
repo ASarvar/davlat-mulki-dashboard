@@ -21,8 +21,8 @@ export interface PropertyFilters {
   fullyRented?: boolean;
   /** Ijara shartnomasi bor — tekin foydalanish yoki pullik, ikkisidan biri. Kategoriyaga bog'liq emas. */
   hasRentContract?: boolean;
-  /** Bir vaqtda HAM xususiylashtirish, HAM ijara savdosida (kat 3 va 4 kesishmasi). */
-  bothAuctions?: boolean;
+  /** Xususiylashtirish YOKI ijara savdosida (kat 3 va 4 birlashmasi, takror sanalmaydi). */
+  onAnyAuction?: boolean;
 }
 
 const PAGE_SIZE = 20;
@@ -98,8 +98,8 @@ export function buildWhere(user: SessionUser, f: PropertyFilters): Prisma.Proper
       ],
     });
   }
-  // "Auksion savdolarida" ustuni — bir vaqtda HAM xususiylashtirish, HAM ijara savdosida.
-  if (f.bothAuctions) and.push({ hasPrivatizationLot: true, hasRentLot: true });
+  // "Auksion savdolarida (Xususiy. va Ijara)" ustuni — xususiylashtirish YOKI ijara savdosida.
+  if (f.onAnyAuction) and.push({ OR: [{ hasPrivatizationLot: true }, { hasRentLot: true }] });
 
   if (typeof f.inefficient === "boolean") and.push({ isInefficient: f.inefficient });
   if (f.syncStatus) and.push({ syncStatus: f.syncStatus });

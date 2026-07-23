@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   const category = sp.get("category");
   const fullyRented = sp.get("fullyRented");
   const hasRentContract = sp.get("hasRentContract");
-  const bothAuctions = sp.get("bothAuctions");
+  const onAnyAuction = sp.get("onAnyAuction");
 
   const filters: PropertyFilters = {
     q: sp.get("q")?.trim() || undefined,
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     syncStatus: statusRaw && statusRaw in SyncStatus ? (statusRaw as SyncStatus) : undefined,
     fullyRented: fullyRented === "1" ? true : undefined,
     hasRentContract: hasRentContract === "1" ? true : undefined,
-    bothAuctions: bothAuctions === "1" ? true : undefined,
+    onAnyAuction: onAnyAuction === "1" ? true : undefined,
   };
 
   const passThrough = new PassThrough();

@@ -145,9 +145,13 @@ bo'yicha, lot bayrog'iga bog'liq emas. SQL: `privLotRentedObjects`, `rentLotOnly
 ⚠️ **Kategoriyaga bog'liq bo'lmagan qo'shimcha ustunlar** — `buildDashboardColumns()`ning natijasi
 EMAS (u faqat 1–12 kategoriya ustunlarini beradi), balki `dashboard/page.tsx` va
 `/api/export/dashboard-categories`da **qo'lda**, aniq joyga qo'shiladi:
-- **"Auksion savdolarida"** — kat 4 ("Savdoda ijara") ustunidan DARHOL KEYIN joylashadi. Bir vaqtda
-  HAM `hasPrivatizationLot`, HAM `hasRentLot` (`rentBreakdown.bothAuctions` — kat 3/4 kesishmasi,
-  real ma'lumotda 44 ta). Ro'yxat filtri: `PropertyFilters.bothAuctions`.
+- **"Auksion savdolarida (Xususiy. va Ijara)"** — kat 4 ("Savdoda ijara") ustunidan DARHOL KEYIN
+  joylashadi. `hasPrivatizationLot` **YOKI** `hasRentLot` (`rentBreakdown.onAnyAuction` — kat 3/4
+  BIRLASHMASI, kesishma EMAS). ⚠️ Foydalanuvchi buni ikki bosqichda aniqlashtirdi: avval "bir
+  vaqtda ikkalasida ham" (kesishma, 44 ta) deb so'ralgan va shunday qilingan, keyin "ikkalasiga ham
+  tegishli bo'lsa faqat bittasini qo'sh" deb tuzatilgan — bu birlashma (AND emas, OR) ekanini
+  bildiradi: kat3 (525) + kat4 (69) − kesishma (44) = 550. Ro'yxat filtri:
+  `PropertyFilters.onAnyAuction` → `{ OR: [{ hasPrivatizationLot: true }, { hasRentLot: true }] }`.
 - **"Ijaraga berilgan obyektlar"** — kat 6 ("Ijara shartnomasi bor") ustunidan DARHOL KEYIN
   joylashadi. Qiymati: `counts["5"] + counts["6"]` — ya'ni FAQAT effektiv kategoriyasi 5 yoki 6
   bo'lgan obyektlar (`rentBreakdown.onlyFreeOrPaidCategory`). ⚠️ Kat 5/6 ustunlarining o'z "Soni"si
