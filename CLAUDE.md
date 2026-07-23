@@ -71,10 +71,23 @@ sozlanadi (`API3_PARAM`, `API4_PARAM`, `API5_PARAM`). API 1 da javobda `inn`, so
   ham `land_area` dan olinadi. Real ma'lumotda 84 holatdan 81 tasi shu bilan tuzaldi, 13 tasida
   `land_area` ham yetarli emas. `Property.vacantArea` = `GREATEST(foydali − ijarada, 0)` ustun sifatida
   saqlanadi (Prisma ikki ustunni solishtira olmaydi, filtr uchun kerak).
+  ⚠️ Obyekt sahifasida (`/dashboard/objects/[...cad]`) "Binoning umumiy maydoni"/"Foydali maydon"
+  `Property.area`/`buildingArea` emas, `rawApi2.object_area_p`/`object_area_u`dan **to'g'ridan-to'g'ri**
+  o'qiladi — chunki DB ustunlari yuqoridagi `land_area` tuzatishi bilan almashtirilgan bo'lishi mumkin,
+  bu yerda esa API 2 ning xom qiymati ko'rsatilishi kerak. Karta ostidagi "Barcha kadastr ma'lumotlari"
+  kengaytmasi (`CadastreRawData.tsx`) barcha `land_area*`/`object_area*` maydonlarini xom holda
+  ko'rsatadi — suffikslar (`_i`, `_b`, `_f`, `_z`, `_d`, `_bd`, `_nz`, `_legal`) ma'nosi jonli javobda
+  hujjatlashtirilmagan, shuning uchun taxmin qilib nomlanmagan.
 - **Kadastr raqamlarida `/` bor** (`10:11:01:01:01:5030/03`) — obyekt sahifasi catch-all
   `/dashboard/objects/[...cad]`, URL qurish faqat `src/lib/cadastre.ts` orqali.
 - Xom javoblar `ObjectStatusCheck.rawResponse` va `Property.rawApi2` da saqlanadi — **shuni saqlashda
   davom eting**: mantiq o'zgarsa API'ni qayta chaqirmasdan qayta hisoblash mumkin (7 daqiqa → 2 soniya).
+- **API 4 (`order`) maydonlari:** `start_price` va `auction_date` bor, lekin **maydon yo'q** — aksincha
+  API 6 (ijara) dan farqli, `auction_date` jonli javobda ISO **emas**, `"DD.MM.YYYY HH:mm:ss"` formatida
+  (`parseApi4Date`, `auction.ts`). Maydon `details[key="hudud_kvm_2"]` da keladi va ko'pincha toza son
+  emas — erkin matn: `"Huquqiy hujjatga asosan 1048,93 (Amalda 1112,23)"` yoki
+  `"Umumiy maydoni: 47,0 kv.m."` (real ma'lumotda ~48% holat). `parseAreaText()` ikkita raqam bo'lsa
+  **"Amalda"** (haqiqiy o'lchangan) qiymatini ustuvor oladi — foydalanuvchi tasdiqlagan tanlov.
 
 ## Kategoriyalar (12 ta, `src/lib/categories.ts` + `prisma/seed.ts`)
 
@@ -107,10 +120,37 @@ mumkin va o'sha ustunlarda ko'rinishi kerak. Shuning uchun ustunlar yig'indisi "
 ⚠️ **`buildWhere()` ham shu mantiqni takrorlashi shart** — aks holda jadvaldagi raqamni bosganda
 ro'yxat bo'sh chiqadi. Kod: kat 3 → `hasPrivatizationLot`, kat 4 → `hasRentLot`, kat 5 → `rentTotalSum = 0`,
 kat 6 → `> 0`, kat 12 → `vacantArea > 0`.
-Jadval ustunlari kengaytirilgan (`COLUMNS` → `subs`, ikki qatorli sarlavha):
-5/6 → **soni · foydali · ijarada · bo'sh**, 11 → **soni · foydali**, 12 → **soni · bo'sh**,
-qolganlari bitta "soni" ustuni. Maydonlar **ming m²** da; faqat "soni" katagi ro'yxatga havola.
-`/dashboard/objects?category=12` da "Maydon" ustuni "Bo'sh maydon"ga almashadi.
+Jadval ustunlari kengaytirilgan (`stats.ts` → `buildDashboardColumns()`, ikki qatorli sarlavha):
+3 → **soni · ijara shartnoma soni**, 4 → **soni · maydon · ijara shartnoma soni**, 5/6 → **soni ·
+foydali · ijarada · bo'sh**, 11 → **soni · foydali**, 12 → **soni · bo'sh**, qolganlari bitta "soni"
+ustuni. Sahifada (`dashboard/page.tsx`) maydonlar **ming m²** da ko'rsatiladi; faqat "soni" katagi
+ro'yxatga havola. `/dashboard/objects?category=12` da "Maydon" ustuni "Bo'sh maydon"ga almashadi.
+⚠️ `buildDashboardColumns()` **markazlashtirilgan** — sahifa va `/api/export/dashboard-categories`
+(Excel eksporti) bir xil funksiyani chaqiradi (`buildWhere()` bilan bir xil printsip); ustun
+qo'shsangiz/o'zgartirsangiz ikkalasi ham avtomatik yangilanadi.
+⚠️ **Kat 3/4 "Ijara shartnoma soni"** — `rentContractCount` (API 5) EFFEKTIV kategoriyadan emas,
+`hasPrivatizationLot`/`hasRentLot` bayroqlaridan taqsimlanadi (foydalanuvchi tasdiqlagan qoida):
+obyekt xususiylashtirish lotida bo'lsa (ijara lotida ham bo'lsa ham) — kat 3 ga; **faqat** ijara
+lotida bo'lsa — kat 4 ga. Ikkalasida ham lot yo'q bo'lsa (masalan faqat ijara shartnomasi, lot yo'q)
+hech qaysi ustunga qo'shilmaydi. SQL: `SUM(cnt) FILTER (WHERE priv)` / `SUM(cnt) FILTER (WHERE rentlot
+AND NOT priv)` (`stats.ts` → `rentRaw`).
+
+⚠️ **Kat 1/3/4/7 "Ijaraga berilgan obyektlar soni"** — yuqoridagi "Ijara shartnoma soni" bilan
+ARALASHTIRMANG: bu yerda **obyektlar soni** (`COUNT(*)`), u yerda **shartnomalar yig'indisi**
+(`SUM(cnt)`). Kat 3/4 taqsimoti bir xil qoida (priv → kat 3, faqat rentlot → kat 4). Kat 1 (Sotilgan,
+bo'lib to'lash) va kat 7 (Savdoga chiqarish jarayonida) — effektiv kategoriya (`cat = 1` / `cat = 7`)
+bo'yicha, lot bayrog'iga bog'liq emas. SQL: `privLotRentedObjects`, `rentLotOnlyRentedObjects`,
+`cat1RentedObjects`, `cat7RentedObjects` (`stats.ts` → `rentRaw`).
+
+⚠️ **Jadval oxiridagi "To'liq ijara berilgan" ustuni** kategoriyaga bog'liq emas (COLUMNS'dan tashqari,
+"Jami" ustuniga o'xshab alohida qo'shilgan): shartnoma bor (tekin foydalanish yoki pullik, ikkisidan
+biri yoki ikkisi birga) VA `vacantArea = 0` (foydali maydon to'liq band). SQL: `COUNT(*) FILTER (WHERE
+cnt > 0 AND vacant = 0)` (`stats.ts` → `rentRaw` → `fullyRentedCount`). Ro'yxat filtri:
+`PropertyFilters.fullyRented` → `buildWhere()` da `{ rentContractCount: { gt: 0 }, vacantArea: 0 }`;
+`/dashboard/objects?fullyRented=1` va uning eksporti (`/api/export/objects`) ham shu filtrni qo'llaydi.
+Excel eksportida (`/api/export/dashboard-categories`) ustun indeksi kategoriya ustunlari sonidan
+**dinamik** hisoblanadi (`fullyRentedColIdx = colIdx` sikldan keyin) — kategoriyalar soni o'zgarsa
+(masalan biri izohga olinsa/qo'shilsa) qayta hisoblashga hojat yo'q.
 
 Aniqlash qoidalari (`classification.ts` → `deriveAuctionCategory`, tartib muhim):
 1. `order_statuses_id === 6` ⇒ sotilgan; `term_payment === 1` ⇒ kat 1, aks holda kat 2
@@ -138,7 +178,9 @@ Kategoriya kodini o'zgartirishdan oldin `manualCategoryCode` ishlatilganini teks
    To'g'ri tartib: serverni to'xtatish → `.next` o'chirish → qayta ishga tushirish.
 3. **`prisma generate`** dev server ishlab turганда Windows'da EPERM beradi — avval to'xtating.
 4. **`db:seed` ni jonli bazada ehtiyot bilan** — u `upsert` qiladi; ilgari real STIR yoniga soxta
-   manba qo'shib yuborgan. Hozir placeholder faqat hududda manba umuman bo'lmasa yaratiladi.
+   manba qo'shib yuborgan. Hozir 14 hududning har biri uchun haqiqiy tashkilot nomi/STIR
+   (`prisma/seed.ts` → `REGIONS`) bor, lekin manba **faqat hududda umuman manba bo'lmasa** yaratiladi —
+   mavjud manbani qayta yozmaydi.
 5. Prisma'da `Json` ustunlar uchun `where: { field: { equals: null } }` SQL NULL bilan mos kelmaydi —
    xom SQL (`"rawApi2" IS NULL`) ishlating.
 

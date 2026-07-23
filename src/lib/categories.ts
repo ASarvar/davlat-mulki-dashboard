@@ -20,7 +20,7 @@ export const CATEGORIES: CategoryMeta[] = [
   { code: 6, nameUz: "Ijara shartnomasi bor", short: "Ijara shartnomasi bor", source: "INTEGRATION", excludeInefficient: true, requiresDocument: false },
   // 7 — qo'lda ham tanlanadi, API 3 status_name ("Экспертиза"/"Баҳолашда"/"Хатловда") ham beradi.
   { code: 7, nameUz: "Savdoga chiqarish jarayonida", short: "Savdoga chiqmoqda", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
-  { code: 8, nameUz: "Savdosi to'xtatilgan", short: "Savdo to'xtatilgan", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
+  // { code: 8, nameUz: "Savdosi to'xtatilgan", short: "Savdo to'xtatilgan", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
   { code: 9, nameUz: "Foydalanishga yaroqsiz holatda", short: "Yaroqsiz holat", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
   { code: 10, nameUz: "Chekka hududlarda joylashgan", short: "Chekka hudud", source: "MANUAL", excludeInefficient: true, requiresDocument: true },
   { code: 11, nameUz: "Bo'sh turgan", short: "Bo'sh turgan", source: "MANUAL", excludeInefficient: false, requiresDocument: true },

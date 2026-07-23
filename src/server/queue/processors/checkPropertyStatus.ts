@@ -201,9 +201,11 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
         type: "PRIVATIZATION",
         lotNumber: auction.lotNumber,
         orderId: auction.orderId,
+        area: auction.area != null ? new Prisma.Decimal(auction.area) : null,
+        startPrice: auction.startPrice != null ? new Prisma.Decimal(auction.startPrice) : null,
+        auctionDate: auction.auctionDate,
         lotStatus: auction.lotStatus,
         orderStatus: auction.orderStatus,
-        auctionDate: null,
         matchedByOldCad: false,
       });
     }

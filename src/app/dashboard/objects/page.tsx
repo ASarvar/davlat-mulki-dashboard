@@ -24,6 +24,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   const soha = str(sp.soha) || undefined;
   const categoryStr = str(sp.category);
   const inefficientStr = str(sp.inefficient);
+  const fullyRentedStr = str(sp.fullyRented);
   const requestedPage = Number(str(sp.page) ?? 1);
   const statusRaw = str(sp.status);
   const syncStatus = statusRaw && statusRaw in SyncStatus ? (statusRaw as SyncStatus) : undefined;
@@ -35,6 +36,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     categoryCode: categoryStr ? Number(categoryStr) : undefined,
     inefficient: inefficientStr === "1" ? true : inefficientStr === "0" ? false : undefined,
     syncStatus,
+    fullyRented: fullyRentedStr === "1" ? true : undefined,
   };
 
   // "Bo'sh maydoni bor" (kat 12) filtri tanlansa, maydon ustunida bo'sh maydon ko'rsatiladi.
@@ -54,6 +56,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   if (soha) baseParams.set("soha", soha);
   if (categoryStr) baseParams.set("category", categoryStr);
   if (inefficientStr) baseParams.set("inefficient", inefficientStr);
+  if (fullyRentedStr) baseParams.set("fullyRented", fullyRentedStr);
 
   const exportHref = `/api/export/objects?${baseParams.toString()}`;
 

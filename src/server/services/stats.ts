@@ -1,5 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { CATEGORIES } from "@/lib/categories";
 
 export interface RegionStat {
   regionId: string;
@@ -44,9 +45,18 @@ export interface RegionCategoryRow {
     hasVacant: { count: number; area: number };
     /** Bo'sh turgan (kat 11) — ijara yo'q, butun foydali maydon bo'sh */
     vacant: { count: number; usefulArea: number };
+    /**
+     * To'liq ijaraga berilgan: ijara shartnomasi bor (tekin foydalanish yoki pullik —
+     * ikkisidan biri yoki ikkisi birga) VA foydali maydon to'liq band (vacantArea = 0).
+     */
+    fullyRented: { count: number };
     /** Savdodagi lotlar — obyekt ikkalasida ham bo'lishi mumkin (kat 3 va 4). */
-    privatizationLot: { count: number };
-    rentLot: { count: number; area: number };
+    privatizationLot: { count: number; rentContracts: number; rentedObjects: number };
+    rentLot: { count: number; area: number; rentContracts: number; rentedObjects: number };
+    /** Kat 1 (Sotilgan, bo'lib to'lash) obyektlaridan ijara shartnomasi borlari soni. */
+    installmentSoldRented: { count: number };
+    /** Kat 7 (Savdoga chiqarish jarayonida) obyektlaridan ijara shartnomasi borlari soni. */
+    onAuctionProcessRented: { count: number };
   };
 }
 
@@ -138,6 +148,10 @@ async function computeDashboardStats(): Promise<DashboardStats> {
       hasVacantCount: bigint; hasVacantArea: string | null;
       vacantCount: bigint; vacantUseful: string | null;
       privLotCount: bigint; rentLotCount: bigint; rentLotArea: string | null;
+      privLotContracts: string | null; rentLotOnlyContracts: string | null;
+      fullyRentedCount: bigint;
+      privLotRentedObjects: bigint; rentLotOnlyRentedObjects: bigint;
+      cat1RentedObjects: bigint; cat7RentedObjects: bigint;
     }[]
   >(`
     WITH r AS (
@@ -164,11 +178,23 @@ async function computeDashboardStats(): Promise<DashboardStats> {
            COALESCE(SUM(vacant) FILTER (WHERE cnt > 0 AND sum > 0), 0) AS "paidVacant",
            COUNT(*)      FILTER (WHERE cnt > 0 AND vacant > 0) AS "hasVacantCount",
            COALESCE(SUM(vacant) FILTER (WHERE cnt > 0 AND vacant > 0), 0) AS "hasVacantArea",
+           -- To'liq ijaraga berilgan: shartnoma bor (tekin yoki pullik) VA foydali maydon
+           -- to'liq band (bo'sh joy qolmagan).
+           COUNT(*)      FILTER (WHERE cnt > 0 AND vacant = 0) AS "fullyRentedCount",
            COUNT(*)      FILTER (WHERE cat = 11) AS "vacantCount",
            COALESCE(SUM(useful) FILTER (WHERE cat = 11), 0) AS "vacantUseful",
            COUNT(*)      FILTER (WHERE priv)    AS "privLotCount",
            COUNT(*)      FILTER (WHERE rentlot) AS "rentLotCount",
-           COALESCE(SUM(lotarea) FILTER (WHERE rentlot), 0) AS "rentLotArea"
+           COALESCE(SUM(lotarea) FILTER (WHERE rentlot), 0) AS "rentLotArea",
+           -- Ijara shartnoma soni kat 3/4 ustunlari uchun: xususiylashtirish lotida bo'lsa
+           -- (ijara lotida ham bo'lsa ham) kat 3 ga, faqat ijara lotida bo'lsa kat 4 ga.
+           COALESCE(SUM(cnt) FILTER (WHERE priv), 0) AS "privLotContracts",
+           COALESCE(SUM(cnt) FILTER (WHERE rentlot AND NOT priv), 0) AS "rentLotOnlyContracts",
+           -- Ijaraga berilgan OBYEKTLAR soni (shartnoma soni emas) — kat 3/4 va 1/7 uchun.
+           COUNT(*) FILTER (WHERE priv AND cnt > 0)               AS "privLotRentedObjects",
+           COUNT(*) FILTER (WHERE rentlot AND NOT priv AND cnt > 0) AS "rentLotOnlyRentedObjects",
+           COUNT(*) FILTER (WHERE cat = 1 AND cnt > 0)            AS "cat1RentedObjects",
+           COUNT(*) FILTER (WHERE cat = 7 AND cnt > 0)            AS "cat7RentedObjects"
     FROM r GROUP BY 1
   `);
 
@@ -224,8 +250,20 @@ async function computeDashboardStats(): Promise<DashboardStats> {
         paid: mk(rr?.paidCount, rr?.paidUseful, rr?.paidRented, rr?.paidVacant),
         hasVacant: { count: Number(rr?.hasVacantCount ?? 0), area: n(rr?.hasVacantArea) },
         vacant: { count: Number(rr?.vacantCount ?? 0), usefulArea: n(rr?.vacantUseful) },
-        privatizationLot: { count: Number(rr?.privLotCount ?? 0) },
-        rentLot: { count: Number(rr?.rentLotCount ?? 0), area: n(rr?.rentLotArea) },
+        fullyRented: { count: Number(rr?.fullyRentedCount ?? 0) },
+        privatizationLot: {
+          count: Number(rr?.privLotCount ?? 0),
+          rentContracts: n(rr?.privLotContracts),
+          rentedObjects: Number(rr?.privLotRentedObjects ?? 0),
+        },
+        rentLot: {
+          count: Number(rr?.rentLotCount ?? 0),
+          area: n(rr?.rentLotArea),
+          rentContracts: n(rr?.rentLotOnlyContracts),
+          rentedObjects: Number(rr?.rentLotOnlyRentedObjects ?? 0),
+        },
+        installmentSoldRented: { count: Number(rr?.cat1RentedObjects ?? 0) },
+        onAuctionProcessRented: { count: Number(rr?.cat7RentedObjects ?? 0) },
       },
     };
   });
@@ -261,3 +299,92 @@ export const getDashboardStats = unstable_cache(computeDashboardStats, ["dashboa
   tags: ["dashboard"],
   revalidate: 60,
 });
+
+export type DashboardColumnSub = { label: string; area?: boolean; get: (r: RegionCategoryRow) => number };
+export type DashboardColumn = { code: number; short: string; nameUz: string; subs: DashboardColumnSub[] };
+
+/**
+ * "Davlat obyektlaridan foydalanish markazi balansidagi obyektlar" jadvalining ustun
+ * tuzilishi — sahifa (UI) va Excel eksporti bir xil mantiqni ishlatishi uchun shu yerda
+ * markazlashtirilgan (properties.ts dagi buildWhere() bilan bir xil printsip).
+ */
+export function buildDashboardColumns(): DashboardColumn[] {
+  return CATEGORIES.map((c) => {
+    const base = { code: c.code, short: c.short, nameUz: c.nameUz };
+    switch (c.code) {
+      case 1:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r: RegionCategoryRow) => r.counts[String(c.code)] ?? 0 },
+            { label: "Ijaraga berilgan obyektlar soni", get: (r: RegionCategoryRow) => r.rentBreakdown.installmentSoldRented.count },
+          ],
+        };
+      case 3:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r: RegionCategoryRow) => r.rentBreakdown.privatizationLot.count },
+            { label: "Ijara shartnoma soni", get: (r: RegionCategoryRow) => r.rentBreakdown.privatizationLot.rentContracts },
+            { label: "Ijaraga berilgan obyektlar soni", get: (r: RegionCategoryRow) => r.rentBreakdown.privatizationLot.rentedObjects },
+          ],
+        };
+      case 4:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r: RegionCategoryRow) => r.rentBreakdown.rentLot.count },
+            { label: "Maydon", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.rentLot.area },
+            { label: "Ijara shartnoma soni", get: (r: RegionCategoryRow) => r.rentBreakdown.rentLot.rentContracts },
+            { label: "Ijaraga berilgan obyektlar soni", get: (r: RegionCategoryRow) => r.rentBreakdown.rentLot.rentedObjects },
+          ],
+        };
+      case 7:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r: RegionCategoryRow) => r.counts[String(c.code)] ?? 0 },
+            { label: "Ijaraga berilgan obyektlar soni", get: (r: RegionCategoryRow) => r.rentBreakdown.onAuctionProcessRented.count },
+          ],
+        };
+      case 5:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r: RegionCategoryRow) => r.rentBreakdown.free.count },
+            { label: "Foydali", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.free.usefulArea },
+            { label: "Ijarada", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.free.rentedArea },
+            { label: "Bo'sh", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.free.vacantArea },
+          ],
+        };
+      case 6:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r: RegionCategoryRow) => r.rentBreakdown.paid.count },
+            { label: "Foydali", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.paid.usefulArea },
+            { label: "Ijarada", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.paid.rentedArea },
+            { label: "Bo'sh", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.paid.vacantArea },
+          ],
+        };
+      case 11:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r: RegionCategoryRow) => r.rentBreakdown.vacant.count },
+            { label: "Maydoni", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.vacant.usefulArea },
+          ],
+        };
+      case 12:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r: RegionCategoryRow) => r.rentBreakdown.hasVacant.count },
+            { label: "Bo'sh maydoni", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.hasVacant.area },
+          ],
+        };
+      default:
+        return { ...base, subs: [{ label: "Soni", get: (r: RegionCategoryRow) => r.counts[String(c.code)] ?? 0 }] };
+    }
+  });
+}

@@ -17,6 +17,8 @@ export interface PropertyFilters {
   syncStatus?: SyncStatus;
   /** Soha = manba nomi ("Ijara markazi", "Sog'liqni saqlash", ...) */
   soha?: string;
+  /** Ijara shartnomasi bor VA foydali maydon to'liq band (vacantArea = 0). Kategoriyaga bog'liq emas. */
+  fullyRented?: boolean;
 }
 
 const PAGE_SIZE = 20;
@@ -77,6 +79,9 @@ export function buildWhere(user: SessionUser, f: PropertyFilters): Prisma.Proper
 
   // Soha bo'yicha: obyekt qaysi tashkilot manbasiga tegishli.
   if (f.soha) and.push({ source: { name: f.soha } });
+
+  // To'liq ijaraga berilgan — dashboard'dagi mos ustun bilan bir xil mantiq (stats.ts → rentRaw).
+  if (f.fullyRented) and.push({ rentContractCount: { gt: 0 }, vacantArea: 0 });
 
   if (typeof f.inefficient === "boolean") and.push({ isInefficient: f.inefficient });
   if (f.syncStatus) and.push({ syncStatus: f.syncStatus });

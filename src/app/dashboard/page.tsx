@@ -11,12 +11,12 @@ import {
   MapPin,
   Tags,
   ArrowUpRight,
+  Download,
   type LucideIcon,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authz";
-import { getDashboardStats } from "@/server/services/stats";
-import { CATEGORIES } from "@/lib/categories";
+import { getDashboardStats, buildDashboardColumns, type DashboardColumnSub } from "@/server/services/stats";
 import { SyncRunStatusBadge } from "@/components/badges";
 
 type Tone = "navy" | "gold" | "green" | "amber" | "red" | "cobalt";
@@ -96,69 +96,13 @@ export default async function DashboardPage() {
   /** Maydonni ming m² da ko'rsatamiz (hisobot shakli shunday). */
   const km = (m2: number) => nf(m2 / 1000, 1);
 
-  type Row = (typeof s.byRegionCategory)[number];
-  type SubCol = { label: string; area?: boolean; get: (r: Row) => number };
-
-  // Har bir kategoriya ustuni. 5/6 — 4 ta kichik ustun, 11/12 — 2 ta, qolganlari bitta.
-  // 5, 6 va 12 EFFEKTIV kategoriyadan emas, ijara xususiyatidan hisoblanadi.
-  const COLUMNS: { code: number; short: string; nameUz: string; subs: SubCol[] }[] = CATEGORIES.map((c) => {
-    const base = { code: c.code, short: c.short, nameUz: c.nameUz };
-    switch (c.code) {
-      // 3 va 4 — lot mavjudligiga qarab. Obyekt bir vaqtda ikkalasida ham bo'lishi mumkin.
-      case 3:
-        return { ...base, subs: [{ label: "Soni", get: (r) => r.rentBreakdown.privatizationLot.count }] };
-      case 4:
-        return {
-          ...base,
-          subs: [
-            { label: "Soni", get: (r) => r.rentBreakdown.rentLot.count },
-            { label: "Maydon", area: true, get: (r) => r.rentBreakdown.rentLot.area },
-          ],
-        };
-      case 5:
-        return {
-          ...base,
-          subs: [
-            { label: "Soni", get: (r) => r.rentBreakdown.free.count },
-            { label: "Foydali", area: true, get: (r) => r.rentBreakdown.free.usefulArea },
-            { label: "Ijarada", area: true, get: (r) => r.rentBreakdown.free.rentedArea },
-            { label: "Bo'sh", area: true, get: (r) => r.rentBreakdown.free.vacantArea },
-          ],
-        };
-      case 6:
-        return {
-          ...base,
-          subs: [
-            { label: "Soni", get: (r) => r.rentBreakdown.paid.count },
-            { label: "Foydali", area: true, get: (r) => r.rentBreakdown.paid.usefulArea },
-            { label: "Ijarada", area: true, get: (r) => r.rentBreakdown.paid.rentedArea },
-            { label: "Bo'sh", area: true, get: (r) => r.rentBreakdown.paid.vacantArea },
-          ],
-        };
-      case 11:
-        return {
-          ...base,
-          subs: [
-            { label: "Soni", get: (r) => r.rentBreakdown.vacant.count },
-            { label: "Foydali", area: true, get: (r) => r.rentBreakdown.vacant.usefulArea },
-          ],
-        };
-      case 12:
-        return {
-          ...base,
-          subs: [
-            { label: "Soni", get: (r) => r.rentBreakdown.hasVacant.count },
-            { label: "Bo'sh", area: true, get: (r) => r.rentBreakdown.hasVacant.area },
-          ],
-        };
-      default:
-        return { ...base, subs: [{ label: "Soni", get: (r) => r.counts[String(c.code)] ?? 0 }] };
-    }
-  });
+  // Ustun tuzilishi markazlashtirilgan (stats.ts) — UI va Excel eksporti bir xil
+  // mantiqni ishlatadi, aks holda ikkisi orasida tafovut paydo bo'lishi mumkin.
+  const COLUMNS = buildDashboardColumns();
 
   // JAMI qatori — hududlar yig'indisi (har bir kichik ustun uchun alohida).
   const totalObjects = s.byRegionCategory.reduce((a, r) => a + r.total, 0);
-  const sumSub = (sub: SubCol) => s.byRegionCategory.reduce((a, r) => a + sub.get(r), 0);
+  const sumSub = (sub: DashboardColumnSub) => s.byRegionCategory.reduce((a, r) => a + sub.get(r), 0);
 
   return (
     <div>
@@ -192,8 +136,15 @@ export default async function DashboardPage() {
 
       {/* Kategoriyalar kesimi — hududlar bo'yicha (JAMI yuqorida) */}
       <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-sm">
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <SectionTitle icon={Tags}>Davlat obyektlaridan foydalanish markazi balansidagi obyektlar</SectionTitle>
+          <a
+            href="/api/export/dashboard-categories"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-slate-50 hover:text-slate-700"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Excelga eksport
+          </a>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -213,6 +164,13 @@ export default async function DashboardPage() {
                     <span className="block text-[12px] font-medium normal-case leading-tight">{c.short}</span>
                   </th>
                 ))}
+                <th
+                  className="border-l border-border px-2 py-2 text-center align-bottom font-bold"
+                  rowSpan={2}
+                  title="Ijara shartnomasi bor (tekin foydalanish yoki pullik) VA foydali maydon to'liq band"
+                >
+                  <span className="block text-[12px] font-medium normal-case leading-tight">To'liq ijara berilgan</span>
+                </th>
               </tr>
               {/* 2-qator: kichik ustunlar */}
               <tr className="border-b border-border text-left text-[10px] text-muted-foreground">
@@ -247,6 +205,9 @@ export default async function DashboardPage() {
                     </td>
                   )),
                 )}
+                <td className="border-l border-border px-2 py-3 text-center tabular-nums" style={{ color: "#b91c1c" }}>
+                  {nf(s.byRegionCategory.reduce((a, r) => a + r.rentBreakdown.fullyRented.count, 0))}
+                </td>
               </tr>
 
               {s.byRegionCategory.map((r, i) => (
@@ -254,7 +215,7 @@ export default async function DashboardPage() {
                   <td className="sticky left-0 z-10 bg-card py-2.5 pr-3 tabular-nums text-muted-foreground group-hover:bg-slate-50">
                     {i + 1}
                   </td>
-                  <td className="sticky left-8 z-10 bg-card py-2.5 pr-4 group-hover:bg-slate-50">
+                  <td className="sticky left-4 right-4 z-10 bg-card py-2.5 pr-4 whitespace-nowrap group-hover:bg-slate-50">
                     <Link href={`/dashboard/objects?region=${r.regionId}`} className="font-medium hover:underline" style={{ color: "var(--cobalt)" }}>
                       {r.name}
                     </Link>
@@ -289,6 +250,19 @@ export default async function DashboardPage() {
                       );
                     }),
                   )}
+                  <td className="border-l border-border px-2 py-2.5 text-center tabular-nums">
+                    {r.rentBreakdown.fullyRented.count === 0 ? (
+                      <span className="text-slate-300">0</span>
+                    ) : (
+                      <Link
+                        href={`/dashboard/objects?region=${r.regionId}&fullyRented=1`}
+                        className="hover:underline"
+                        style={{ color: "var(--cobalt)" }}
+                      >
+                        {nf(r.rentBreakdown.fullyRented.count)}
+                      </Link>
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -304,13 +278,24 @@ export default async function DashboardPage() {
           hisoblanadi (sotilgan yoki savdodagi obyekt ham ijara shartnomasiga ega bo'lishi mumkin) —
           shuning uchun ustunlar yig'indisi "Jami"dan katta bo'lishi mumkin.
         </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          <strong>To'liq ijara berilgan</strong> — ijara shartnomasi bor (tekin foydalanish yoki pullik,
+          ikkisidan biri yoki ikkisi birga) va foydali maydonning to'liq band qismi (bo'sh joy qolmagan).
+        </p>
       </section>
 
 
       {/* Hududlar kesimi — rasmiy hisobot shakli (JAMI yuqorida) */}
       <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-sm">
-        <div className="mb-4">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <SectionTitle icon={MapPin}>Hududlar kesimi — ijara shartnomalari</SectionTitle>
+          <a
+            href="/api/export/dashboard-rent"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-slate-50 hover:text-slate-700"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Excelga eksport
+          </a>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -326,7 +311,7 @@ export default async function DashboardPage() {
                   Obyekt soni
                   <span className="block text-[10px] font-normal normal-case">(ijaraga berilgan)</span>
                 </th>
-                <th className="py-2 pr-4 text-right font-medium">Ijaraga berilishi (%)</th>
+                {/* <th className="py-2 pr-4 text-right font-medium">Ijaraga berilishi (%)</th> */}
                 <th className="py-2 pr-4 text-right font-medium">Shartnoma soni</th>
                 <th className="py-2 pr-4 text-right font-medium">Maydoni (kv.m)</th>
                 <th className="py-2 text-right font-medium">Yillik ijara summasi</th>
@@ -341,7 +326,7 @@ export default async function DashboardPage() {
                 </td>
                 <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "#b91c1c" }}>{nf(s.totals.total)}</td>
                 <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "#b91c1c" }}>{nf(s.totals.rentedObjects)}</td>
-                <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "#b91c1c" }}>{s.totals.rentedPct}</td>
+                {/* <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "#b91c1c" }}>{s.totals.rentedPct}</td> */}
                 <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "#b91c1c" }}>{nf(s.totals.contractCount)}</td>
                 <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "#b91c1c" }}>{nf(s.totals.rentArea, 1)}</td>
                 <td className="py-3 text-right tabular-nums" style={{ color: "#b91c1c" }}>{nf(s.totals.rentSum / 1_000_000, 1)}</td>
@@ -357,7 +342,7 @@ export default async function DashboardPage() {
                   </td>
                   <td className="py-2.5 pr-4 text-right tabular-nums">{nf(r.total)}</td>
                   <td className="py-2.5 pr-4 text-right tabular-nums">{nf(r.rentedObjects)}</td>
-                  <td className="py-2.5 pr-4 text-right tabular-nums">{r.rentedPct}</td>
+                  {/* <td className="py-2.5 pr-4 text-right tabular-nums">{r.rentedPct}</td> */}
                   <td className="py-2.5 pr-4 text-right tabular-nums">{nf(r.contractCount)}</td>
                   <td className="py-2.5 pr-4 text-right tabular-nums">{nf(r.rentArea, 1)}</td>
                   <td className="py-2.5 text-right tabular-nums">{nf(r.rentSum / 1_000_000, 1)}</td>

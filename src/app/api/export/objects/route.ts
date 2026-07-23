@@ -25,6 +25,7 @@ export async function GET(req: Request) {
   const statusRaw = sp.get("status");
   const inefficient = sp.get("inefficient");
   const category = sp.get("category");
+  const fullyRented = sp.get("fullyRented");
 
   const filters: PropertyFilters = {
     q: sp.get("q")?.trim() || undefined,
@@ -33,6 +34,7 @@ export async function GET(req: Request) {
     categoryCode: category ? Number(category) : undefined,
     inefficient: inefficient === "1" ? true : inefficient === "0" ? false : undefined,
     syncStatus: statusRaw && statusRaw in SyncStatus ? (statusRaw as SyncStatus) : undefined,
+    fullyRented: fullyRented === "1" ? true : undefined,
   };
 
   const passThrough = new PassThrough();

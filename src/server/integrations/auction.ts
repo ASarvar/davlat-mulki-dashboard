@@ -74,6 +74,12 @@ export interface AuctionInfo {
   groupName: string | null;
   /** API 3 dagi xom `status_name` (kirillcha): "Савдода", "Экспертиза", "Муаммоли" ... */
   assetStatus: string | null;
+  /** API 4 `start_price` — faqat order topilganda mavjud. */
+  startPrice: number | null;
+  /** API 4 `auction_date` (jonli javobda `DD.MM.YYYY HH:mm:ss`). */
+  auctionDate: Date | null;
+  /** API 4 `details["hudud_kvm_2"]` — binolar/inshootlar egallagan maydon (kv.m). */
+  area: number | null;
   raw: unknown;
 }
 
@@ -92,6 +98,9 @@ export const EMPTY_AUCTION: AuctionInfo = {
   isSold: false,
   groupName: null,
   assetStatus: null,
+  startPrice: null,
+  auctionDate: null,
+  area: null,
   raw: null,
 };
 
@@ -123,6 +132,43 @@ const int = (v: unknown): number | null => {
   if (v === null || v === undefined || v === "") return null;
   const n = Number(v);
   return Number.isFinite(n) ? Math.trunc(n) : null;
+};
+
+/** `start_price` kabi ba'zi sonli maydonlar vergulni kasr ajratkich sifatida ishlatishi mumkin. */
+const numLoose = (v: unknown): number | null => {
+  const s = str(v);
+  if (!s) return null;
+  const n = Number(s.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+};
+
+// Son: guruh ajratkich sifatida bo'sh joy ("1 434"), kasr ajratkich vergul yoki nuqta.
+const AMOUNT_RE = "\\d+(?:[ \\u00A0]\\d{3})*(?:[.,]\\d+)?";
+
+/**
+ * `hudud_kvm_2` jonli javobda ko'pincha toza son emas, erkin matn: "Huquqiy hujjatga
+ * asosan 1048,93 (Amalda 1112,23)" yoki "Umumiy maydoni: 47,0 kv.m." Ikkita raqam
+ * bo'lsa "amalda" (haqiqiy o'lchangan) qiymati ustuvor — foydalanuvchi tasdiqlagan.
+ */
+const parseAreaText = (v: unknown): number | null => {
+  const s = str(v);
+  if (!s) return null;
+  const amaldaMatch = s.match(new RegExp(`amalda\\D*?(${AMOUNT_RE})`, "i"));
+  const raw = amaldaMatch?.[1] ?? s.match(new RegExp(AMOUNT_RE))?.[0];
+  if (!raw) return null;
+  const n = Number(raw.replace(/[  ]/g, "").replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+};
+
+/** API 4 `auction_date` jonli javobda ISO emas — "DD.MM.YYYY HH:mm:ss". */
+const parseApi4Date = (v: unknown): Date | null => {
+  const s = str(v);
+  if (!s) return null;
+  const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);
+  if (!m) return null;
+  const [, dd, mm, yyyy, hh = "00", mi = "00", ss = "00"] = m;
+  const d = new Date(`${yyyy}-${mm}-${dd}T${hh}:${mi}:${ss}`);
+  return Number.isNaN(d.getTime()) ? null : d;
 };
 
 // details[] ichidan kalit bo'yicha qiymat olish.
@@ -229,6 +275,9 @@ export async function checkAuction(cadNumber: string): Promise<AuctionInfo> {
     isSold: orderStatusId === ORDER_STATUS_SOLD,
     groupName,
     assetStatus: str(asset.status_name),
+    startPrice: numLoose(order.start_price),
+    auctionDate: parseApi4Date(order.auction_date),
+    area: parseAreaText(detailValue(order, "hudud_kvm_2")),
     // group_name'ni ham saqlaymiz — keyinchalik API'siz qayta hisoblash uchun kerak.
     raw: { api3: asset, api4: order, group_name: groupName },
   };

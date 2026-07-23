@@ -20,6 +20,7 @@ import { pathToCad } from "@/lib/cadastre";
 import { CATEGORY_BY_CODE } from "@/lib/categories";
 import { CategoryBadge, InefficientBadge, SyncStatusBadge } from "@/components/badges";
 import { AssignCategoryForm } from "./AssignCategoryForm";
+import { CadastreRawData } from "./CadastreRawData";
 import { syncSingleAction } from "../actions";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
@@ -51,6 +52,18 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
 
   const canWrite =
     user.role === "SUPER_ADMIN" || (user.role === "REGION_USER" && user.regionId === p.regionId);
+
+  // "Binoning umumiy maydoni" / "Foydali maydon" — API 2 xom javobidan to'g'ridan-to'g'ri
+  // (object_area_p / object_area_u), Property.area/buildingArea emas: bu ustunlar
+  // ba'zan land_area bilan qayta hisoblanadi (CLAUDE.md — "Maydon tuzatish").
+  const rawApi2 = (p.rawApi2 as Record<string, unknown> | null) ?? null;
+  const numOrNull = (v: unknown): number | null => {
+    if (v === null || v === undefined || v === "") return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const objectAreaP = numOrNull(rawApi2?.object_area_p) ?? (p.area ? Number(p.area) : null);
+  const objectAreaU = numOrNull(rawApi2?.object_area_u) ?? (p.buildingArea ? Number(p.buildingArea) : null);
 
   return (
     <div>
@@ -99,13 +112,14 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
               <Field label="Manba" value={p.source.name} />
               <Field label="Nomi" value={p.name} />
               <Field label="Manzil" value={p.address} />
-              <Field label="Binoning umumiy maydoni" value={p.area ? `${p.area.toString()} m²` : null} />
-              <Field label="Foydali maydon" value={p.buildingArea ? `${p.buildingArea.toString()} m²` : null} />
+              <Field label="Binoning umumiy maydoni" value={objectAreaP != null ? `${objectAreaP.toLocaleString("uz")} m²` : null} />
+              <Field label="Foydali maydon" value={objectAreaU != null ? `${objectAreaU.toLocaleString("uz")} m²` : null} />
               <Field label="Kategoriya" value={<CategoryBadge integrationCode={p.integrationCategoryCode} manualCode={p.manualCategoryCode} />} />
             </dl>
             {p.lastSyncError ? (
               <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">Sync xatosi: {p.lastSyncError}</p>
             ) : null}
+            <CadastreRawData rawApi2={p.rawApi2} />
           </div>
 
           {/* Auksion lotlari — obyekt bir vaqtda ham xususiylashtirish, ham ijara
