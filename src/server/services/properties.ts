@@ -1,5 +1,12 @@
 import { Prisma, type SyncStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import {
+  CAT_FREE_USE,
+  CAT_HAS_RENT,
+  CAT_HAS_VACANT_AREA,
+  CAT_ON_AUCTION,
+  CAT_ON_AUCTION_RENT,
+} from "./classification";
 import type { SessionUser } from "@/lib/authz";
 
 export interface PropertyFilters {
@@ -38,14 +45,34 @@ export function buildWhere(user: SessionUser, f: PropertyFilters): Prisma.Proper
     });
   }
 
-  // Effektiv kategoriya: integratsiya (1–4) > qo'lda (5–10).
+  // Kategoriya filtri.
+  // 5 (Tekin foydalanish), 6 (Ijara shartnomasi bor) va 12 (Bo'sh maydoni bor) —
+  // dashboard'da XUSUSIYAT bo'yicha hisoblanadi (obyekt sotilgan bo'lsa ham ijarasi bo'lishi
+  // mumkin), shuning uchun filtr ham shu mantiqni takrorlashi shart. Aks holda jadvaldagi
+  // raqamni bosganda ro'yxat bo'sh chiqadi.
   if (f.categoryCode) {
-    and.push({
-      OR: [
-        { integrationCategoryCode: f.categoryCode },
-        { integrationCategoryCode: null, manualCategoryCode: f.categoryCode },
-      ],
-    });
+    const c = f.categoryCode;
+    if (c === CAT_ON_AUCTION) {
+      // Xususiylashtirish savdosida — obyekt bir vaqtda ijara savdosida ham bo'lishi mumkin.
+      and.push({ hasPrivatizationLot: true });
+    } else if (c === CAT_ON_AUCTION_RENT) {
+      and.push({ hasRentLot: true });
+    } else if (c === CAT_FREE_USE) {
+      and.push({ rentContractCount: { gt: 0 }, rentTotalSum: 0 });
+    } else if (c === CAT_HAS_RENT) {
+      and.push({ rentContractCount: { gt: 0 }, rentTotalSum: { gt: 0 } });
+    } else if (c === CAT_HAS_VACANT_AREA) {
+      // Bo'sh maydoni bor = ijarasi bor, lekin foydali maydon to'liq band emas.
+      and.push({ rentContractCount: { gt: 0 } });
+      and.push({ vacantArea: { gt: 0 } });
+    } else {
+      and.push({
+        OR: [
+          { integrationCategoryCode: c },
+          { integrationCategoryCode: null, manualCategoryCode: c },
+        ],
+      });
+    }
   }
 
   // Soha bo'yicha: obyekt qaysi tashkilot manbasiga tegishli.
@@ -70,6 +97,8 @@ export interface PropertyListItem {
   syncStatus: SyncStatus;
   lotNumber: string | null;
   lotStatus: string | null;
+  /** Bo'sh maydon (foydali − ijarada). "Bo'sh maydoni bor" filtri uchun ko'rsatiladi. */
+  vacantArea: string | null;
 }
 
 export interface PropertyListResult {
@@ -110,6 +139,7 @@ export async function listProperties(
       syncStatus: true,
       lotNumber: true,
       lotStatus: true,
+      vacantArea: true,
       region: { select: { name: true } },
     },
   });
@@ -131,6 +161,7 @@ export async function listProperties(
       syncStatus: r.syncStatus,
       lotNumber: r.lotNumber,
       lotStatus: r.lotStatus,
+      vacantArea: r.vacantArea ? r.vacantArea.toString() : null,
     })),
   };
 }
@@ -242,6 +273,7 @@ export async function getPropertyDetail(user: SessionUser, cadNumber: string) {
       manualCategory: true,
       statusChecks: { orderBy: { apiSource: "asc" } },
       rentContracts: { orderBy: [{ contractDate: "desc" }, { contractNumber: "asc" }] },
+      auctionLots: { orderBy: [{ type: "asc" }, { auctionDate: "desc" }] },
       documents: { orderBy: { createdAt: "desc" } },
       assignments: {
         orderBy: { createdAt: "desc" },

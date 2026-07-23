@@ -133,10 +133,25 @@ model Property {
   auctionCheckedAt   DateTime?
   auctionGroupName   String? // API 4 group_name (ijara savdosi / xususiylashtirish)
 
+  // Bitta obyekt bir vaqtda HAM xususiylashtirish, HAM ijara savdosida bo'lishi mumkin
+  // (real ma'lumotda 46 ta shunday). Shuning uchun ikkita alohida bayroq —
+  // "bitta obyekt = bitta kategoriya" modeli bu yerda yetarli emas.
+  hasPrivatizationLot Boolean @default(false)
+  hasRentLot          Boolean @default(false)
+  /** Auksionga chiqarilgan jami maydon (barcha lotlar bo'yicha, kv.m) */
+  auctionTotalArea    Decimal? @db.Decimal(14, 2)
+  auctionLots         AuctionLot[]
+
   // ── Ijara shartnomalari (API 5) — tafsilotlar RentContract jadvalida ──
   rentContractCount  Int? // nechta ijara shartnomasi bor
   rentTotalSum       Decimal? @db.Decimal(18, 2) // jami summa (0 => tekin foydalanish)
   rentTotalArea      Decimal? @db.Decimal(14, 2) // jami ijara maydoni (kv.m)
+  /**
+   * Bo'sh maydon = foydali maydon − ijaraga berilgan (manfiy bo'lsa 0).
+   * Ustun sifatida saqlanadi: Prisma ikki ustunni o'zaro solishtira olmaydi,
+   * shuning uchun filtr/aggregat uchun oldindan hisoblab qo'yamiz.
+   */
+  vacantArea         Decimal? @db.Decimal(14, 2)
   /** Ijara ma'lumoti ESKI kadastr raqami orqali topilganmi. */
   rentMatchedByOldCad Boolean @default(false)
   rentCheckedAt      DateTime?
@@ -163,6 +178,36 @@ model Property {
   @@index([manualCategoryCode])
   @@index([lotNumber])
   // pg_trgm GIN indekslari migratsiyada qo'lda qo'shiladi (prisma/migrations/*_pg_trgm)
+}
+
+enum AuctionLotType {
+  PRIVATIZATION // xususiylashtirish savdosi (API 3 + 4)
+  RENT // ijara savdosi (API 6)
+}
+
+// Auksion lotlari. Bitta kadastr obyekti bo'lib-bo'lib bir nechta lotga chiqarilishi
+// mumkin (real ma'lumotda bitta obyektda 13 tagacha ijara loti uchradi).
+model AuctionLot {
+  id           String         @id @default(cuid())
+  propertyId   String
+  property     Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  type         AuctionLotType
+  lotNumber    String?
+  orderId      Int?
+  /** Shu lotga chiqarilgan maydon (kv.m) */
+  area         Decimal?       @db.Decimal(14, 2)
+  startPrice   Decimal?       @db.Decimal(18, 2)
+  auctionDate  DateTime?
+  lotStatus    String?
+  orderStatus  String?
+  /** Lot nomi (API 6 dagi `name`) */
+  name         String?
+  matchedByOldCad Boolean     @default(false)
+  createdAt    DateTime       @default(now())
+
+  @@index([propertyId])
+  @@index([lotNumber])
+  @@index([type])
 }
 
 // Ijara shartnomalari (API 5). Bitta kadastrda bir nechta shartnoma bo'lishi mumkin

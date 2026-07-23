@@ -19,9 +19,13 @@ export interface Api2Response {
   address?: string | null;
   short_address?: string | null;
 
-  // Maydonlar: yer va obyekt alohida
+  // Maydonlar. DIQQAT: hisobotda ishlatiladigan ikkitasi:
+  //   object_area_p — binoning UMUMIY maydoni
+  //   object_area_u — FOYDALI maydon
   land_area?: number | string | null;
   object_area?: number | string | null;
+  object_area_p?: number | string | null;
+  object_area_u?: number | string | null;
 
   subjects?: { name?: string | null; inn?: string | null; type?: number }[];
   [k: string]: unknown;
@@ -100,9 +104,10 @@ export async function fetchPropertyBase(cadNumber: string): Promise<Api2Result> 
       cadNumberOld: str(res.cad_number_old), // "" => null
       name: str(res.name),
       address: str(res.address) ?? str(res.short_address),
-      // area = yer uchastkasi maydoni, buildingArea = obyekt (bino) maydoni
-      area: num(res.land_area),
-      buildingArea: num(res.object_area),
+      // area = binoning umumiy maydoni, buildingArea = foydali maydon.
+      // Eskirgan `land_area`/`object_area` emas — hisobot aynan shu ikkisini talab qiladi.
+      area: num(res.object_area_p),
+      buildingArea: num(res.object_area_u),
       region: str(res.region),
       district: str(res.district),
       holderName: str(holder?.name),

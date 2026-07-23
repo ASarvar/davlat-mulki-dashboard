@@ -51,6 +51,7 @@ Ochiq ro'yxatdan o'tish yo'q — foydalanuvchini faqat admin qo'shadi.
 | 3 | `POST {API3_BASE_URL}` body `{cad_number}` | Basic (`AUCTION_API_*`) |
 | 4 | `GET {API4_BASE_URL}?order={order_id}` | Basic (bir xil juftlik) |
 | 5 | `POST {API5_BASE_URL}` body `{cadastre_number}` | Basic (`API5_*`) |
+| 6 | `POST {API6_BASE_URL}` body `{cad_number}` | Basic (`API6_*`) |
 
 **Parametr nomlari taxminga tayanmaydi** — har biri jonli sinovda aniqlangan va `.env` orqali
 sozlanadi (`API3_PARAM`, `API4_PARAM`, `API5_PARAM`). API 1 da javobda `inn`, so'rovda esa `num` edi.
@@ -64,6 +65,12 @@ sozlanadi (`API3_PARAM`, `API4_PARAM`, `API5_PARAM`). API 1 da javobda `inn`, so
   Shuning uchun "savdoda" kategoriyasi haqiqiy `lotNumber` talab qiladi.
 - **API 4:** parametr o'qilmasa `result` o'ramisiz `{result_msg:"Xatolik", result_code:0}` qaytadi —
   ya'ni `result_code === 0` muvaffaqiyat kafolati emas, `result.order` borligini ham tekshirish shart.
+- **API 2 maydonlari:** `area` ← `object_area_p` (**binoning umumiy maydoni**),
+  `buildingArea` ← `object_area_u` (**foydali maydon**).
+  ⚠️ Shartnoma maydoni foydali maydondan katta bo'lsa (obyekt aslida yer uchastkasi) — ikkala ustun
+  ham `land_area` dan olinadi. Real ma'lumotda 84 holatdan 81 tasi shu bilan tuzaldi, 13 tasida
+  `land_area` ham yetarli emas. `Property.vacantArea` = `GREATEST(foydali − ijarada, 0)` ustun sifatida
+  saqlanadi (Prisma ikki ustunni solishtira olmaydi, filtr uchun kerak).
 - **Kadastr raqamlarida `/` bor** (`10:11:01:01:01:5030/03`) — obyekt sahifasi catch-all
   `/dashboard/objects/[...cad]`, URL qurish faqat `src/lib/cadastre.ts` orqali.
 - Xom javoblar `ObjectStatusCheck.rawResponse` va `Property.rawApi2` da saqlanadi — **shuni saqlashda
@@ -83,14 +90,37 @@ sozlanadi (`API3_PARAM`, `API4_PARAM`, `API5_PARAM`). API 1 da javobda `inn`, so
 | 8–10 | Savdo to'xtatilgan / yaroqsiz / chekka hudud | **qo'lda + PDF** |
 | 11–12 | Bo'sh turgan / bo'sh maydoni bor | **qo'lda + PDF** |
 
-**Faqat 11–12 va kategoriyasiz = SAMARASIZ.** `EXCLUDED_CATEGORY_CODES = {1..10}`.
+**Faqat 11–12 = SAMARASIZ.** `EXCLUDED_CATEGORY_CODES = {1..10}`.
+Hech qanday integratsiya kategoriyasi topilmasa obyekt **11 (Bo'sh turgan)** bo'ladi — "kategoriyasiz"
+holati yo'q (`CAT_VACANT` default).
+
+⚠️ **Bitta obyekt = bitta kategoriya modeli yetarli emas.** Obyekt bo'lib-bo'lib bir nechta lotga
+chiqarilishi (real: bitta obyektda 13 ta ijara loti) va bir vaqtda HAM xususiylashtirish, HAM ijara
+savdosida bo'lishi mumkin (44 ta shunday). Shuning uchun `AuctionLot` jadvali (`PRIVATIZATION`/`RENT`)
+va `Property.hasPrivatizationLot` / `hasRentLot` bayroqlari bor. **"Savdoda" = hozir savdoda turgan:**
+sotilgan obyektning ham loti bor, shuning uchun `hasPrivatizationLot` da `!isSold` sharti bor
+(aks holda kat 3 da 1427 ta chiqadi, 524 o'rniga).
+
+**Dashboard jadvalida 3, 4, 5, 6 va 12-ustunlar effektiv kategoriyadan EMAS, xususiyatdan hisoblanadi**
+(`stats.ts` → `rentBreakdown`): sotilgan yoki savdodagi obyekt ham ijara shartnomasiga ega bo'lishi
+mumkin va o'sha ustunlarda ko'rinishi kerak. Shuning uchun ustunlar yig'indisi "Jami"dan katta chiqadi.
+⚠️ **`buildWhere()` ham shu mantiqni takrorlashi shart** — aks holda jadvaldagi raqamni bosganda
+ro'yxat bo'sh chiqadi. Kod: kat 3 → `hasPrivatizationLot`, kat 4 → `hasRentLot`, kat 5 → `rentTotalSum = 0`,
+kat 6 → `> 0`, kat 12 → `vacantArea > 0`.
+Jadval ustunlari kengaytirilgan (`COLUMNS` → `subs`, ikki qatorli sarlavha):
+5/6 → **soni · foydali · ijarada · bo'sh**, 11 → **soni · foydali**, 12 → **soni · bo'sh**,
+qolganlari bitta "soni" ustuni. Maydonlar **ming m²** da; faqat "soni" katagi ro'yxatga havola.
+`/dashboard/objects?category=12` da "Maydon" ustuni "Bo'sh maydon"ga almashadi.
 
 Aniqlash qoidalari (`classification.ts` → `deriveAuctionCategory`, tartib muhim):
 1. `order_statuses_id === 6` ⇒ sotilgan; `term_payment === 1` ⇒ kat 1, aks holda kat 2
    (⚠️ mezon `term_payment`, `details.tulov_muddati` **emas** — u sotuv bo'lib to'lash bo'lsa ham bo'sh keladi)
-2. **haqiqiy** lot bor, sotilmagan ⇒ `group_name === "Davlat mulkini ijaraga berish"` ? kat 4 : kat 3
-3. lot yo'q, API 3 `status_name` ∈ {`Экспертиза`, `Баҳолашда`, `Хатловда`} ⇒ kat 7
-4. ijara shartnomasi bor ⇒ jami summa 0 ? kat 5 : kat 6
+2. **API 6 da faol ijara loti** topilsa ⇒ kat 4 (Savdoda ijara). Bu kat 4 ning ASOSIY mezoni —
+   API 4 dagi `group_name` real ma'lumotda hech qachon "ijaraga berish" bo'lmagan, va API 3/4
+   ijara lotini umuman ko'rmasligi mumkin (shuning uchun `found` shartidan oldin tekshiriladi).
+3. **haqiqiy** lot bor, sotilmagan ⇒ kat 3 (Savdoda xususiylashtirish)
+4. lot yo'q, API 3 `status_name` ∈ {`Экспертиза`, `Баҳолашда`, `Хатловда`} ⇒ kat 7
+5. ijara shartnomasi bor ⇒ jami summa 0 ? kat 5 : kat 6
 - **Ustuvorlik:** auksion > ijara > boshqa
 
 ⚠️ **`lot_number: 0` — lot YO'Q degani.** `lotStr()` uni null'ga aylantiradi; oddiy `String()` ishlatilsa

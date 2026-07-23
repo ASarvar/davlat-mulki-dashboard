@@ -4,6 +4,7 @@ import { fetchPropertyBase } from "@/server/integrations/api2";
 import { STATUS_APIS } from "@/server/integrations/config";
 import { isAuctionConfigured } from "@/server/integrations/auction";
 import { isRentApiConfigured } from "@/server/integrations/rentApi";
+import { isRentAuctionConfigured } from "@/server/integrations/rentAuction";
 import { computeIsInefficient } from "@/server/services/classification";
 import { enqueueStatusCheck } from "../dispatch";
 import type { JobOutcome, PropertyBaseJob } from "../jobs";
@@ -70,7 +71,12 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
   // Hech qanday holat-tekshiruvi sozlanmagan bo'lsa — ikkinchi bosqich bo'sh ish bo'lardi.
   // Uni navbatga qo'ymaymiz va obyektni shu yerda yakunlaymiz (bir marta kamroq
   // navbat aylanishi = sezilarli tezlanish).
-  if (STATUS_APIS.length === 0 && !isAuctionConfigured() && !isRentApiConfigured()) {
+  if (
+    STATUS_APIS.length === 0 &&
+    !isAuctionConfigured() &&
+    !isRentApiConfigured() &&
+    !isRentAuctionConfigured()
+  ) {
     await prisma.property.update({
       where: { id: property.id },
       data: {

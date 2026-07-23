@@ -42,7 +42,14 @@ const schema = z.object({
   API5_PASSWORD: z.string().optional(),
   // Jonli tasdiqlangan: API 5 POST body parametri `cadastre_number`
   API5_PARAM: z.string().default("cadastre_number"),
+
+  // API 6 — faol IJARA LOTI (savdoda ijara kategoriyasini aniqlaydi).
+  // Basic auth, POST body `cad_number` (API 5 dan farqli!).
   API6_BASE_URL: z.string().url().optional(),
+  API6_USERNAME: z.string().optional(),
+  API6_PASSWORD: z.string().optional(),
+  API6_PARAM: z.string().default("cad_number"),
+
   API7_BASE_URL: z.string().url().optional(),
   API8_BASE_URL: z.string().url().optional(),
   API_STATUS_TOKEN: z.string().optional(),

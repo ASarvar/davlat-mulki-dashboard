@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authz";
 import { listProperties, PROPERTY_PAGE_SIZE, type PropertyFilters } from "@/server/services/properties";
 import { listSourceNames } from "@/server/services/sources";
+import { CAT_HAS_VACANT_AREA } from "@/server/services/classification";
 import { objectHref } from "@/lib/cadastre";
 import { CategoryBadge, InefficientBadge, SyncStatusBadge } from "@/components/badges";
 import { Pagination } from "@/components/Pagination";
@@ -35,6 +36,9 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     inefficient: inefficientStr === "1" ? true : inefficientStr === "0" ? false : undefined,
     syncStatus,
   };
+
+  // "Bo'sh maydoni bor" (kat 12) filtri tanlansa, maydon ustunida bo'sh maydon ko'rsatiladi.
+  const showVacant = filters.categoryCode === CAT_HAS_VACANT_AREA;
 
   const canFilterRegion = user.role !== "REGION_USER";
   const [regions, sohaList, result] = await Promise.all([
@@ -96,7 +100,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
               <th className="px-4 py-3 font-medium">Eski kadastr</th>
               <th className="px-4 py-3 font-medium">Hudud</th>
               <th className="px-4 py-3 font-medium">Manzil</th>
-              <th className="px-4 py-3 font-medium">Maydon</th>
+              <th className="px-4 py-3 font-medium">{showVacant ? "Bo'sh maydon" : "Maydon"}</th>
               <th className="px-4 py-3 font-medium">Lot</th>
               <th className="px-4 py-3 font-medium">Kategoriya</th>
               <th className="px-4 py-3 font-medium">Samaradorlik</th>
@@ -120,7 +124,15 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
                   <td className="px-4 py-3 text-muted-foreground">{p.cadNumberOld ?? "—"}</td>
                   <td className="px-4 py-3">{p.regionName}</td>
                   <td className="px-4 py-3 text-muted-foreground">{p.address ?? "—"}</td>
-                  <td className="px-4 py-3">{p.area ? `${p.area} m²` : "—"}</td>
+                  <td className="px-4 py-3">
+                    {showVacant
+                      ? p.vacantArea
+                        ? `${p.vacantArea} m²`
+                        : "—"
+                      : p.area
+                        ? `${p.area} m²`
+                        : "—"}
+                  </td>
                   <td className="px-4 py-3">
                     {p.lotNumber ? (
                       <a

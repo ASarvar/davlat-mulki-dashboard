@@ -1,3 +1,4 @@
+import { Fragment } from "react";
 import Link from "next/link";
 import {
   Building2,
@@ -89,15 +90,75 @@ export default async function DashboardPage() {
   const nf = (n: number, digits = 0) =>
     n.toLocaleString("uz-UZ", { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
-  // Kategoriya jadvalining JAMI qatori — hududlar yig'indisi.
-  const catTotals = s.byRegionCategory.reduce<{ total: number; counts: Record<string, number> }>(
-    (acc, r) => {
-      acc.total += r.total;
-      for (const [k, v] of Object.entries(r.counts)) acc.counts[k] = (acc.counts[k] ?? 0) + v;
-      return acc;
-    },
-    { total: 0, counts: {} },
-  );
+  // 5 (Tekin foydalanish), 6 (Ijara shartnomasi bor) va 12 (Bo'sh maydoni bor) ustunlari
+  // EFFEKTIV kategoriyadan emas, ijara XUSUSIYATIDAN hisoblanadi: obyekt sotilgan yoki
+  // savdoda bo'lsa ham, ijara shartnomasi bo'lsa shu ustunda ko'rinadi.
+  /** Maydonni ming m² da ko'rsatamiz (hisobot shakli shunday). */
+  const km = (m2: number) => nf(m2 / 1000, 1);
+
+  type Row = (typeof s.byRegionCategory)[number];
+  type SubCol = { label: string; area?: boolean; get: (r: Row) => number };
+
+  // Har bir kategoriya ustuni. 5/6 — 4 ta kichik ustun, 11/12 — 2 ta, qolganlari bitta.
+  // 5, 6 va 12 EFFEKTIV kategoriyadan emas, ijara xususiyatidan hisoblanadi.
+  const COLUMNS: { code: number; short: string; nameUz: string; subs: SubCol[] }[] = CATEGORIES.map((c) => {
+    const base = { code: c.code, short: c.short, nameUz: c.nameUz };
+    switch (c.code) {
+      // 3 va 4 — lot mavjudligiga qarab. Obyekt bir vaqtda ikkalasida ham bo'lishi mumkin.
+      case 3:
+        return { ...base, subs: [{ label: "Soni", get: (r) => r.rentBreakdown.privatizationLot.count }] };
+      case 4:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r) => r.rentBreakdown.rentLot.count },
+            { label: "Maydon", area: true, get: (r) => r.rentBreakdown.rentLot.area },
+          ],
+        };
+      case 5:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r) => r.rentBreakdown.free.count },
+            { label: "Foydali", area: true, get: (r) => r.rentBreakdown.free.usefulArea },
+            { label: "Ijarada", area: true, get: (r) => r.rentBreakdown.free.rentedArea },
+            { label: "Bo'sh", area: true, get: (r) => r.rentBreakdown.free.vacantArea },
+          ],
+        };
+      case 6:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r) => r.rentBreakdown.paid.count },
+            { label: "Foydali", area: true, get: (r) => r.rentBreakdown.paid.usefulArea },
+            { label: "Ijarada", area: true, get: (r) => r.rentBreakdown.paid.rentedArea },
+            { label: "Bo'sh", area: true, get: (r) => r.rentBreakdown.paid.vacantArea },
+          ],
+        };
+      case 11:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r) => r.rentBreakdown.vacant.count },
+            { label: "Foydali", area: true, get: (r) => r.rentBreakdown.vacant.usefulArea },
+          ],
+        };
+      case 12:
+        return {
+          ...base,
+          subs: [
+            { label: "Soni", get: (r) => r.rentBreakdown.hasVacant.count },
+            { label: "Bo'sh", area: true, get: (r) => r.rentBreakdown.hasVacant.area },
+          ],
+        };
+      default:
+        return { ...base, subs: [{ label: "Soni", get: (r) => r.counts[String(c.code)] ?? 0 }] };
+    }
+  });
+
+  // JAMI qatori — hududlar yig'indisi (har bir kichik ustun uchun alohida).
+  const totalObjects = s.byRegionCategory.reduce((a, r) => a + r.total, 0);
+  const sumSub = (sub: SubCol) => s.byRegionCategory.reduce((a, r) => a + sub.get(r), 0);
 
   return (
     <div>
@@ -137,26 +198,34 @@ export default async function DashboardPage() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-border text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="sticky left-0 z-10 bg-card py-2 pr-3 font-medium">№</th>
-                <th className="sticky left-8 z-10 bg-card py-2 pr-4 font-medium">Hududlar nomi</th>
-                <th className="py-2  text-center font-medium">Jami</th>
-                {CATEGORIES.map((c) => (
+              {/* 1-qator: kategoriya nomlari (kengaytirilganlari colSpan bilan) */}
+              <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
+                <th className="sticky left-0 z-10 bg-card py-2 pr-3 font-medium" rowSpan={2}>№</th>
+                <th className="sticky left-8 z-10 bg-card py-2 pr-4 font-medium" rowSpan={2}>Hududlar nomi</th>
+                <th className="py-2 text-center font-medium" rowSpan={2}>Jami</th>
+                {COLUMNS.map((c) => (
                   <th
                     key={c.code}
-                    className="py-2 pr-3 text-right font-medium"
+                    colSpan={c.subs.length}
                     title={`${c.code}. ${c.nameUz}`}
+                    className="border-l border-border px-2 py-2 text-center align-bottom font-medium"
                   >
-                    <span className="block"></span>
-                    <span className="block max-w-[92px] text-[10px] text-center font-normal normal-case leading-tight">
-                      {c.short}
-                    </span>
+                    <span className="block text-[10px] font-normal normal-case leading-tight">{c.short}</span>
                   </th>
                 ))}
-                <th className="py-2 text-right font-medium">
-                  <span className="block"></span>
-                  <span className="block text-[10px] font-normal normal-case">Kategoriyasiz</span>
-                </th>
+              </tr>
+              {/* 2-qator: kichik ustunlar */}
+              <tr className="border-b border-border text-left text-[10px] uppercase text-muted-foreground">
+                {COLUMNS.map((c) =>
+                  c.subs.map((sub, si) => (
+                    <th
+                      key={`${c.code}-${sub.label}`}
+                      className={`px-2 py-1 text-center font-normal ${si === 0 ? "border-l border-border" : ""}`}
+                    >
+                      {c.subs.length > 1 ? sub.label : ""}
+                    </th>
+                  )),
+                )}
               </tr>
             </thead>
             <tbody>
@@ -166,15 +235,18 @@ export default async function DashboardPage() {
                 <td className="sticky left-8 z-10 py-3 pr-4" style={{ background: "#f7f1e4", color: "#b91c1c" }}>
                   J A M I:
                 </td>
-                <td className="py-3 pl-6 text-center tabular-nums" style={{ color: "#b91c1c" }}>{nf(catTotals.total)}</td>
-                {CATEGORIES.map((c) => (
-                  <td key={c.code} className="py-3 pr-3 text-center tabular-nums" style={{ color: "#b91c1c" }}>
-                    {nf(catTotals.counts[String(c.code)] ?? 0)}
-                  </td>
-                ))}
-                <td className="py-3 text-center tabular-nums" style={{ color: "#b91c1c" }}>
-                  {nf(catTotals.counts.none ?? 0)}
-                </td>
+                <td className="py-3 text-center tabular-nums" style={{ color: "#b91c1c" }}>{nf(totalObjects)}</td>
+                {COLUMNS.map((c) =>
+                  c.subs.map((sub, si) => (
+                    <td
+                      key={`${c.code}-${sub.label}`}
+                      className={`px-2 py-3 text-center tabular-nums ${si === 0 ? "border-l border-border" : ""}`}
+                      style={{ color: "#b91c1c" }}
+                    >
+                      {sub.area ? km(sumSub(sub)) : nf(sumSub(sub))}
+                    </td>
+                  )),
+                )}
               </tr>
 
               {s.byRegionCategory.map((r, i) => (
@@ -187,42 +259,53 @@ export default async function DashboardPage() {
                       {r.name}
                     </Link>
                   </td>
-                  <td className="py-2.5 pr-4 text-right font-semibold tabular-nums">{nf(r.total)}</td>
-                  {CATEGORIES.map((c) => {
-                    const n = r.counts[String(c.code)] ?? 0;
-                    return (
-                      <td key={c.code} className="py-2.5 pr-3 text-center tabular-nums">
-                        {n === 0 ? (
-                          <span className="text-slate-300">0</span>
-                        ) : (
-                          <Link
-                            href={`/dashboard/objects?region=${r.regionId}&category=${c.code}`}
-                            className="hover:underline"
-                            style={{ color: "var(--cobalt)" }}
-                          >
-                            {nf(n)}
-                          </Link>
-                        )}
-                      </td>
-                    );
-                  })}
-                  <td className="py-2.5 text-center tabular-nums">
-                    {(r.counts.none ?? 0) === 0 ? (
-                      <span className="text-slate-300">0</span>
-                    ) : (
-                      <span className="text-muted-foreground">{nf(r.counts.none ?? 0)}</span>
-                    )}
-                  </td>
+                  <td className="py-2.5 text-center font-semibold tabular-nums">{nf(r.total)}</td>
+                  {COLUMNS.map((c) =>
+                    c.subs.map((sub, si) => {
+                      const v = sub.get(r);
+                      const cls = `px-2 py-2.5 text-center tabular-nums ${si === 0 ? "border-l border-border" : ""}`;
+                      if (v === 0) {
+                        return (
+                          <td key={`${c.code}-${sub.label}`} className={cls}>
+                            <span className="text-slate-300">0</span>
+                          </td>
+                        );
+                      }
+                      // Faqat "Soni" katagi ro'yxatga havola bo'ladi.
+                      return (
+                        <td key={`${c.code}-${sub.label}`} className={cls}>
+                          {sub.area ? (
+                            <span className="text-muted-foreground">{km(v)}</span>
+                          ) : (
+                            <Link
+                              href={`/dashboard/objects?region=${r.regionId}&category=${c.code}`}
+                              className="hover:underline"
+                              style={{ color: "var(--cobalt)" }}
+                            >
+                              {nf(v)}
+                            </Link>
+                          )}
+                        </td>
+                      );
+                    }),
+                  )}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
-          Kategoriya kodlari ustun sarlavhasida — to'liq nomni ko'rish uchun sarlavha ustiga bosing.
-          Raqamni bosish o'sha hudud + kategoriya bo'yicha obyektlarni ochadi.
+          Maydonlar <strong>ming m²</strong>da, "Soni" — obyektlar soni (bosilsa ro'yxat ochiladi).
+          To'liq kategoriya nomini ko'rish uchun sarlavha ustiga bosing.
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          <strong>Tekin foydalanish</strong>, <strong>Ijara shartnomasi bor</strong> va{" "}
+          <strong>Bo'sh maydoni bor</strong> ustunlari obyektning asosiy kategoriyasidan qat'i nazar
+          hisoblanadi (sotilgan yoki savdodagi obyekt ham ijara shartnomasiga ega bo'lishi mumkin) —
+          shuning uchun ustunlar yig'indisi "Jami"dan katta bo'lishi mumkin.
         </p>
       </section>
+
 
       {/* Hududlar kesimi — rasmiy hisobot shakli (JAMI yuqorida) */}
       <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-sm">

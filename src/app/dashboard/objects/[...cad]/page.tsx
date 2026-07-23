@@ -99,8 +99,8 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
               <Field label="Manba" value={p.source.name} />
               <Field label="Nomi" value={p.name} />
               <Field label="Manzil" value={p.address} />
-              <Field label="Umumiy maydon" value={p.area ? `${p.area.toString()} m²` : null} />
-              <Field label="Bino maydoni" value={p.buildingArea ? `${p.buildingArea.toString()} m²` : null} />
+              <Field label="Binoning umumiy maydoni" value={p.area ? `${p.area.toString()} m²` : null} />
+              <Field label="Foydali maydon" value={p.buildingArea ? `${p.buildingArea.toString()} m²` : null} />
               <Field label="Kategoriya" value={<CategoryBadge integrationCode={p.integrationCategoryCode} manualCode={p.manualCategoryCode} />} />
             </dl>
             {p.lastSyncError ? (
@@ -108,46 +108,103 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
             ) : null}
           </div>
 
-          {/* Auksion ma'lumotlari (API 3 + API 4) */}
-          {p.lotNumber || p.auctionStatus ? (
+          {/* Auksion lotlari — obyekt bir vaqtda ham xususiylashtirish, ham ijara
+              savdosida bo'lishi va har biri bir nechta lotga bo'linishi mumkin. */}
+          {p.auctionLots.length > 0 || p.auctionStatus ? (
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
-              <div className="mb-4">
-                <SectionTitle icon={Gavel}>Auksion ma'lumotlari</SectionTitle>
+              <div className="mb-4 flex flex-wrap items-center gap-3">
+                <SectionTitle icon={Gavel}>Auksion lotlari ({p.auctionLots.length})</SectionTitle>
+                {p.hasPrivatizationLot ? (
+                  <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                    Savdoda xususiylashtirish
+                  </span>
+                ) : null}
+                {p.hasRentLot ? (
+                  <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    Savdoda ijara
+                  </span>
+                ) : null}
               </div>
-              <dl className="grid grid-cols-2 gap-4 md:grid-cols-3">
-                <div>
-                  <dt className="text-xs text-muted-foreground">Lot raqami</dt>
-                  <dd className="mt-0.5 text-sm">
-                    {p.lotNumber ? (
-                      <a
-                        href={lotUrl(p.lotNumber)}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="inline-flex items-center gap-1 font-medium hover:underline"
-                        style={{ color: "var(--cobalt)" }}
-                        title="e-auksion.uz da ochish"
-                      >
-                        {p.lotNumber}
-                        <ExternalLink className="h-3.5 w-3.5" />
-                      </a>
-                    ) : (
-                      "—"
-                    )}
-                  </dd>
-                </div>
-                <Field label="Lot holati" value={p.lotStatus} />
+
+              <dl className="mb-4 grid grid-cols-2 gap-4 md:grid-cols-4">
+                <Field
+                  label="Auksionga chiqarilgan maydon"
+                  value={p.auctionTotalArea != null ? `${Number(p.auctionTotalArea).toLocaleString("uz")} m²` : null}
+                />
                 <Field label="Auksion holati" value={p.auctionStatus} />
-                <Field label="Savdo turi" value={p.auctionGroupName} />
                 <Field
                   label="To'lov muddati"
                   value={p.paymentTermMonths ? `${p.paymentTermMonths} oy (bo'lib to'lash)` : null}
                 />
-                <Field label="Order ID" value={p.auctionOrderId} />
                 <Field
                   label="Tekshirilgan"
                   value={p.auctionCheckedAt ? p.auctionCheckedAt.toLocaleString("uz") : null}
                 />
               </dl>
+
+              {p.auctionLots.length > 0 ? (
+                <div className="overflow-x-auto rounded-lg border border-border">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border bg-slate-50 text-left text-xs uppercase tracking-wide text-muted-foreground">
+                        <th className="px-3 py-2 font-medium">Turi</th>
+                        <th className="px-3 py-2 font-medium">Lot</th>
+                        <th className="px-3 py-2 text-right font-medium">Maydon</th>
+                        <th className="px-3 py-2 text-right font-medium">Boshlang'ich narx</th>
+                        <th className="px-3 py-2 font-medium">Auksion sanasi</th>
+                        <th className="px-3 py-2 font-medium">Holati</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {p.auctionLots.map((l) => (
+                        <tr key={l.id} className="border-b border-border last:border-0 hover:bg-slate-50/60">
+                          <td className="px-3 py-2">
+                            <span
+                              className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                                l.type === "RENT" ? "bg-emerald-50 text-emerald-700" : "bg-blue-50 text-blue-700"
+                              }`}
+                            >
+                              {l.type === "RENT" ? "Ijara" : "Xususiylash."}
+                            </span>
+                          </td>
+                          <td className="px-3 py-2 font-medium">
+                            {l.lotNumber ? (
+                              <a
+                                href={lotUrl(l.lotNumber)}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 hover:underline"
+                                style={{ color: "var(--cobalt)" }}
+                                title="e-auksion.uz da ochish"
+                              >
+                                {l.lotNumber}
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            ) : (
+                              "—"
+                            )}
+                            {l.matchedByOldCad ? (
+                              <span className="ml-1.5 rounded bg-amber-50 px-1 py-0.5 text-[10px] text-amber-700">
+                                eski kad.
+                              </span>
+                            ) : null}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {l.area != null ? `${Number(l.area).toLocaleString("uz")} m²` : "—"}
+                          </td>
+                          <td className="px-3 py-2 text-right tabular-nums">
+                            {l.startPrice != null ? Number(l.startPrice).toLocaleString("uz") : "—"}
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">
+                            {l.auctionDate ? l.auctionDate.toLocaleString("uz") : "—"}
+                          </td>
+                          <td className="px-3 py-2 text-muted-foreground">{l.lotStatus ?? l.orderStatus ?? "—"}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
