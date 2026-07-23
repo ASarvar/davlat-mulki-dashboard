@@ -62,7 +62,7 @@ export function ObjectFilters({
           <option value="">Barchasi</option>
           {CATEGORIES.map((c) => (
             <option key={c.code} value={c.code}>
-              {c.code}. {c.short}
+              {c.short}
             </option>
           ))}
         </select>

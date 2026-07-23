@@ -30,21 +30,22 @@ const CATEGORIES: {
 
 // ─── 14 hudud ───
 // Tartib rasmiy hisobot shaklidagidek (foydalanuvchi belgilagan) — sortOrder shuni saqlaydi.
-const REGIONS: { code: string; name: string; sortOrder: number }[] = [
-  { code: "QQR", name: "Qoraqalpog'iston R.", sortOrder: 1 },
-  { code: "AND", name: "Andijon", sortOrder: 2 },
-  { code: "BUX", name: "Buxoro", sortOrder: 3 },
-  { code: "JIZ", name: "Jizzax", sortOrder: 4 },
-  { code: "QAS", name: "Qashqadaryo", sortOrder: 5 },
-  { code: "NAV", name: "Navoiy", sortOrder: 6 },
-  { code: "NAM", name: "Namangan", sortOrder: 7 },
-  { code: "SAM", name: "Samarqand", sortOrder: 8 },
-  { code: "SUR", name: "Surxondaryo", sortOrder: 9 },
-  { code: "SIR", name: "Sirdaryo", sortOrder: 10 },
-  { code: "TAS", name: "Toshkent v.", sortOrder: 11 },
-  { code: "FAR", name: "Farg'ona", sortOrder: 12 },
-  { code: "XOR", name: "Xorazm", sortOrder: 13 },
-  { code: "TAS_CITY", name: "Toshkent sh.", sortOrder: 14 },
+// orgName/stir — "Davlat obyektlaridan foydalanish markazi" hududiy boshqarmalarining haqiqiy STIR'i.
+const REGIONS: { code: string; name: string; sortOrder: number; orgName: string; stir: string }[] = [
+  { code: "QQR", name: "Qoraqalpog'iston R.", sortOrder: 1, orgName: "Davlat obyektlaridan foydalanish markazi Qoraqalpog'iston R. hududiy boshqarmasi", stir: "203618353" },
+  { code: "AND", name: "Andijon", sortOrder: 2, orgName: "Davlat obyektlaridan foydalanish markazi Andijon viloyati hududiy boshqarmasi", stir: "203613993" },
+  { code: "BUX", name: "Buxoro", sortOrder: 3, orgName: "Davlat obyektlaridan foydalanish markazi Buxoro viloyati hududiy boshqarmasi", stir: "201189099" },
+  { code: "JIZ", name: "Jizzax", sortOrder: 4, orgName: "Davlat obyektlaridan foydalanish markazi Jizzax viloyati hududiy boshqarmasi", stir: "201374351" },
+  { code: "QAS", name: "Qashqadaryo", sortOrder: 5, orgName: "Davlat obyektlaridan foydalanish markazi Qashqadaryo viloyati hududiy boshqarmasi", stir: "202495873" },
+  { code: "NAV", name: "Navoiy", sortOrder: 6, orgName: "Davlat obyektlaridan foydalanish markazi Navoiy viloyati hududiy boshqarmasi", stir: "201295735" },
+  { code: "NAM", name: "Namangan", sortOrder: 7, orgName: "Davlat obyektlaridan foydalanish markazi Namangan viloyati hududiy boshqarmasi", stir: "207001028" },
+  { code: "SAM", name: "Samarqand", sortOrder: 8, orgName: "Davlat obyektlaridan foydalanish markazi Samarqand viloyati hududiy boshqarmasi", stir: "201660391" },
+  { code: "SUR", name: "Surxondaryo", sortOrder: 9, orgName: "Davlat obyektlaridan foydalanish markazi Surxondaryo viloyati hududiy boshqarmasi", stir: "203140182" },
+  { code: "SIR", name: "Sirdaryo", sortOrder: 10, orgName: "Davlat obyektlaridan foydalanish markazi Sirdaryo viloyati hududiy boshqarmasi", stir: "204717332" },
+  { code: "TAS", name: "Toshkent v.", sortOrder: 11, orgName: "Davlat obyektlaridan foydalanish markazi Toshkent viloyati hududiy boshqarmasi", stir: "300393445" },
+  { code: "FAR", name: "Farg'ona", sortOrder: 12, orgName: "Davlat obyektlaridan foydalanish markazi Farg'ona viloyati hududiy boshqarmasi", stir: "207323441" },
+  { code: "XOR", name: "Xorazm", sortOrder: 13, orgName: "Davlat obyektlaridan foydalanish markazi Xorazm viloyati hududiy boshqarmasi", stir: "200410308" },
+  { code: "TAS_CITY", name: "Toshkent sh.", sortOrder: 14, orgName: "Davlat obyektlaridan foydalanish markazi Toshkent shahar hududiy boshqarmasi", stir: "201502223" },
 ];
 
 async function main() {
@@ -58,28 +59,26 @@ async function main() {
   }
   console.log(`✓ ${CATEGORIES.length} ta kategoriya`);
 
-  // Hududlar + (kerak bo'lsa) placeholder manba
+  // Hududlar + (kerak bo'lsa) hududiy boshqarma manbasi (haqiqiy STIR)
   let created = 0;
-  for (const [i, r] of REGIONS.entries()) {
+  for (const r of REGIONS) {
     const region = await prisma.region.upsert({
       where: { code: r.code },
       update: { name: r.name, sortOrder: r.sortOrder },
-      create: r,
+      create: { code: r.code, name: r.name, sortOrder: r.sortOrder },
     });
-    // Placeholder manba FAQAT hududda hech qanday manba bo'lmaganda yaratiladi.
+    // Manba FAQAT hududda hech qanday manba bo'lmaganda yaratiladi.
     // MUHIM: ilgari bu `upsert` edi va seed qayta ishga tushirilganda real STIR
     // yonига soxta STIR bilan ikkinchi manba qo'shib yuborardi (sync xato berardi).
     const existing = await prisma.organizationSource.count({ where: { regionId: region.id } });
     if (existing === 0) {
-      // O'zbekiston STIR'i 9 xonali (validatsiya ham 9 ta raqam talab qiladi).
-      const stir = `300000${String(i + 1).padStart(3, "0")}`;
       await prisma.organizationSource.create({
-        data: { name: "Ijara markazi", stir, regionId: region.id },
+        data: { name: r.orgName, stir: r.stir, regionId: region.id },
       });
       created++;
     }
   }
-  console.log(`✓ ${REGIONS.length} ta hudud (yangi placeholder manba: ${created})`);
+  console.log(`✓ ${REGIONS.length} ta hudud (yangi manba: ${created})`);
 
   // Super-admin
   const email = process.env.SEED_ADMIN_EMAIL ?? "admin@davlatmulki.uz";

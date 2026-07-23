@@ -26,9 +26,9 @@ export function CategoryBadge({
           ? { background: "rgba(26,58,124,0.10)", color: "var(--cobalt)" }
           : { background: "rgba(200,169,110,0.18)", color: "#8a6d34" }
       }
-      title={`${cat.code}. ${cat.nameUz}`}
+      title={`${cat.nameUz}`}
     >
-      {cat.code}. {cat.short}
+      {cat.short}
     </span>
   );
 }
