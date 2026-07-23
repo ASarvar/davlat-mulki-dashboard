@@ -31,20 +31,20 @@ const CATEGORIES: {
 // ─── 14 hudud ───
 // Tartib rasmiy hisobot shaklidagidek (foydalanuvchi belgilagan) — sortOrder shuni saqlaydi.
 const REGIONS: { code: string; name: string; sortOrder: number }[] = [
-  { code: "QQR", name: "Qoraqalpog'iston Respublikasi", sortOrder: 1 },
-  { code: "AND", name: "Andijon viloyati", sortOrder: 2 },
-  { code: "BUX", name: "Buxoro viloyati", sortOrder: 3 },
-  { code: "JIZ", name: "Jizzax viloyati", sortOrder: 4 },
-  { code: "QAS", name: "Qashqadaryo viloyati", sortOrder: 5 },
-  { code: "NAV", name: "Navoiy viloyati", sortOrder: 6 },
-  { code: "NAM", name: "Namangan viloyati", sortOrder: 7 },
-  { code: "SAM", name: "Samarqand viloyati", sortOrder: 8 },
-  { code: "SUR", name: "Surxondaryo viloyati", sortOrder: 9 },
-  { code: "SIR", name: "Sirdaryo viloyati", sortOrder: 10 },
-  { code: "TAS", name: "Toshkent viloyati", sortOrder: 11 },
-  { code: "FAR", name: "Farg'ona viloyati", sortOrder: 12 },
-  { code: "XOR", name: "Xorazm viloyati", sortOrder: 13 },
-  { code: "TAS_CITY", name: "Toshkent shahri", sortOrder: 14 },
+  { code: "QQR", name: "Qoraqalpog'iston R.", sortOrder: 1 },
+  { code: "AND", name: "Andijon", sortOrder: 2 },
+  { code: "BUX", name: "Buxoro", sortOrder: 3 },
+  { code: "JIZ", name: "Jizzax", sortOrder: 4 },
+  { code: "QAS", name: "Qashqadaryo", sortOrder: 5 },
+  { code: "NAV", name: "Navoiy", sortOrder: 6 },
+  { code: "NAM", name: "Namangan", sortOrder: 7 },
+  { code: "SAM", name: "Samarqand", sortOrder: 8 },
+  { code: "SUR", name: "Surxondaryo", sortOrder: 9 },
+  { code: "SIR", name: "Sirdaryo", sortOrder: 10 },
+  { code: "TAS", name: "Toshkent v.", sortOrder: 11 },
+  { code: "FAR", name: "Farg'ona", sortOrder: 12 },
+  { code: "XOR", name: "Xorazm", sortOrder: 13 },
+  { code: "TAS_CITY", name: "Toshkent sh.", sortOrder: 14 },
 ];
 
 async function main() {

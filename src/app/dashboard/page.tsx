@@ -183,39 +183,39 @@ export default async function DashboardPage() {
 
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-6">
         <StatCard label="Jami obyektlar" value={s.total} icon={Building2} tone="navy" href="/dashboard/objects" />
-        <StatCard label="Samarasiz" value={s.inefficient} icon={TrendingDown} tone="gold" href="/dashboard/objects?inefficient=1" />
-        <StatCard label="Samarasiz ulushi" value={`${pct(s.inefficient, s.total)}%`} icon={Percent} tone="cobalt" />
+        <StatCard label="Bo'sh turgan" value={s.inefficient} icon={TrendingDown} tone="gold" href="/dashboard/objects?inefficient=1" />
+        {/* <StatCard label="Bo'sh turgan ulushi" value={`${pct(s.inefficient, s.total)}%`} icon={Percent} tone="cobalt" /> */}
         <StatCard label="Sinxronlangan" value={s.synced} icon={CheckCircle2} tone="green" />
-        <StatCard label="Kutilmoqda" value={s.pending} icon={Clock3} tone="amber" />
+        {/* <StatCard label="Kutilmoqda" value={s.pending} icon={Clock3} tone="amber" /> */}
         <StatCard label="Xato" value={s.failed} icon={XCircle} tone="red" />
       </div>
 
       {/* Kategoriyalar kesimi — hududlar bo'yicha (JAMI yuqorida) */}
       <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="mb-4">
-          <SectionTitle icon={Tags}>Kategoriyalar kesimi — hududlar bo'yicha</SectionTitle>
+          <SectionTitle icon={Tags}>Davlat obyektlaridan foydalanish markazi balansidagi obyektlar</SectionTitle>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               {/* 1-qator: kategoriya nomlari (kengaytirilganlari colSpan bilan) */}
               <tr className="text-left text-xs uppercase tracking-wide text-muted-foreground">
-                <th className="sticky left-0 z-10 bg-card py-2 pr-3 font-medium" rowSpan={2}>№</th>
-                <th className="sticky left-8 z-10 bg-card py-2 pr-4 font-medium" rowSpan={2}>Hududlar nomi</th>
-                <th className="py-2 text-center font-medium" rowSpan={2}>Jami</th>
+                <th className="sticky left-0 z-10 bg-card py-2 pr-3 font-bold" rowSpan={2}>№</th>
+                <th className="sticky left-8 z-10 bg-card py-2 pr-4 font-bold" rowSpan={2}>Hududlar nomi</th>
+                <th className="py-2  px-4 text-center font-bold" rowSpan={2}>Jami</th>
                 {COLUMNS.map((c) => (
                   <th
                     key={c.code}
                     colSpan={c.subs.length}
                     title={`${c.code}. ${c.nameUz}`}
-                    className="border-l border-border px-2 py-2 text-center align-bottom font-medium"
+                    className="border-l border-border px-2 py-2 text-center align-bottom font-bold"
                   >
-                    <span className="block text-[10px] font-normal normal-case leading-tight">{c.short}</span>
+                    <span className="block text-[12px] font-medium normal-case leading-tight">{c.short}</span>
                   </th>
                 ))}
               </tr>
               {/* 2-qator: kichik ustunlar */}
-              <tr className="border-b border-border text-left text-[10px] uppercase text-muted-foreground">
+              <tr className="border-b border-border text-left text-[10px] text-muted-foreground">
                 {COLUMNS.map((c) =>
                   c.subs.map((sub, si) => (
                     <th
