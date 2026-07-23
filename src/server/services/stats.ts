@@ -43,6 +43,12 @@ export interface RegionCategoryRow {
     paid: RentAreaStat;
     /** Bo'sh maydoni bor (ijarasi bor, lekin maydon to'liq band emas) */
     hasVacant: { count: number; area: number };
+    /**
+     * Kat 5 (Tekin foydalanish) yoki kat 6 (Ijara shartnomasi bor) — FAQAT shu ikkisiga EFFEKTIV
+     * kategoriyasi bo'yicha tegishli obyektlar (`counts["5"] + counts["6"]`). `free`/`paid` dan farqli:
+     * ular xususiyat bo'yicha (savdodagi obyekt ham kirishi mumkin), bu yerda faqat sof kat 5/6.
+     */
+    onlyFreeOrPaidCategory: { count: number };
     /** Bo'sh turgan (kat 11) — ijara yo'q, butun foydali maydon bo'sh */
     vacant: { count: number; usefulArea: number };
     /**
@@ -53,6 +59,8 @@ export interface RegionCategoryRow {
     /** Savdodagi lotlar — obyekt ikkalasida ham bo'lishi mumkin (kat 3 va 4). */
     privatizationLot: { count: number; rentContracts: number; rentedObjects: number };
     rentLot: { count: number; area: number; rentContracts: number; rentedObjects: number };
+    /** Bir vaqtda HAM xususiylashtirish, HAM ijara savdosida (hasPrivatizationLot AND hasRentLot). */
+    bothAuctions: { count: number };
     /** Kat 1 (Sotilgan, bo'lib to'lash) obyektlaridan ijara shartnomasi borlari soni. */
     installmentSoldRented: { count: number };
     /** Kat 7 (Savdoga chiqarish jarayonida) obyektlaridan ijara shartnomasi borlari soni. */
@@ -152,6 +160,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
       fullyRentedCount: bigint;
       privLotRentedObjects: bigint; rentLotOnlyRentedObjects: bigint;
       cat1RentedObjects: bigint; cat7RentedObjects: bigint;
+      bothAuctionsCount: bigint;
     }[]
   >(`
     WITH r AS (
@@ -186,6 +195,8 @@ async function computeDashboardStats(): Promise<DashboardStats> {
            COUNT(*)      FILTER (WHERE priv)    AS "privLotCount",
            COUNT(*)      FILTER (WHERE rentlot) AS "rentLotCount",
            COALESCE(SUM(lotarea) FILTER (WHERE rentlot), 0) AS "rentLotArea",
+           -- Bir vaqtda HAM xususiylashtirish, HAM ijara savdosida (kat 3/4 kesishmasi).
+           COUNT(*)      FILTER (WHERE priv AND rentlot) AS "bothAuctionsCount",
            -- Ijara shartnoma soni kat 3/4 ustunlari uchun: xususiylashtirish lotida bo'lsa
            -- (ijara lotida ham bo'lsa ham) kat 3 ga, faqat ijara lotida bo'lsa kat 4 ga.
            COALESCE(SUM(cnt) FILTER (WHERE priv), 0) AS "privLotContracts",
@@ -240,15 +251,17 @@ async function computeDashboardStats(): Promise<DashboardStats> {
       // Obyekt darajasida hisoblangan bo'sh maydonlar yig'indisi (manfiy emas).
       vacantArea: n(vacant),
     });
+    const counts = countsByRegion.get(r.regionId) ?? {};
     return {
       regionId: r.regionId,
       name: r.name,
       total: r.total,
-      counts: countsByRegion.get(r.regionId) ?? {},
+      counts,
       rentBreakdown: {
         free: mk(rr?.freeCount, rr?.freeUseful, rr?.freeRented, rr?.freeVacant),
         paid: mk(rr?.paidCount, rr?.paidUseful, rr?.paidRented, rr?.paidVacant),
         hasVacant: { count: Number(rr?.hasVacantCount ?? 0), area: n(rr?.hasVacantArea) },
+        onlyFreeOrPaidCategory: { count: (counts["5"] ?? 0) + (counts["6"] ?? 0) },
         vacant: { count: Number(rr?.vacantCount ?? 0), usefulArea: n(rr?.vacantUseful) },
         fullyRented: { count: Number(rr?.fullyRentedCount ?? 0) },
         privatizationLot: {
@@ -264,6 +277,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
         },
         installmentSoldRented: { count: Number(rr?.cat1RentedObjects ?? 0) },
         onAuctionProcessRented: { count: Number(rr?.cat7RentedObjects ?? 0) },
+        bothAuctions: { count: Number(rr?.bothAuctionsCount ?? 0) },
       },
     };
   });
@@ -317,7 +331,7 @@ export function buildDashboardColumns(): DashboardColumn[] {
           ...base,
           subs: [
             { label: "Soni", get: (r: RegionCategoryRow) => r.counts[String(c.code)] ?? 0 },
-            { label: "Ijaraga berilgan obyektlar soni", get: (r: RegionCategoryRow) => r.rentBreakdown.installmentSoldRented.count },
+            // { label: "Ijaraga berilgan obyektlar soni", get: (r: RegionCategoryRow) => r.rentBreakdown.installmentSoldRented.count },
           ],
         };
       case 3:
@@ -325,8 +339,8 @@ export function buildDashboardColumns(): DashboardColumn[] {
           ...base,
           subs: [
             { label: "Soni", get: (r: RegionCategoryRow) => r.rentBreakdown.privatizationLot.count },
-            { label: "Ijara shartnoma soni", get: (r: RegionCategoryRow) => r.rentBreakdown.privatizationLot.rentContracts },
-            { label: "Ijaraga berilgan obyektlar soni", get: (r: RegionCategoryRow) => r.rentBreakdown.privatizationLot.rentedObjects },
+            // { label: "Ijara shartnoma soni", get: (r: RegionCategoryRow) => r.rentBreakdown.privatizationLot.rentContracts },
+            // { label: "Ijaraga berilgan obyektlar soni", get: (r: RegionCategoryRow) => r.rentBreakdown.privatizationLot.rentedObjects },
           ],
         };
       case 4:
@@ -335,8 +349,8 @@ export function buildDashboardColumns(): DashboardColumn[] {
           subs: [
             { label: "Soni", get: (r: RegionCategoryRow) => r.rentBreakdown.rentLot.count },
             { label: "Maydon", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.rentLot.area },
-            { label: "Ijara shartnoma soni", get: (r: RegionCategoryRow) => r.rentBreakdown.rentLot.rentContracts },
-            { label: "Ijaraga berilgan obyektlar soni", get: (r: RegionCategoryRow) => r.rentBreakdown.rentLot.rentedObjects },
+            // { label: "Ijara shartnoma soni", get: (r: RegionCategoryRow) => r.rentBreakdown.rentLot.rentContracts },
+            // { label: "Ijaraga berilgan obyektlar soni", get: (r: RegionCategoryRow) => r.rentBreakdown.rentLot.rentedObjects },
           ],
         };
       case 7:
@@ -344,7 +358,7 @@ export function buildDashboardColumns(): DashboardColumn[] {
           ...base,
           subs: [
             { label: "Soni", get: (r: RegionCategoryRow) => r.counts[String(c.code)] ?? 0 },
-            { label: "Ijaraga berilgan obyektlar soni", get: (r: RegionCategoryRow) => r.rentBreakdown.onAuctionProcessRented.count },
+            // { label: "Ijaraga berilgan obyektlar soni", get: (r: RegionCategoryRow) => r.rentBreakdown.onAuctionProcessRented.count },
           ],
         };
       case 5:
@@ -352,9 +366,9 @@ export function buildDashboardColumns(): DashboardColumn[] {
           ...base,
           subs: [
             { label: "Soni", get: (r: RegionCategoryRow) => r.rentBreakdown.free.count },
-            { label: "Foydali", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.free.usefulArea },
-            { label: "Ijarada", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.free.rentedArea },
-            { label: "Bo'sh", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.free.vacantArea },
+            { label: "Foydali maydon", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.free.usefulArea },
+            { label: "Ijara maydoni", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.free.rentedArea },
+            { label: "Bo‘sh maydon", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.free.vacantArea },
           ],
         };
       case 6:
@@ -362,9 +376,9 @@ export function buildDashboardColumns(): DashboardColumn[] {
           ...base,
           subs: [
             { label: "Soni", get: (r: RegionCategoryRow) => r.rentBreakdown.paid.count },
-            { label: "Foydali", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.paid.usefulArea },
-            { label: "Ijarada", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.paid.rentedArea },
-            { label: "Bo'sh", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.paid.vacantArea },
+            { label: "Foydali maydon", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.paid.usefulArea },
+            { label: "Ijara maydoni", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.paid.rentedArea },
+            { label: "Bo‘sh maydon", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.paid.vacantArea },
           ],
         };
       case 11:

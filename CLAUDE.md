@@ -142,15 +142,28 @@ bo'lib to'lash) va kat 7 (Savdoga chiqarish jarayonida) — effektiv kategoriya 
 bo'yicha, lot bayrog'iga bog'liq emas. SQL: `privLotRentedObjects`, `rentLotOnlyRentedObjects`,
 `cat1RentedObjects`, `cat7RentedObjects` (`stats.ts` → `rentRaw`).
 
-⚠️ **Jadval oxiridagi "To'liq ijara berilgan" ustuni** kategoriyaga bog'liq emas (COLUMNS'dan tashqari,
-"Jami" ustuniga o'xshab alohida qo'shilgan): shartnoma bor (tekin foydalanish yoki pullik, ikkisidan
-biri yoki ikkisi birga) VA `vacantArea = 0` (foydali maydon to'liq band). SQL: `COUNT(*) FILTER (WHERE
-cnt > 0 AND vacant = 0)` (`stats.ts` → `rentRaw` → `fullyRentedCount`). Ro'yxat filtri:
-`PropertyFilters.fullyRented` → `buildWhere()` da `{ rentContractCount: { gt: 0 }, vacantArea: 0 }`;
-`/dashboard/objects?fullyRented=1` va uning eksporti (`/api/export/objects`) ham shu filtrni qo'llaydi.
-Excel eksportida (`/api/export/dashboard-categories`) ustun indeksi kategoriya ustunlari sonidan
-**dinamik** hisoblanadi (`fullyRentedColIdx = colIdx` sikldan keyin) — kategoriyalar soni o'zgarsa
-(masalan biri izohga olinsa/qo'shilsa) qayta hisoblashga hojat yo'q.
+⚠️ **Kategoriyaga bog'liq bo'lmagan qo'shimcha ustunlar** — `buildDashboardColumns()`ning natijasi
+EMAS (u faqat 1–12 kategoriya ustunlarini beradi), balki `dashboard/page.tsx` va
+`/api/export/dashboard-categories`da **qo'lda**, aniq joyga qo'shiladi:
+- **"Auksion savdolarida"** — kat 4 ("Savdoda ijara") ustunidan DARHOL KEYIN joylashadi. Bir vaqtda
+  HAM `hasPrivatizationLot`, HAM `hasRentLot` (`rentBreakdown.bothAuctions` — kat 3/4 kesishmasi,
+  real ma'lumotda 44 ta). Ro'yxat filtri: `PropertyFilters.bothAuctions`.
+- **"Ijaraga berilgan obyektlar"** — kat 6 ("Ijara shartnomasi bor") ustunidan DARHOL KEYIN
+  joylashadi. Qiymati: `counts["5"] + counts["6"]` — ya'ni FAQAT effektiv kategoriyasi 5 yoki 6
+  bo'lgan obyektlar (`rentBreakdown.onlyFreeOrPaidCategory`). ⚠️ Kat 5/6 ustunlarining o'z "Soni"si
+  (`free.count`/`paid.count`) bundan FARQ QILADI — ular XUSUSIYAT bo'yicha (savdodagi/sotilgan
+  obyekt ham kirishi mumkin), bu yangi ustun esa faqat SOF kat 5/6 obyektlarini sanaydi
+  (foydalanuvchi aniq talab qilgan: "boshqa kategoriyalar... ularni qo'shma"). Ro'yxat filtri:
+  `PropertyFilters.hasRentContract` → effektiv kategoriya `OR` (5 yoki 6), `rentContractCount`ga
+  emas (aks holda kat 3/4dagi ijara shartnomali obyektlar ham kirib ketardi).
+- **"To'liq ijara berilgan"** — jadval OXIRIDA, "Jami" ustuniga o'xshab: shartnoma bor (tekin
+  foydalanish yoki pullik) VA `vacantArea = 0`. Ro'yxat filtri: `PropertyFilters.fullyRented`.
+
+Barchasi `stats.ts` → `RegionCategoryRow.rentBreakdown`da hisoblanadi. Excel eksportida
+(`route.ts` → `exportCols`) kategoriya ustunlari va bu ikkitasi **BITTA** massivga (`ExportCol[]`)
+yig'iladi, so'ng kenglik/sarlavha/qiymat sikllari shu bitta massiv ustidan yuradi — 3 ta alohida
+siklda `colIdx`ni mustaqil hisoblashdan ko'ra xavfsizroq (kategoriyalardan biri izohga
+olinganda/qo'shilganda — masalan kat 8 — barcha sikllar avtomatik izchil qoladi).
 
 Aniqlash qoidalari (`classification.ts` → `deriveAuctionCategory`, tartib muhim):
 1. `order_statuses_id === 6` ⇒ sotilgan; `term_payment === 1` ⇒ kat 1, aks holda kat 2

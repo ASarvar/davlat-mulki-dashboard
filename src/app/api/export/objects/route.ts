@@ -26,6 +26,8 @@ export async function GET(req: Request) {
   const inefficient = sp.get("inefficient");
   const category = sp.get("category");
   const fullyRented = sp.get("fullyRented");
+  const hasRentContract = sp.get("hasRentContract");
+  const bothAuctions = sp.get("bothAuctions");
 
   const filters: PropertyFilters = {
     q: sp.get("q")?.trim() || undefined,
@@ -35,6 +37,8 @@ export async function GET(req: Request) {
     inefficient: inefficient === "1" ? true : inefficient === "0" ? false : undefined,
     syncStatus: statusRaw && statusRaw in SyncStatus ? (statusRaw as SyncStatus) : undefined,
     fullyRented: fullyRented === "1" ? true : undefined,
+    hasRentContract: hasRentContract === "1" ? true : undefined,
+    bothAuctions: bothAuctions === "1" ? true : undefined,
   };
 
   const passThrough = new PassThrough();

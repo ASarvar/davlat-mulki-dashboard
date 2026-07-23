@@ -155,14 +155,33 @@ export default async function DashboardPage() {
                 <th className="sticky left-8 z-10 bg-card py-2 pr-4 font-bold" rowSpan={2}>Hududlar nomi</th>
                 <th className="py-2  px-4 text-center font-bold" rowSpan={2}>Jami</th>
                 {COLUMNS.map((c) => (
-                  <th
-                    key={c.code}
-                    colSpan={c.subs.length}
-                    title={`${c.code}. ${c.nameUz}`}
-                    className="border-l border-border px-2 py-2 text-center align-bottom font-bold"
-                  >
-                    <span className="block text-[12px] font-medium normal-case leading-tight">{c.short}</span>
-                  </th>
+                  <Fragment key={c.code}>
+                    <th
+                      colSpan={c.subs.length}
+                      title={`${c.code}. ${c.nameUz}`}
+                      className="border-l border-border px-2 py-2 text-center align-bottom font-bold"
+                    >
+                      <span className="block text-[12px] font-medium normal-case leading-tight">{c.short}</span>
+                    </th>
+                    {c.code === 4 ? (
+                      <th
+                        className="border-l border-border px-2 py-2 text-center align-bottom font-bold"
+                        rowSpan={2}
+                        title="Bir vaqtda ham xususiylashtirish, ham ijara savdosida turgan obyektlar"
+                      >
+                        <span className="block text-[12px] font-medium normal-case leading-tight">Auksion savdolarida (Xususiy. va Ijara)</span>
+                      </th>
+                    ) : null}
+                    {c.code === 6 ? (
+                      <th
+                        className="border-l border-border px-2 py-2 text-center align-bottom font-bold"
+                        rowSpan={2}
+                        title="Tekin foydalanish yoki Ijara shartnomasi bor kategoriyalaridan biriga tegishli obyektlar"
+                      >
+                        <span className="block text-[12px] font-medium normal-case leading-tight">Ijaraga berilgan obyektlar (Sotilgan / Savdodagilardan tashqari)</span>
+                      </th>
+                    ) : null}
+                  </Fragment>
                 ))}
                 <th
                   className="border-l border-border px-2 py-2 text-center align-bottom font-bold"
@@ -194,17 +213,29 @@ export default async function DashboardPage() {
                   J A M I:
                 </td>
                 <td className="py-3 text-center tabular-nums" style={{ color: "#b91c1c" }}>{nf(totalObjects)}</td>
-                {COLUMNS.map((c) =>
-                  c.subs.map((sub, si) => (
-                    <td
-                      key={`${c.code}-${sub.label}`}
-                      className={`px-2 py-3 text-center tabular-nums ${si === 0 ? "border-l border-border" : ""}`}
-                      style={{ color: "#b91c1c" }}
-                    >
-                      {sub.area ? km(sumSub(sub)) : nf(sumSub(sub))}
-                    </td>
-                  )),
-                )}
+                {COLUMNS.map((c) => (
+                  <Fragment key={c.code}>
+                    {c.subs.map((sub, si) => (
+                      <td
+                        key={`${c.code}-${sub.label}`}
+                        className={`px-2 py-3 text-center tabular-nums ${si === 0 ? "border-l border-border" : ""}`}
+                        style={{ color: "#b91c1c" }}
+                      >
+                        {sub.area ? km(sumSub(sub)) : nf(sumSub(sub))}
+                      </td>
+                    ))}
+                    {c.code === 4 ? (
+                      <td className="border-l border-border px-2 py-3 text-center tabular-nums" style={{ color: "#b91c1c" }}>
+                        {nf(s.byRegionCategory.reduce((a, r) => a + r.rentBreakdown.bothAuctions.count, 0))}
+                      </td>
+                    ) : null}
+                    {c.code === 6 ? (
+                      <td className="border-l border-border px-2 py-3 text-center tabular-nums" style={{ color: "#b91c1c" }}>
+                        {nf(s.byRegionCategory.reduce((a, r) => a + r.rentBreakdown.onlyFreeOrPaidCategory.count, 0))}
+                      </td>
+                    ) : null}
+                  </Fragment>
+                ))}
                 <td className="border-l border-border px-2 py-3 text-center tabular-nums" style={{ color: "#b91c1c" }}>
                   {nf(s.byRegionCategory.reduce((a, r) => a + r.rentBreakdown.fullyRented.count, 0))}
                 </td>
@@ -221,35 +252,67 @@ export default async function DashboardPage() {
                     </Link>
                   </td>
                   <td className="py-2.5 text-center font-semibold tabular-nums">{nf(r.total)}</td>
-                  {COLUMNS.map((c) =>
-                    c.subs.map((sub, si) => {
-                      const v = sub.get(r);
-                      const cls = `px-2 py-2.5 text-center tabular-nums ${si === 0 ? "border-l border-border" : ""}`;
-                      if (v === 0) {
+                  {COLUMNS.map((c) => (
+                    <Fragment key={c.code}>
+                      {c.subs.map((sub, si) => {
+                        const v = sub.get(r);
+                        const cls = `px-2 py-2.5 text-center tabular-nums ${si === 0 ? "border-l border-border" : ""}`;
+                        if (v === 0) {
+                          return (
+                            <td key={`${c.code}-${sub.label}`} className={cls}>
+                              <span className="text-slate-300">0</span>
+                            </td>
+                          );
+                        }
+                        // Faqat "Soni" katagi ro'yxatga havola bo'ladi.
                         return (
                           <td key={`${c.code}-${sub.label}`} className={cls}>
-                            <span className="text-slate-300">0</span>
+                            {sub.area ? (
+                              <span className="text-muted-foreground">{km(v)}</span>
+                            ) : (
+                              <Link
+                                href={`/dashboard/objects?region=${r.regionId}&category=${c.code}`}
+                                className="hover:underline"
+                                style={{ color: "var(--cobalt)" }}
+                              >
+                                {nf(v)}
+                              </Link>
+                            )}
                           </td>
                         );
-                      }
-                      // Faqat "Soni" katagi ro'yxatga havola bo'ladi.
-                      return (
-                        <td key={`${c.code}-${sub.label}`} className={cls}>
-                          {sub.area ? (
-                            <span className="text-muted-foreground">{km(v)}</span>
+                      })}
+                      {c.code === 4 ? (
+                        <td className="border-l border-border px-2 py-2.5 text-center tabular-nums">
+                          {r.rentBreakdown.bothAuctions.count === 0 ? (
+                            <span className="text-slate-300">0</span>
                           ) : (
                             <Link
-                              href={`/dashboard/objects?region=${r.regionId}&category=${c.code}`}
+                              href={`/dashboard/objects?region=${r.regionId}&bothAuctions=1`}
                               className="hover:underline"
                               style={{ color: "var(--cobalt)" }}
                             >
-                              {nf(v)}
+                              {nf(r.rentBreakdown.bothAuctions.count)}
                             </Link>
                           )}
                         </td>
-                      );
-                    }),
-                  )}
+                      ) : null}
+                      {c.code === 6 ? (
+                        <td className="border-l border-border px-2 py-2.5 text-center tabular-nums">
+                          {r.rentBreakdown.onlyFreeOrPaidCategory.count === 0 ? (
+                            <span className="text-slate-300">0</span>
+                          ) : (
+                            <Link
+                              href={`/dashboard/objects?region=${r.regionId}&hasRentContract=1`}
+                              className="hover:underline"
+                              style={{ color: "var(--cobalt)" }}
+                            >
+                              {nf(r.rentBreakdown.onlyFreeOrPaidCategory.count)}
+                            </Link>
+                          )}
+                        </td>
+                      ) : null}
+                    </Fragment>
+                  ))}
                   <td className="border-l border-border px-2 py-2.5 text-center tabular-nums">
                     {r.rentBreakdown.fullyRented.count === 0 ? (
                       <span className="text-slate-300">0</span>
@@ -281,6 +344,16 @@ export default async function DashboardPage() {
         <p className="mt-1 text-xs text-muted-foreground">
           <strong>To'liq ijara berilgan</strong> — ijara shartnomasi bor (tekin foydalanish yoki pullik,
           ikkisidan biri yoki ikkisi birga) va foydali maydonning to'liq band qismi (bo'sh joy qolmagan).
+        </p>
+        {/* <p className="mt-1 text-xs text-muted-foreground">
+          <strong>Ijaraga berilgan obyektlar</strong> (Ijara shartnomasi bor ustunidan keyin) —{" "}
+          <strong>Tekin foydalanish</strong> yoki <strong>Ijara shartnomasi bor</strong> kategoriyalaridan
+          biriga tegishli obyektlar soni (ikkalasi bir-birini istisno qiladi).
+        </p> */}
+        <p className="mt-1 text-xs text-muted-foreground">
+          <strong>Auksion savdolarida</strong> — bir vaqtda ham{" "}
+          <strong>Savdoda xususiylashtirish</strong>, ham <strong>Savdoda ijara</strong> savdosida
+          turgan obyektlar soni.
         </p>
       </section>
 

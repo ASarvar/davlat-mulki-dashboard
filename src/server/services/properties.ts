@@ -19,6 +19,10 @@ export interface PropertyFilters {
   soha?: string;
   /** Ijara shartnomasi bor VA foydali maydon to'liq band (vacantArea = 0). Kategoriyaga bog'liq emas. */
   fullyRented?: boolean;
+  /** Ijara shartnomasi bor — tekin foydalanish yoki pullik, ikkisidan biri. Kategoriyaga bog'liq emas. */
+  hasRentContract?: boolean;
+  /** Bir vaqtda HAM xususiylashtirish, HAM ijara savdosida (kat 3 va 4 kesishmasi). */
+  bothAuctions?: boolean;
 }
 
 const PAGE_SIZE = 20;
@@ -82,6 +86,20 @@ export function buildWhere(user: SessionUser, f: PropertyFilters): Prisma.Proper
 
   // To'liq ijaraga berilgan — dashboard'dagi mos ustun bilan bir xil mantiq (stats.ts → rentRaw).
   if (f.fullyRented) and.push({ rentContractCount: { gt: 0 }, vacantArea: 0 });
+  // "Ijaraga berilgan obyektlar" ustuni — faqat EFFEKTIV kategoriyasi 5 yoki 6 bo'lganlar
+  // (boshqa kategoriyadagi, masalan savdodagi, ijara shartnomali obyektlar bu yerga kirmaydi).
+  if (f.hasRentContract) {
+    and.push({
+      OR: [
+        { integrationCategoryCode: CAT_FREE_USE },
+        { integrationCategoryCode: null, manualCategoryCode: CAT_FREE_USE },
+        { integrationCategoryCode: CAT_HAS_RENT },
+        { integrationCategoryCode: null, manualCategoryCode: CAT_HAS_RENT },
+      ],
+    });
+  }
+  // "Auksion savdolarida" ustuni — bir vaqtda HAM xususiylashtirish, HAM ijara savdosida.
+  if (f.bothAuctions) and.push({ hasPrivatizationLot: true, hasRentLot: true });
 
   if (typeof f.inefficient === "boolean") and.push({ isInefficient: f.inefficient });
   if (f.syncStatus) and.push({ syncStatus: f.syncStatus });
