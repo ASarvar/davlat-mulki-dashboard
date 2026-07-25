@@ -2,8 +2,7 @@ import { PassThrough, Readable } from "node:stream";
 import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { SyncStatus } from "@prisma/client";
-import { auth } from "@/auth";
-import type { SessionUser } from "@/lib/authz";
+import { getCurrentUser } from "@/lib/authz";
 import { CATEGORY_BY_CODE, effectiveCategory } from "@/lib/categories";
 import { iteratePropertiesForExport, type PropertyFilters } from "@/server/services/properties";
 
@@ -17,9 +16,9 @@ const SYNC_LABEL: Record<string, string> = {
 // Obyektlar ro'yxatini .xlsx qilib beradi. Joriy filtrlarni va
 // rol/hudud doirasini hurmat qiladi (buildWhere ro'yxat bilan umumiy).
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
-  const user = session.user as SessionUser;
+  // Rol DB'dan (eski sessiya eski rolni saqlaydi) — eksport hudud doirasi shunga bog'liq.
+  const user = await getCurrentUser();
+  if (!user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
 
   const sp = new URL(req.url).searchParams;
   const statusRaw = sp.get("status");

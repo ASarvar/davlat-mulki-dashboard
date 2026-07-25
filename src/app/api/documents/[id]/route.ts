@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getCurrentUser } from "@/lib/authz";
 import { prisma } from "@/lib/prisma";
 import { resolveDocumentPath } from "@/server/services/documents";
 
@@ -9,9 +9,9 @@ import { resolveDocumentPath } from "@/server/services/documents";
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const session = await auth();
-  if (!session?.user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
-  const user = session.user;
+  // Rol JWT'dan emas, DB'dan (authz.ts → getCurrentUser) — eski sessiya eski rolni saqlaydi.
+  const user = await getCurrentUser();
+  if (!user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
 
   const doc = await prisma.document.findUnique({
     where: { id },
@@ -19,8 +19,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   });
   if (!doc) return new NextResponse("Hujjat topilmadi", { status: 404 });
 
-  // NAZORATCHI faqat o'z hududi hujjatlarini ko'ra oladi.
-  if (user.role === "NAZORATCHI" && doc.property.regionId !== user.regionId) {
+  // IJROCHI faqat o'z hududi hujjatlarini ko'ra oladi.
+  if (user.role === "IJROCHI" && doc.property.regionId !== user.regionId) {
     return new NextResponse("Ruxsat yo'q", { status: 403 });
   }
 

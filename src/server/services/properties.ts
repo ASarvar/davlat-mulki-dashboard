@@ -36,11 +36,11 @@ export const PROPERTY_PAGE_SIZE = PAGE_SIZE;
 export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise<Prisma.PropertyWhereInput> {
   const and: Prisma.PropertyWhereInput[] = [];
 
-  // Hudud doirasi: NAZORATCHI faqat o'z hududini ko'radi. Boshqa rollar (admin/moderator/
+  // Hudud doirasi: IJROCHI faqat o'z hududini ko'radi. Boshqa rollar (admin/moderator/
   // kuzatuvchi) hamma obyektni ko'radi, lekin filtr param'ni hurmat qiladi. MODERATOR
   // qo'shimcha ravishda "faqat mening hududlarim" bilan o'ziga biriktirilgan hudud(lar)
   // bo'yicha saralashi mumkin (myRegionsOnly) — bu ko'rish cheklovi emas, ixtiyoriy filtr.
-  if (user.role === "NAZORATCHI" && user.regionId) {
+  if (user.role === "IJROCHI" && user.regionId) {
     and.push({ regionId: user.regionId });
   } else {
     if (f.regionId) and.push({ regionId: f.regionId });
@@ -321,13 +321,14 @@ export async function getPropertyDetail(user: SessionUser, cadNumber: string) {
         take: 10,
         include: {
           requestedBy: { select: { fullName: true } },
-          reviewedBy: { select: { fullName: true } },
+          moderator: { select: { fullName: true } },
+          rahbar: { select: { fullName: true } },
           document: { select: { id: true, fileName: true } },
         },
       },
     },
   });
   if (!property) return null;
-  if (user.role === "NAZORATCHI" && property.regionId !== user.regionId) return null;
+  if (user.role === "IJROCHI" && property.regionId !== user.regionId) return null;
   return property;
 }

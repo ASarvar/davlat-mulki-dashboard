@@ -20,6 +20,8 @@ export async function assignCategoryAction(_prev: AssignState, formData: FormDat
     const categoryCode = Number(formData.get("categoryCode"));
     const note = String(formData.get("note") ?? "");
     const file = formData.get("file");
+    // Ixtiyoriy ilova rasmlari — bo'sh input ham File (size 0) qaytaradi, filtrlanadi.
+    const images = formData.getAll("images").filter((f): f is File => f instanceof File && f.size > 0);
 
     if (!cadNumber) return { error: "Kadastr ko'rsatilmagan" };
     if (!categoryCode) return { error: "Kategoriya tanlanmagan" };
@@ -29,6 +31,7 @@ export async function assignCategoryAction(_prev: AssignState, formData: FormDat
       categoryCode,
       note,
       file: file instanceof File ? file : null,
+      images,
     });
 
     revalidatePath(objectHref(cadNumber));
@@ -45,9 +48,10 @@ export async function removeCategoryAction(_prev: AssignState, formData: FormDat
   try {
     const user = await requireUser();
     const cadNumber = String(formData.get("cadNumber") ?? "");
+    const note = String(formData.get("note") ?? "");
     if (!cadNumber) return { error: "Kadastr ko'rsatilmagan" };
 
-    await removeManualCategory(user, cadNumber);
+    await removeManualCategory(user, cadNumber, note);
 
     revalidatePath(objectHref(cadNumber));
     revalidatePath("/dashboard/objects");

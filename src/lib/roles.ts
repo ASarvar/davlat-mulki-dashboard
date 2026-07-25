@@ -4,8 +4,9 @@ import type { Role } from "@prisma/client";
 export const ROLE_LABEL: Record<Role, string> = {
   SUPER_ADMIN: "Super admin",
   ADMIN: "Admin",
+  RAHBARIYAT: "Rahbariyat",
   MODERATOR: "Moderator",
-  NAZORATCHI: "Hudud nazoratchisi",
+  IJROCHI: "Hudud ijrochisi",
   VIEWER: "Kuzatuvchi",
 };
 
@@ -18,14 +19,15 @@ export interface RoleOption {
 // Ro'yxatda ko'rsatiladigan yaratiladigan rollar (SUPER_ADMIN yaratilmaydi — u seed).
 export const ASSIGNABLE_ROLES: RoleOption[] = [
   { value: "ADMIN", label: "Admin", desc: "Super admin bilan bir xil huquq" },
-  { value: "MODERATOR", label: "Moderator", desc: "So'rovlarni tasdiqlaydi (hudud biriktiriladi)" },
-  { value: "NAZORATCHI", label: "Hudud nazoratchisi", desc: "Bitta hudud, kategoriya so'rovi yuboradi" },
+  { value: "RAHBARIYAT", label: "Rahbariyat", desc: "So'rovni yakuniy tasdiqlaydi (hamma hudud)" },
+  { value: "MODERATOR", label: "Moderator", desc: "So'rovni qabul qiladi (hudud biriktiriladi)" },
+  { value: "IJROCHI", label: "Hudud ijrochisi", desc: "Bitta hudud, kategoriya so'rovi yuboradi" },
   { value: "VIEWER", label: "Kuzatuvchi", desc: "Faqat ko'rish" },
 ];
 
 /** Rolga hudud kerakmi va qanday shaklda. */
 export function regionMode(role: Role): "single" | "multi" | "none" {
-  if (role === "NAZORATCHI") return "single";
+  if (role === "IJROCHI") return "single";
   if (role === "MODERATOR") return "multi";
   return "none";
 }

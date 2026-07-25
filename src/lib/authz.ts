@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@prisma/client";
@@ -17,11 +18,35 @@ export function isAdmin(role: Role): boolean {
   return role === "SUPER_ADMIN" || role === "ADMIN";
 }
 
+// Rol/hudud JWT'dan EMAS, har so'rovda DB'dan o'qiladi.
+// Sabab: JWT tizimga kirgan paytdagi rolni muzlatib qo'yadi — rol o'zgarsa (yoki
+// enum qayta nomlansa, masalan NAZORATCHI→IJROCHI) foydalanuvchi qayta kirmaguncha
+// eski huquqda qolardi. `cache()` bir so'rov ichida faqat bitta so'rov ketishini
+// ta'minlaydi. Middleware (edge) baribir faqat "kirganmi?" ni tekshiradi.
+const loadUser = cache(async (id: string) =>
+  prisma.user.findUnique({
+    where: { id },
+    select: { id: true, role: true, regionId: true, username: true, fullName: true, isActive: true },
+  }),
+);
+
+// Tizimga kirgan foydalanuvchi (yo'q/faolsiz bo'lsa null).
+export async function getCurrentUser(): Promise<SessionUser | null> {
+  const session = await auth();
+  const sessionUser = session?.user as SessionUser | undefined;
+  if (!sessionUser?.id) return null;
+
+  const db = await loadUser(sessionUser.id);
+  if (!db || !db.isActive) return null;
+
+  return { id: db.id, role: db.role, regionId: db.regionId, username: db.username, name: db.fullName };
+}
+
 // Tizimga kirgan foydalanuvchini talab qiladi.
 export async function requireUser(): Promise<SessionUser> {
-  const session = await auth();
-  if (!session?.user) throw new Error("Avtorizatsiya talab qilinadi");
-  return session.user as SessionUser;
+  const user = await getCurrentUser();
+  if (!user) throw new Error("Avtorizatsiya talab qilinadi");
+  return user;
 }
 
 // Ma'lum rol(lar)ni talab qiladi.
@@ -33,14 +58,14 @@ export async function requireRole(...roles: Role[]): Promise<SessionUser> {
 
 /**
  * Foydalanuvchi qaysi hududlarga tegishli:
- *  - SUPER_ADMIN / ADMIN / VIEWER → null (hamma hudud, cheklovsiz)
+ *  - SUPER_ADMIN / ADMIN / RAHBARIYAT / VIEWER → null (hamma hudud, cheklovsiz)
  *  - MODERATOR → allRegions bo'lsa null, aks holda biriktirilgan hududlar ro'yxati
- *  - NAZORATCHI → [o'z hududi]
+ *  - IJROCHI → [o'z hududi]
  * `null` = cheklov yo'q. Bo'sh massiv = hech qanday hudud (ehtiyot uchun).
  */
 export async function userRegionScope(user: SessionUser): Promise<string[] | null> {
-  if (isAdmin(user.role) || user.role === "VIEWER") return null;
-  if (user.role === "NAZORATCHI") return user.regionId ? [user.regionId] : [];
+  if (isAdmin(user.role) || user.role === "RAHBARIYAT" || user.role === "VIEWER") return null;
+  if (user.role === "IJROCHI") return user.regionId ? [user.regionId] : [];
   if (user.role === "MODERATOR") {
     const u = await prisma.user.findUnique({
       where: { id: user.id },
@@ -54,9 +79,9 @@ export async function userRegionScope(user: SessionUser): Promise<string[] | nul
 }
 
 // Hududga yozish/tasdiqlash ruxsati.
-//  - ADMIN/SUPER_ADMIN — hamma hudud
+//  - ADMIN/SUPER_ADMIN/RAHBARIYAT — hamma hudud
 //  - MODERATOR — o'z hududlari (yoki hammasi)
-//  - NAZORATCHI — o'z hududi (lekin u to'g'ridan-to'g'ri emas, so'rov orqali)
+//  - IJROCHI — o'z hududi (lekin u to'g'ridan-to'g'ri emas, so'rov orqali)
 export async function assertRegionWriteAccess(user: SessionUser, regionId: string): Promise<void> {
   if (isAdmin(user.role)) return;
   const scope = await userRegionScope(user);

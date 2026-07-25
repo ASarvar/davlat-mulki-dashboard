@@ -29,8 +29,11 @@ export interface SidebarUser {
 const NAV = [
   { href: "/dashboard", label: "Boshqaruv paneli", icon: LayoutDashboard, exact: true, roles: [] as string[] },
   { href: "/dashboard/objects", label: "Obyektlar", icon: Building2, exact: false, roles: [] },
-  { href: "/dashboard/requests", label: "Tasdiqlash so'rovlari", icon: ClipboardCheck, exact: false, roles: ["MODERATOR"] },
-  { href: "/dashboard/notifications", label: "Bildirishnomalar", icon: Bell, exact: false, roles: ["NAZORATCHI"] },
+  // Hammaga ko'rinadi: ko'rib chiqish jadvali rolga qarab, tarix esa har bir rol uchun
+  // o'z doirasida (ijrochi — o'z so'rovlari, moderator — o'z hududlari, qolganlar — hammasi).
+  { href: "/dashboard/requests", label: "Tasdiqlash so'rovlari", icon: ClipboardCheck, exact: false, roles: [] },
+  // Moderator ham xabar oladi: rahbariyat u qabul qilgan so'rov bo'yicha qaror chiqarsa.
+  { href: "/dashboard/notifications", label: "Bildirishnomalar", icon: Bell, exact: false, roles: ["IJROCHI", "MODERATOR"] },
   { href: "/dashboard/sync", label: "Sinxronizatsiya", icon: RefreshCw, exact: false, roles: ["SUPER_ADMIN", "ADMIN"] },
   { href: "/dashboard/sources", label: "Manbalar (STIR)", icon: Database, exact: false, roles: ["SUPER_ADMIN", "ADMIN"] },
   { href: "/dashboard/users", label: "Foydalanuvchilar", icon: Users, exact: false, roles: ["SUPER_ADMIN", "ADMIN"] },

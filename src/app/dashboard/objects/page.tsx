@@ -50,7 +50,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   // "Bo'sh maydoni bor" (kat 12) filtri tanlansa, maydon ustunida bo'sh maydon ko'rsatiladi.
   const showVacant = filters.categoryCode === CAT_HAS_VACANT_AREA;
 
-  const canFilterRegion = user.role !== "NAZORATCHI";
+  const canFilterRegion = user.role !== "IJROCHI";
   // MODERATOR hamma hududni ko'radi — dropdown'da ham hamma hudud ko'rsatiladi. Qo'shimcha
   // Hudud select'ining birinchi varianti "Faqat mening hududlarim" (ObjectFilters) bilan
   // o'ziga biriktirilganlar bo'yicha saralay oladi (myRegionsOnly, buildWhere()da qo'llanadi).

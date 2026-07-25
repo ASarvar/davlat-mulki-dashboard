@@ -17,7 +17,7 @@ import {
   Layers,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/authz";
+import { requireUser, isAdmin } from "@/lib/authz";
 import {
   getDashboardStats,
   buildDashboardColumns,
@@ -147,7 +147,7 @@ export default async function DashboardPage() {
             Davlat mulki obyektlari bo'yicha umumiy holat
           </p>
         </div>
-        {user.role !== "VIEWER" ? (
+        {isAdmin(user.role) ? (
           <Link
             href="/dashboard/sync"
             className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"

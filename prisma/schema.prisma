@@ -14,13 +14,16 @@ datasource db {
 // ─────────────────────────── Auth & Rollar ───────────────────────────
 // SUPER_ADMIN — tizim egasi.  ADMIN — super admin bilan bir xil, lekin super
 // adminni ko'rmaydi.  MODERATOR — hamma obyektni ko'radi, biriktirilgan hudud(lar)
-// so'rovlarini tasdiqlaydi.  NAZORATCHI — o'z hududi obyektlarini kategoriyaga
-// biriktirish so'rovini yuboradi.  VIEWER — faqat ko'rish.
+// so'rovlarini QABUL QILADI (1-bosqich).  RAHBARIYAT — moderator qabul qilgan
+// so'rovni yakuniy tasdiqlaydi (2-bosqich), 9/10 ni "Bo'sh turgan"ga qaytara oladi.
+// IJROCHI — o'z hududi obyektlarini kategoriyaga biriktirish so'rovini yuboradi.
+// VIEWER — faqat ko'rish.
 enum Role {
   SUPER_ADMIN
   ADMIN
+  RAHBARIYAT
   MODERATOR
-  NAZORATCHI
+  IJROCHI
   VIEWER
 }
 
@@ -32,7 +35,7 @@ model User {
   role         Role    @default(VIEWER)
   isActive     Boolean @default(true)
 
-  // NAZORATCHI uchun bitta hudud (majburiy, app-level).
+  // IJROCHI uchun bitta hudud (majburiy, app-level).
   regionId String?
   region   Region? @relation(fields: [regionId], references: [id])
 
@@ -45,7 +48,8 @@ model User {
   syncRuns         SyncRun[]                    @relation("TriggeredBy")
   auditLogs        AuditLog[]
   requestedChanges CategoryChangeRequest[]      @relation("RequestedBy")
-  reviewedChanges  CategoryChangeRequest[]      @relation("ReviewedBy")
+  moderatedChanges CategoryChangeRequest[]      @relation("ModeratorReview")
+  approvedChanges  CategoryChangeRequest[]      @relation("RahbarReview")
   notifications    Notification[]
 
   createdAt DateTime @default(now())
@@ -312,14 +316,27 @@ model Document {
   changeRequests CategoryChangeRequest[]
   createdAt    DateTime                     @default(now())
 
+  // Ilova rasmlari (ixtiyoriy, 4tagacha) asosiy PDF hujjatning "bolalari" sifatida
+  // saqlanadi — shunda so'rov ham, darhol biriktirish ham bitta FK bilan ishlaydi
+  // va PDF o'chirilganda rasmlar ham kaskad o'chadi.
+  parentId String?
+  parent   Document?  @relation("DocAttachments", fields: [parentId], references: [id], onDelete: Cascade)
+  children Document[] @relation("DocAttachments")
+
   @@index([propertyId])
+  @@index([parentId])
 }
 
 // ─────────────────── Kategoriya o'zgartirish so'rovi (workflow) ───────────────────
-// NAZORATCHI "Bo'sh turgan" obyektni "Yaroqsiz holat"/"Chekka hudud"ga biriktirish
-// SO'ROVINI yuboradi — u darhol qo'llanmaydi, MODERATOR tasdiqlaydi yoki rad etadi.
+// IJROCHI "Bo'sh turgan" obyektni "Yaroqsiz holat"/"Chekka hudud"ga biriktirish
+// SO'ROVINI yuboradi. So'rov IKKI BOSQICHDAN o'tadi va faqat oxirida qo'llanadi:
+//   PENDING_MODERATOR  → moderator obyektni o'rganadi, qabul qiladi yoki rad etadi
+//   PENDING_RAHBARIYAT → rahbariyat yakuniy qaror qabul qiladi
+//   APPROVED           → kategoriya qo'llandi
+//   REJECTED           → rad etildi (sababi bilan, ijrochiga xabar boradi)
 enum ChangeRequestStatus {
-  PENDING
+  PENDING_MODERATOR
+  PENDING_RAHBARIYAT
   APPROVED
   REJECTED
 }
@@ -335,12 +352,21 @@ model CategoryChangeRequest {
   note          String?
   documentId    String?
   document      Document?           @relation(fields: [documentId], references: [id])
-  status        ChangeRequestStatus @default(PENDING)
-  reviewedById  String?
-  reviewedBy    User?               @relation("ReviewedBy", fields: [reviewedById], references: [id])
-  reviewNote    String?
-  reviewedAt    DateTime?
-  createdAt     DateTime            @default(now())
+  status        ChangeRequestStatus @default(PENDING_MODERATOR)
+
+  // 1-bosqich — moderator (qabul qiluvchi)
+  moderatorId   String?
+  moderator     User?     @relation("ModeratorReview", fields: [moderatorId], references: [id])
+  moderatorNote String?
+  moderatorAt   DateTime?
+
+  // 2-bosqich — rahbariyat (yakuniy qaror)
+  rahbarId   String?
+  rahbar     User?     @relation("RahbarReview", fields: [rahbarId], references: [id])
+  rahbarNote String?
+  rahbarAt   DateTime?
+
+  createdAt DateTime @default(now())
 
   @@index([status])
   @@index([propertyId])

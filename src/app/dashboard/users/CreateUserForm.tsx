@@ -15,7 +15,7 @@ export function CreateUserForm({
   isSuperAdmin: boolean;
 }) {
   const [state, formAction, pending] = useActionState<UserFormState, FormData>(createUserAction, {});
-  const [role, setRole] = useState<Role>("NAZORATCHI");
+  const [role, setRole] = useState<Role>("IJROCHI");
 
   // ADMIN faqat Moderator/Nazoratchi/Kuzatuvchi yaratadi (Admin rolini super admin beradi).
   const roleOptions = ASSIGNABLE_ROLES.filter((r) => isSuperAdmin || r.value !== "ADMIN");

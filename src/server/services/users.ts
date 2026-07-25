@@ -7,7 +7,7 @@ export interface CreateUserInput {
   fullName: string;
   password: string;
   role: Role;
-  regionId?: string | null; // NAZORATCHI uchun
+  regionId?: string | null; // IJROCHI uchun
   allRegions?: boolean; // MODERATOR uchun (hamma hudud)
   moderatorRegionIds?: string[]; // MODERATOR uchun (aniq hududlar)
 }
@@ -28,7 +28,7 @@ function resolveRegions(input: {
   allRegions?: boolean;
   moderatorRegionIds?: string[];
 }): { regionId: string | null; allRegions: boolean; moderatorRegionIds: string[] } {
-  if (input.role === "NAZORATCHI") {
+  if (input.role === "IJROCHI") {
     if (!input.regionId) throw new Error("Nazoratchi uchun hudud tanlanishi shart");
     return { regionId: input.regionId, allRegions: false, moderatorRegionIds: [] };
   }

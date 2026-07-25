@@ -59,17 +59,20 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
   const effectiveCode = p.integrationCategoryCode ?? p.manualCategoryCode ?? 11;
   const isVacant = effectiveCode === 11;
   const inRegion = user.regionId === p.regionId;
-  // NAZORATCHI → so'rov; ADMIN/SUPER_ADMIN → darhol. MODERATOR'da to'g'ridan-to'g'ri
+  // IJROCHI → so'rov; ADMIN/SUPER_ADMIN → darhol. MODERATOR'da to'g'ridan-to'g'ri
   // biriktirish huquqi yo'q — u faqat /dashboard/requests'da so'rovlarni ko'rib chiqadi.
-  const canAssign = isVacant && (isAdmin(user.role) || (user.role === "NAZORATCHI" && inRegion));
-  const isRequest = user.role === "NAZORATCHI";
-  const pendingRequest = p.changeRequests.find((r) => r.status === "PENDING");
+  const canAssign = isVacant && (isAdmin(user.role) || (user.role === "IJROCHI" && inRegion));
+  const isRequest = user.role === "IJROCHI";
+  const pendingRequest = p.changeRequests.find(
+    (r) => r.status === "PENDING_MODERATOR" || r.status === "PENDING_RAHBARIYAT",
+  );
 
-  // Yaroqsiz/Chekka belgisini olib tashlash: faqat ADMIN/SUPER_ADMIN (MODERATOR'da
-  // to'g'ridan-to'g'ri biriktirish/bekor qilish huquqi yo'q). Olib tashlangach obyekt
+  // Yaroqsiz/Chekka belgisini olib tashlash: ADMIN/SUPER_ADMIN va RAHBARIYAT
+  // (MODERATOR/IJROCHI'da bekor qilish huquqi yo'q). Olib tashlangach obyekt
   // yana "Bo'sh turgan"ga qaytadi (integratsiya kategoriyasi 9/10 bo'la olmaydi,
   // shuning uchun effectiveCode===9/10 har doim manualCategoryCode'dan kelgan bo'ladi).
-  const canRemoveCategory = (effectiveCode === 9 || effectiveCode === 10) && isAdmin(user.role);
+  const canRemoveCategory =
+    (effectiveCode === 9 || effectiveCode === 10) && (isAdmin(user.role) || user.role === "RAHBARIYAT");
 
   // "Binoning umumiy maydoni" / "Foydali maydon" — API 2 xom javobidan to'g'ridan-to'g'ri
   // (object_area_p / object_area_u), Property.area/buildingArea emas: bu ustunlar
@@ -411,7 +414,10 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
               <p className="mt-1 text-amber-700">
                 {pendingRequest.requestedBy.fullName} tomonidan{" "}
                 <strong>{CATEGORY_BY_CODE.get(pendingRequest.toCategory)?.nameUz}</strong> kategoriyasiga
-                biriktirish so'rovi yuborilgan. Moderator tasdiqlashini kutmoqda.
+                biriktirish so'rovi yuborilgan.{" "}
+                {pendingRequest.status === "PENDING_MODERATOR"
+                  ? "Moderator ko'rib chiqishini kutmoqda (1-bosqich)."
+                  : "Moderator qabul qildi — rahbariyat tasdig'i kutilmoqda (2-bosqich)."}
               </p>
             </div>
           ) : null}
@@ -425,7 +431,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
               </div>
               <AssignCategoryForm cadNumber={p.cadNumber} isRequest={isRequest} />
             </div>
-          ) : !canAssign && (user.role === "NAZORATCHI" || isAdmin(user.role)) && !pendingRequest ? (
+          ) : !canAssign && (user.role === "IJROCHI" || isAdmin(user.role)) && !pendingRequest ? (
             <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
               Faqat "Bo'sh turgan" obyektni Yaroqsiz/Chekka kategoriyaga biriktirish mumkin.
             </div>

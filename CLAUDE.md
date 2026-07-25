@@ -38,25 +38,62 @@ status-check   API 3+4 (auksion zanjiri) + API 5 (ijara) → kategoriya
 - **Eski kadastr fallback:** har bir tekshiruv avval yangi, topilmasa eski kadastr bilan urinadi.
   Real ma'lumotda obyektlarning ~86% ida eski kadastr bor — bu asosiy yo'l, istisno emas.
 
-### Rollar (5 ta)
+### Rollar (6 ta)
 - `SUPER_ADMIN` — hammasi.
 - `ADMIN` — super admin bilan bir xil, lekin super adminni ko'rmaydi/boshqarmaydi.
+- `RAHBARIYAT` — **hamma hudud** (hudud biriktirilmaydi); so'rovni **yakuniy tasdiqlaydi** (2-bosqich);
+  9/10 kategoriyani "Bo'sh turgan"ga qaytara oladi (`removeManualCategory`).
 - `MODERATOR` — hamma obyektni ko'radi; biriktirilgan hudud(lar) (`UserRegion` yoki `allRegions`)
-  so'rovlarini tasdiqlaydi/rad etadi; darhol biriktira ham oladi.
-- `NAZORATCHI` — bitta hudud (`regionId`); "Bo'sh turgan" obyektni Yaroqsiz/Chekka'ga biriktirish
-  **so'rovini** yuboradi (darhol emas).
+  so'rovlarini **qabul qiladi** (1-bosqich) yoki rad etadi. To'g'ridan-to'g'ri biriktira **olmaydi**.
+- `IJROCHI` (Hudud ijrochisi) — bitta hudud (`regionId`); "Bo'sh turgan" obyektni Yaroqsiz/Chekka'ga
+  biriktirish **so'rovini** yuboradi (darhol emas).
 - `VIEWER` — faqat ko'rish.
+
+⚠️ Enum `NAZORATCHI` → `IJROCHI` deb qayta nomlangan (migratsiya `20260725120000_rahbariyat_two_stage`).
+Yorliqlar `src/lib/roles.ts` → `ROLE_LABEL` da; kodda rol satrini qo'lda yozmang.
 
 **Email YO'Q — `username` (login) + parol.** Ochiq ro'yxatdan o'tish yo'q; userlarni faqat
 SUPER_ADMIN/ADMIN qo'shadi (ADMIN, ADMIN/SUPER_ADMIN yarata olmaydi). Sync/Manbalar/Userlar —
 faqat SUPER_ADMIN+ADMIN. Rol doirasi bir joyda: `authz.ts` → `userRegionScope()`,
-`assertRegionWriteAccess()` (endi **async**).
+`assertRegionWriteAccess()` (endi **async**). RAHBARIYAT `userRegionScope()`da `null` (cheklovsiz).
 
-### Tasdiqlash workflow (`assignment.ts` + `CategoryChangeRequest`)
-Nazoratchi so'rovi → `CategoryChangeRequest(PENDING)` + PDF (darhol qo'llanmaydi). Moderator
-`/dashboard/requests`da tasdiqlaydi (kategoriya qo'llanadi + `Notification`) yoki rad etadi (Notification).
-Nazoratchi `/dashboard/notifications`da xabarni ko'radi. Admin/Moderator biriktirishi darhol qo'llanadi.
-Biriktirish formasi faqat **9 (Yaroqsiz), 10 (Chekka)** — `ASSIGNABLE_CATEGORY_CODES`, raqamsiz, PDF 15MB.
+### Tasdiqlash workflow — IKKI BOSQICH (`assignment.ts` + `CategoryChangeRequest`)
+```
+IJROCHI so'rov  →  PENDING_MODERATOR  →  (moderator qabul)  →  PENDING_RAHBARIYAT
+                                      →  (rad, sabab bilan)  →  REJECTED
+                   PENDING_RAHBARIYAT →  (rahbariyat tasdiq) →  APPROVED  ⇒ kategoriya QO'LLANADI
+                                      →  (rad, sabab bilan)  →  REJECTED
+```
+⚠️ **Kategoriya faqat oxirgi bosqichda qo'llanadi.** Moderator "qabul qilish"i hech narsani
+o'zgartirmaydi — u faqat statusni `PENDING_RAHBARIYAT`ga o'tkazadi. UI'da ham "Tasdiqlash" emas,
+"Qabul qilish" deb yoziladi (`RequestRow.tsx`).
+- **Rad etishda sabab MAJBURIY** (`reviewRequest` xato tashlaydi; tugma ham client'da bloklanadi) —
+  ijrochi sababni bildirishnomada ko'radi.
+- Rad etilsa PDF va rasmlar diskdan ham o'chadi.
+- Bildirishnomalar: har bosqichda ijrochiga; rahbariyat qarori haqida **qabul qilgan moderatorga ham**.
+- Kim qaysi bosqichni ko'radi — `reviewableStages()` (moderator → 1, rahbariyat → 2, admin → ikkalasi).
+  Hudud cheklovi amalda faqat moderator bosqichida ishlaydi.
+- Bosqich maydonlari alohida: `moderatorId/moderatorNote/moderatorAt` va `rahbarId/rahbarNote/rahbarAt`
+  (eski yagona `reviewedBy*` uchligi moderator maydonlariga qayta nomlangan).
+
+**So'rovlar tarixi** — `/dashboard/requests` **hamma rolga** ochiq. Sahifada ikki bo'lim:
+"Ko'rib chiqish kutilmoqda" (faqat `reviewableStages()` bo'sh bo'lmasa) va "So'rovlar tarixi"
+(`listRequestHistory()`, hammaga, o'z doirasida: ijrochi → o'z so'rovlari, moderator → o'z hududlari,
+rahbariyat/admin/kuzatuvchi → hammasi). Tarixda har ikki bosqich qarori (kim + izoh) ko'rinadi.
+
+⚠️ **Kategoriyani qaytarishda (`removeManualCategory`) sabab MAJBURIY** va u
+`PropertyCategoryAssignment`ga **11 (Bo'sh turgan)** yozuvi sifatida saqlanadi — shunda obyekt
+sahifasidagi "Biriktirishlar tarixi"da nima uchun qaytarilgani ko'rinadi. Ya'ni bu jadval endi
+faqat "biriktirish" emas, **qaytarish**ni ham yozadi.
+
+Biriktirish formasi faqat **9 (Yaroqsiz), 10 (Chekka)** — `ASSIGNABLE_CATEGORY_CODES`, raqamsiz.
+**Fayllar:** PDF majburiy (15MB), **4tagacha ixtiyoriy rasm** (JPG/PNG/WEBP, `MAX_IMAGE_ATTACHMENTS`,
+har biri `MAX_IMAGE_UPLOAD_BYTES` = 5MB — PDF'dan alohida, kichikroq chegara).
+⚠️ Rasmlar alohida jadval emas — asosiy PDF hujjatning **bolalari** (`Document.parentId`, self-relation,
+`onDelete: Cascade`). Shuning uchun PDF o'chsa rasmlar ham o'chadi va so'rov/darhol-biriktirish
+yo'llarining ikkalasi ham bitta `documentId` FK bilan ishlayveradi. Diskdan o'chirishda
+`{ OR: [{ id }, { parentId: id }] }` bilan storageKey'larni oldin yig'ish kerak (kaskad DB'da, disk emas).
+PDF siqish YO'Q — foydalanuvchi tanlovi (Ghostscript kerak bo'lardi).
 
 ## Tashqi API'lar (hammasi jonli tasdiqlangan)
 
