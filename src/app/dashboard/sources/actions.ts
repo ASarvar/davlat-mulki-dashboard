@@ -21,7 +21,7 @@ const createSchema = z.object({
 
 export async function createSourceAction(_prev: SourceState, formData: FormData): Promise<SourceState> {
   try {
-    const actor = await requireRole("SUPER_ADMIN");
+    const actor = await requireRole("SUPER_ADMIN", "ADMIN");
     const parsed = createSchema.safeParse({
       regionId: formData.get("regionId"),
       name: formData.get("name"),
@@ -39,7 +39,7 @@ export async function createSourceAction(_prev: SourceState, formData: FormData)
 
 export async function deleteSourceAction(_prev: SourceState, formData: FormData): Promise<SourceState> {
   try {
-    const actor = await requireRole("SUPER_ADMIN");
+    const actor = await requireRole("SUPER_ADMIN", "ADMIN");
     const sourceId = String(formData.get("sourceId") ?? "");
     if (!sourceId) return { error: "Manba ko'rsatilmagan" };
 
@@ -59,7 +59,7 @@ const updateSchema = z.object({
 
 export async function updateSourceAction(_prev: SourceState, formData: FormData): Promise<SourceState> {
   try {
-    const actor = await requireRole("SUPER_ADMIN");
+    const actor = await requireRole("SUPER_ADMIN", "ADMIN");
     const parsed = updateSchema.safeParse({
       sourceId: formData.get("sourceId"),
       name: formData.get("name"),

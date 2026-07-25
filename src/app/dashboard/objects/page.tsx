@@ -20,7 +20,10 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   const sp = await searchParams;
 
   const q = str(sp.q)?.trim() || undefined;
-  const region = str(sp.region) || undefined;
+  const regionRaw = str(sp.region) || undefined;
+  // "mine" — Hudud select'idagi maxsus variant (faqat MODERATOR), haqiqiy hudud ID emas.
+  const myRegionsOnly = regionRaw === "mine";
+  const region = myRegionsOnly ? undefined : regionRaw;
   const soha = str(sp.soha) || undefined;
   const categoryStr = str(sp.category);
   const inefficientStr = str(sp.inefficient);
@@ -41,14 +44,21 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     fullyRented: fullyRentedStr === "1" ? true : undefined,
     hasRentContract: hasRentContractStr === "1" ? true : undefined,
     onAnyAuction: onAnyAuctionStr === "1" ? true : undefined,
+    myRegionsOnly: myRegionsOnly || undefined,
   };
 
   // "Bo'sh maydoni bor" (kat 12) filtri tanlansa, maydon ustunida bo'sh maydon ko'rsatiladi.
   const showVacant = filters.categoryCode === CAT_HAS_VACANT_AREA;
 
-  const canFilterRegion = user.role !== "REGION_USER";
+  const canFilterRegion = user.role !== "NAZORATCHI";
+  // MODERATOR hamma hududni ko'radi — dropdown'da ham hamma hudud ko'rsatiladi. Qo'shimcha
+  // Hudud select'ining birinchi varianti "Faqat mening hududlarim" (ObjectFilters) bilan
+  // o'ziga biriktirilganlar bo'yicha saralay oladi (myRegionsOnly, buildWhere()da qo'llanadi).
+  const showMyRegionsToggle = user.role === "MODERATOR";
   const [regions, sohaList, result] = await Promise.all([
-    canFilterRegion ? prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }) : Promise.resolve([]),
+    canFilterRegion
+      ? prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } })
+      : Promise.resolve([]),
     listSourceNames(),
     listProperties(user, filters, requestedPage),
   ]);
@@ -56,7 +66,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   // Joriy filtrlar (eksport va sahifalash uchun umumiy).
   const baseParams = new URLSearchParams();
   if (q) baseParams.set("q", q);
-  if (region) baseParams.set("region", region);
+  if (regionRaw) baseParams.set("region", regionRaw);
   if (soha) baseParams.set("soha", soha);
   if (categoryStr) baseParams.set("category", categoryStr);
   if (inefficientStr) baseParams.set("inefficient", inefficientStr);
@@ -98,7 +108,8 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
         regions={regions}
         sohaList={sohaList}
         canFilterRegion={canFilterRegion}
-        current={{ q, region, soha, category: categoryStr, inefficient: inefficientStr }}
+        showMyRegionsToggle={showMyRegionsToggle}
+        current={{ q, region: regionRaw, soha, category: categoryStr, inefficient: inefficientStr }}
       />
 
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">

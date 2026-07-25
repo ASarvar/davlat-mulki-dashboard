@@ -44,7 +44,7 @@ function StatCard({
   href,
 }: {
   label: string;
-  value: number | string;
+  value: React.ReactNode;
   icon: LucideIcon;
   tone: Tone;
   href?: string;

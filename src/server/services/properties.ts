@@ -6,8 +6,9 @@ import {
   CAT_HAS_VACANT_AREA,
   CAT_ON_AUCTION,
   CAT_ON_AUCTION_RENT,
+  CAT_VACANT,
 } from "./classification";
-import type { SessionUser } from "@/lib/authz";
+import { userRegionScope, type SessionUser } from "@/lib/authz";
 
 export interface PropertyFilters {
   q?: string; // kadastr (yangi/eski) bo'yicha qidiruv
@@ -23,6 +24,8 @@ export interface PropertyFilters {
   hasRentContract?: boolean;
   /** Xususiylashtirish YOKI ijara savdosida (kat 3 va 4 birlashmasi, takror sanalmaydi). */
   onAnyAuction?: boolean;
+  /** MODERATOR uchun: faqat o'ziga biriktirilgan hudud(lar) bo'yicha saralash (ko'rish cheklovi emas). */
+  myRegionsOnly?: boolean;
 }
 
 const PAGE_SIZE = 20;
@@ -30,14 +33,21 @@ export const PROPERTY_PAGE_SIZE = PAGE_SIZE;
 
 // Rol/hudud + filtrlar asosida WHERE quramiz.
 // EKSPORT ham shu funksiyani ishlatadi — hudud doirasi bir joyda, takrorlanmaydi.
-export function buildWhere(user: SessionUser, f: PropertyFilters): Prisma.PropertyWhereInput {
+export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise<Prisma.PropertyWhereInput> {
   const and: Prisma.PropertyWhereInput[] = [];
 
-  // Hudud doirasi: REGION_USER faqat o'z hududini ko'radi.
-  if (user.role === "REGION_USER" && user.regionId) {
+  // Hudud doirasi: NAZORATCHI faqat o'z hududini ko'radi. Boshqa rollar (admin/moderator/
+  // kuzatuvchi) hamma obyektni ko'radi, lekin filtr param'ni hurmat qiladi. MODERATOR
+  // qo'shimcha ravishda "faqat mening hududlarim" bilan o'ziga biriktirilgan hudud(lar)
+  // bo'yicha saralashi mumkin (myRegionsOnly) — bu ko'rish cheklovi emas, ixtiyoriy filtr.
+  if (user.role === "NAZORATCHI" && user.regionId) {
     and.push({ regionId: user.regionId });
-  } else if (f.regionId) {
-    and.push({ regionId: f.regionId });
+  } else {
+    if (f.regionId) and.push({ regionId: f.regionId });
+    if (f.myRegionsOnly && user.role === "MODERATOR") {
+      const scope = await userRegionScope(user);
+      if (scope !== null) and.push({ regionId: { in: scope } });
+    }
   }
 
   // Kadastr qidiruvi (pg_trgm GIN indeks orqali ILIKE %q%).
@@ -71,6 +81,10 @@ export function buildWhere(user: SessionUser, f: PropertyFilters): Prisma.Proper
       // Bo'sh maydoni bor = ijarasi bor, lekin foydali maydon to'liq band emas.
       and.push({ rentContractCount: { gt: 0 } });
       and.push({ vacantArea: { gt: 0 } });
+    } else if (c === CAT_VACANT) {
+      // "Bo'sh turgan" DB ustunlarida hech qachon literal 11 sifatida saqlanmaydi —
+      // bu ikkala kategoriya ustuni ham null bo'lgan (hali hech narsaga biriktirilmagan) holat.
+      and.push({ integrationCategoryCode: null, manualCategoryCode: null });
     } else {
       and.push({
         OR: [
@@ -139,7 +153,7 @@ export async function listProperties(
   filters: PropertyFilters,
   requestedPage = 1,
 ): Promise<PropertyListResult> {
-  const where = buildWhere(user, filters);
+  const where = await buildWhere(user, filters);
 
   const total = await prisma.property.count({ where });
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
@@ -220,7 +234,7 @@ export async function* iteratePropertiesForExport(
   filters: PropertyFilters,
   batchSize = 1000,
 ): AsyncGenerator<PropertyExportRow[]> {
-  const where = buildWhere(user, filters);
+  const where = await buildWhere(user, filters);
   let cursor: string | undefined;
 
   for (;;) {
@@ -302,9 +316,18 @@ export async function getPropertyDetail(user: SessionUser, cadNumber: string) {
         orderBy: { createdAt: "desc" },
         include: { category: true, document: true, assignedBy: { select: { fullName: true } } },
       },
+      changeRequests: {
+        orderBy: { createdAt: "desc" },
+        take: 10,
+        include: {
+          requestedBy: { select: { fullName: true } },
+          reviewedBy: { select: { fullName: true } },
+          document: { select: { id: true, fileName: true } },
+        },
+      },
     },
   });
   if (!property) return null;
-  if (user.role === "REGION_USER" && property.regionId !== user.regionId) return null;
+  if (user.role === "NAZORATCHI" && property.regionId !== user.regionId) return null;
   return property;
 }

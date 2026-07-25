@@ -14,12 +14,13 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { lotUrl } from "@/server/integrations/auction";
-import { requireUser } from "@/lib/authz";
+import { requireUser, isAdmin } from "@/lib/authz";
 import { getPropertyDetail } from "@/server/services/properties";
 import { pathToCad } from "@/lib/cadastre";
 import { CATEGORY_BY_CODE } from "@/lib/categories";
 import { CategoryBadge, InefficientBadge, SyncStatusBadge } from "@/components/badges";
 import { AssignCategoryForm } from "./AssignCategoryForm";
+import { RemoveCategoryButton } from "./RemoveCategoryButton";
 import { CadastreRawData } from "./CadastreRawData";
 import { syncSingleAction } from "../actions";
 
@@ -50,8 +51,25 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
   const p = await getPropertyDetail(user, cadNumber);
   if (!p) notFound();
 
-  const canWrite =
-    user.role === "SUPER_ADMIN" || (user.role === "REGION_USER" && user.regionId === p.regionId);
+  // Kim yangilash tugmasini ko'radi (API orqali sync) — admin.
+  const canSync = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
+
+  // Kategoriya biriktirish/so'rov: faqat "Bo'sh turgan" (11) obyekt uchun.
+  // Ikkalasi ham null bo'lsa ham "Bo'sh turgan" (DB'da 11 alohida saqlanmaydi).
+  const effectiveCode = p.integrationCategoryCode ?? p.manualCategoryCode ?? 11;
+  const isVacant = effectiveCode === 11;
+  const inRegion = user.regionId === p.regionId;
+  // NAZORATCHI → so'rov; ADMIN/SUPER_ADMIN → darhol. MODERATOR'da to'g'ridan-to'g'ri
+  // biriktirish huquqi yo'q — u faqat /dashboard/requests'da so'rovlarni ko'rib chiqadi.
+  const canAssign = isVacant && (isAdmin(user.role) || (user.role === "NAZORATCHI" && inRegion));
+  const isRequest = user.role === "NAZORATCHI";
+  const pendingRequest = p.changeRequests.find((r) => r.status === "PENDING");
+
+  // Yaroqsiz/Chekka belgisini olib tashlash: faqat ADMIN/SUPER_ADMIN (MODERATOR'da
+  // to'g'ridan-to'g'ri biriktirish/bekor qilish huquqi yo'q). Olib tashlangach obyekt
+  // yana "Bo'sh turgan"ga qaytadi (integratsiya kategoriyasi 9/10 bo'la olmaydi,
+  // shuning uchun effectiveCode===9/10 har doim manualCategoryCode'dan kelgan bo'ladi).
+  const canRemoveCategory = (effectiveCode === 9 || effectiveCode === 10) && isAdmin(user.role);
 
   // "Binoning umumiy maydoni" / "Foydali maydon" — API 2 xom javobidan to'g'ridan-to'g'ri
   // (object_area_p / object_area_u), Property.area/buildingArea emas: bu ustunlar
@@ -83,7 +101,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
         <div className="flex flex-wrap items-center gap-2">
           <SyncStatusBadge status={p.syncStatus} />
           <InefficientBadge value={p.isInefficient} />
-          {canWrite ? (
+          {canSync ? (
             <form action={syncSingleAction}>
               <input type="hidden" name="cadNumber" value={p.cadNumber} />
               <button
@@ -387,18 +405,44 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
 
         {/* Kategoriya biriktirish + tarix */}
         <section className="space-y-4">
-          {canWrite ? (
+          {pendingRequest ? (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm shadow-sm">
+              <p className="font-medium text-amber-800">Tasdiqlash kutilmoqda</p>
+              <p className="mt-1 text-amber-700">
+                {pendingRequest.requestedBy.fullName} tomonidan{" "}
+                <strong>{CATEGORY_BY_CODE.get(pendingRequest.toCategory)?.nameUz}</strong> kategoriyasiga
+                biriktirish so'rovi yuborilgan. Moderator tasdiqlashini kutmoqda.
+              </p>
+            </div>
+          ) : null}
+
+          {canAssign && !pendingRequest ? (
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <div className="mb-3">
-                <SectionTitle icon={Tag}>Qo'lda kategoriya biriktirish</SectionTitle>
+                <SectionTitle icon={Tag}>
+                  {isRequest ? "Kategoriya biriktirish so'rovi" : "Qo'lda kategoriya biriktirish"}
+                </SectionTitle>
               </div>
-              <AssignCategoryForm cadNumber={p.cadNumber} />
+              <AssignCategoryForm cadNumber={p.cadNumber} isRequest={isRequest} />
             </div>
-          ) : (
+          ) : !canAssign && (user.role === "NAZORATCHI" || isAdmin(user.role)) && !pendingRequest ? (
             <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
-              Kategoriya biriktirish uchun ushbu hudud foydalanuvchisi bo'lishingiz kerak.
+              Faqat "Bo'sh turgan" obyektni Yaroqsiz/Chekka kategoriyaga biriktirish mumkin.
             </div>
-          )}
+          ) : null}
+
+          {canRemoveCategory ? (
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <div className="mb-3">
+                <SectionTitle icon={Tag}>Kategoriyani bekor qilish</SectionTitle>
+              </div>
+              <p className="mb-3 text-sm text-muted-foreground">
+                Obyekt hozir <strong>{CATEGORY_BY_CODE.get(effectiveCode)?.nameUz}</strong> kategoriyasida.
+                Olib tashlansa, obyekt yana "Bo'sh turgan"ga qaytadi.
+              </p>
+              <RemoveCategoryButton cadNumber={p.cadNumber} />
+            </div>
+          ) : null}
 
           <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
             <div className="mb-3">

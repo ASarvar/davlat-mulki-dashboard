@@ -12,23 +12,28 @@ import {
   LogOut,
   Menu,
   X,
+  Bell,
+  ClipboardCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/app/dashboard/actions";
 
 export interface SidebarUser {
   name: string;
-  email: string;
+  username: string;
   role: string;
   roleLabel: string;
 }
 
+// `roles` — bo'sh bo'lsa hammaga ko'rinadi; aks holda faqat shu rollarga.
 const NAV = [
-  { href: "/dashboard", label: "Boshqaruv paneli", icon: LayoutDashboard, exact: true, adminOnly: false },
-  { href: "/dashboard/objects", label: "Obyektlar", icon: Building2, exact: false, adminOnly: false },
-  { href: "/dashboard/sync", label: "Sinxronizatsiya", icon: RefreshCw, exact: false, adminOnly: false },
-  { href: "/dashboard/sources", label: "Manbalar (STIR)", icon: Database, exact: false, adminOnly: true },
-  { href: "/dashboard/users", label: "Foydalanuvchilar", icon: Users, exact: false, adminOnly: true },
+  { href: "/dashboard", label: "Boshqaruv paneli", icon: LayoutDashboard, exact: true, roles: [] as string[] },
+  { href: "/dashboard/objects", label: "Obyektlar", icon: Building2, exact: false, roles: [] },
+  { href: "/dashboard/requests", label: "Tasdiqlash so'rovlari", icon: ClipboardCheck, exact: false, roles: ["MODERATOR"] },
+  { href: "/dashboard/notifications", label: "Bildirishnomalar", icon: Bell, exact: false, roles: ["NAZORATCHI"] },
+  { href: "/dashboard/sync", label: "Sinxronizatsiya", icon: RefreshCw, exact: false, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { href: "/dashboard/sources", label: "Manbalar (STIR)", icon: Database, exact: false, roles: ["SUPER_ADMIN", "ADMIN"] },
+  { href: "/dashboard/users", label: "Foydalanuvchilar", icon: Users, exact: false, roles: ["SUPER_ADMIN", "ADMIN"] },
 ];
 
 const SIDEBAR_BG = "linear-gradient(180deg, var(--navy) 0%, var(--navy-mid) 100%)";
@@ -39,14 +44,14 @@ function initials(name: string): string {
   return chars || "?";
 }
 
-export function Sidebar({ user }: { user: SidebarUser }) {
+export function Sidebar({ user, unreadCount = 0 }: { user: SidebarUser; unreadCount?: number }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   // Sahifa almashganda mobil menyuni yopamiz.
   useEffect(() => setOpen(false), [pathname]);
 
-  const items = NAV.filter((i) => !i.adminOnly || user.role === "SUPER_ADMIN");
+  const items = NAV.filter((i) => i.roles.length === 0 || i.roles.includes(user.role));
 
   const inner = (
     <>
@@ -77,7 +82,13 @@ export function Sidebar({ user }: { user: SidebarUser }) {
                 style={active ? { color: "var(--gold)" } : undefined}
               />
               <span className="truncate">{label}</span>
-              {active ? <span className="ml-auto h-5 w-1 shrink-0 rounded-full" style={{ background: "var(--gold)" }} /> : null}
+              {href === "/dashboard/notifications" && unreadCount > 0 ? (
+                <span className="ml-auto rounded-full bg-red-500 px-1.5 text-[11px] font-semibold text-white">
+                  {unreadCount}
+                </span>
+              ) : active ? (
+                <span className="ml-auto h-5 w-1 shrink-0 rounded-full" style={{ background: "var(--gold)" }} />
+              ) : null}
             </Link>
           );
         })}
@@ -87,10 +98,10 @@ export function Sidebar({ user }: { user: SidebarUser }) {
       <div className="border-t border-white/10 p-4">
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
-            {initials(user.name || user.email)}
+            {initials(user.name || user.username)}
           </div>
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-medium text-white">{user.name || user.email}</p>
+            <p className="truncate text-sm font-medium text-white">{user.name || user.username}</p>
             <p className="truncate text-[11px] text-white/50">{user.roleLabel}</p>
           </div>
           <form action={signOutAction}>

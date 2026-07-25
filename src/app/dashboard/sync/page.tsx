@@ -1,6 +1,6 @@
 import { RefreshCw, History, AlertTriangle } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/authz";
+import { requireRole } from "@/lib/authz";
 import { getPendingJobCounts, getQueueHealth } from "@/server/services/syncAdmin";
 import { SyncRunStatusBadge } from "@/components/badges";
 import { SyncControls } from "./SyncControls";
@@ -13,7 +13,8 @@ const RUN_TYPE_LABEL: Record<string, string> = {
 };
 
 export default async function SyncPage() {
-  const user = await requireUser();
+  // Sinxronizatsiya faqat SUPER_ADMIN va ADMIN uchun.
+  await requireRole("SUPER_ADMIN", "ADMIN");
 
   const [regions, runs] = await Promise.all([
     prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
@@ -63,16 +64,9 @@ export default async function SyncPage() {
         </div>
       ) : null}
 
-      {user.role !== "VIEWER" ? (
-        <div className="mb-6">
-          <SyncControls
-            regions={regions}
-            canFullSync={user.role === "SUPER_ADMIN"}
-            lockedRegionId={user.role === "REGION_USER" ? user.regionId : null}
-            pendingJobs={pendingJobs}
-          />
-        </div>
-      ) : null}
+      <div className="mb-6">
+        <SyncControls regions={regions} canFullSync lockedRegionId={null} pendingJobs={pendingJobs} />
+      </div>
 
       <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--navy)" }}>
         <History className="h-4 w-4" style={{ color: "var(--gold)" }} />

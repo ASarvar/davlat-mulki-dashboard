@@ -38,9 +38,25 @@ status-check   API 3+4 (auksion zanjiri) + API 5 (ijara) → kategoriya
 - **Eski kadastr fallback:** har bir tekshiruv avval yangi, topilmasa eski kadastr bilan urinadi.
   Real ma'lumotda obyektlarning ~86% ida eski kadastr bor — bu asosiy yo'l, istisno emas.
 
-### Rollar
-`SUPER_ADMIN` (hammasi) · `REGION_USER` (faqat o'z hududi, kategoriya+PDF biriktiradi) · `VIEWER` (ko'rish).
-Ochiq ro'yxatdan o'tish yo'q — foydalanuvchini faqat admin qo'shadi.
+### Rollar (5 ta)
+- `SUPER_ADMIN` — hammasi.
+- `ADMIN` — super admin bilan bir xil, lekin super adminni ko'rmaydi/boshqarmaydi.
+- `MODERATOR` — hamma obyektni ko'radi; biriktirilgan hudud(lar) (`UserRegion` yoki `allRegions`)
+  so'rovlarini tasdiqlaydi/rad etadi; darhol biriktira ham oladi.
+- `NAZORATCHI` — bitta hudud (`regionId`); "Bo'sh turgan" obyektni Yaroqsiz/Chekka'ga biriktirish
+  **so'rovini** yuboradi (darhol emas).
+- `VIEWER` — faqat ko'rish.
+
+**Email YO'Q — `username` (login) + parol.** Ochiq ro'yxatdan o'tish yo'q; userlarni faqat
+SUPER_ADMIN/ADMIN qo'shadi (ADMIN, ADMIN/SUPER_ADMIN yarata olmaydi). Sync/Manbalar/Userlar —
+faqat SUPER_ADMIN+ADMIN. Rol doirasi bir joyda: `authz.ts` → `userRegionScope()`,
+`assertRegionWriteAccess()` (endi **async**).
+
+### Tasdiqlash workflow (`assignment.ts` + `CategoryChangeRequest`)
+Nazoratchi so'rovi → `CategoryChangeRequest(PENDING)` + PDF (darhol qo'llanmaydi). Moderator
+`/dashboard/requests`da tasdiqlaydi (kategoriya qo'llanadi + `Notification`) yoki rad etadi (Notification).
+Nazoratchi `/dashboard/notifications`da xabarni ko'radi. Admin/Moderator biriktirishi darhol qo'llanadi.
+Biriktirish formasi faqat **9 (Yaroqsiz), 10 (Chekka)** — `ASSIGNABLE_CATEGORY_CODES`, raqamsiz, PDF 15MB.
 
 ## Tashqi API'lar (hammasi jonli tasdiqlangan)
 

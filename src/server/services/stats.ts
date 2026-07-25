@@ -131,7 +131,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
       ORDER BY r."sortOrder", r.name
     `),
     prisma.$queryRaw<{ code: number | null; count: number }[]>`
-      SELECT COALESCE("integrationCategoryCode", "manualCategoryCode") AS code,
+      SELECT COALESCE("integrationCategoryCode", "manualCategoryCode", 11) AS code,
              COUNT(*)::int AS count
       FROM "Property"
       GROUP BY 1
@@ -144,7 +144,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
     { regionId: string; code: number | null; count: bigint }[]
   >(`
     SELECT p."regionId",
-           COALESCE(p."integrationCategoryCode", p."manualCategoryCode") AS code,
+           COALESCE(p."integrationCategoryCode", p."manualCategoryCode", 11) AS code,
            COUNT(*) AS count
     FROM "Property" p
     GROUP BY 1, 2
@@ -177,7 +177,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
              COALESCE("auctionTotalArea", 0)  AS lotarea,
              "hasPrivatizationLot"            AS priv,
              "hasRentLot"                     AS rentlot,
-             COALESCE("integrationCategoryCode", "manualCategoryCode") AS cat
+             COALESCE("integrationCategoryCode", "manualCategoryCode", 11) AS cat
       FROM "Property"
     )
     SELECT "regionId",

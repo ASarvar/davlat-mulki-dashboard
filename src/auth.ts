@@ -6,23 +6,23 @@ import { prisma } from "@/lib/prisma";
 import { authConfig } from "@/auth.config";
 
 const credsSchema = z.object({
-  email: z.string().email(),
+  username: z.string().min(1),
   password: z.string().min(1),
 });
 
 // To'liq (Node) konfiguratsiya — Credentials provider bilan.
-// Ochiq registratsiya YO'Q: userlarni faqat SUPER_ADMIN yaratadi.
+// Email YO'Q: login (username) + parol. Ochiq registratsiya YO'Q — userlarni admin yaratadi.
 export const { handlers, auth, signIn, signOut } = NextAuth({
   ...authConfig,
   providers: [
     Credentials({
-      credentials: { email: {}, password: {} },
+      credentials: { username: {}, password: {} },
       authorize: async (raw) => {
         const parsed = credsSchema.safeParse(raw);
         if (!parsed.success) return null;
-        const { email, password } = parsed.data;
+        const { username, password } = parsed.data;
 
-        const user = await prisma.user.findUnique({ where: { email } });
+        const user = await prisma.user.findUnique({ where: { username } });
         if (!user || !user.isActive) return null;
 
         const ok = await bcrypt.compare(password, user.passwordHash);
@@ -30,8 +30,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         return {
           id: user.id,
-          email: user.email,
           name: user.fullName,
+          username: user.username,
           role: user.role,
           regionId: user.regionId,
         };

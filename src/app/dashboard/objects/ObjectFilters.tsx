@@ -9,11 +9,14 @@ export function ObjectFilters({
   regions,
   sohaList,
   canFilterRegion,
+  showMyRegionsToggle,
   current,
 }: {
   regions: { id: string; name: string }[];
   sohaList: string[];
   canFilterRegion: boolean;
+  /** MODERATOR uchun: "Faqat mening hududlarim" — Hudud select'ining birinchi varianti sifatida. */
+  showMyRegionsToggle?: boolean;
   current: { q?: string; region?: string; soha?: string; category?: string; inefficient?: string };
 }) {
   return (
@@ -34,6 +37,7 @@ export function ObjectFilters({
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Hudud</label>
           <select name="region" defaultValue={current.region ?? ""} className={`${selectCls} w-48`}>
+            {showMyRegionsToggle ? <option value="mine">Faqat mening hududlarim</option> : null}
             <option value="">Barchasi</option>
             {regions.map((r) => (
               <option key={r.id} value={r.id}>

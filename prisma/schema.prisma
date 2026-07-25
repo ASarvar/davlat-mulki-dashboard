@@ -12,26 +12,41 @@ datasource db {
 }
 
 // ─────────────────────────── Auth & Rollar ───────────────────────────
+// SUPER_ADMIN — tizim egasi.  ADMIN — super admin bilan bir xil, lekin super
+// adminni ko'rmaydi.  MODERATOR — hamma obyektni ko'radi, biriktirilgan hudud(lar)
+// so'rovlarini tasdiqlaydi.  NAZORATCHI — o'z hududi obyektlarini kategoriyaga
+// biriktirish so'rovini yuboradi.  VIEWER — faqat ko'rish.
 enum Role {
   SUPER_ADMIN
-  REGION_USER
+  ADMIN
+  MODERATOR
+  NAZORATCHI
   VIEWER
 }
 
 model User {
   id           String  @id @default(cuid())
-  email        String  @unique
+  username     String  @unique // email YO'Q — login+parol orqali avtorizatsiya
   fullName     String
   passwordHash String
   role         Role    @default(VIEWER)
   isActive     Boolean @default(true)
-  regionId     String? // REGION_USER uchun majburiy (app-level tekshiruv)
-  region       Region? @relation(fields: [regionId], references: [id])
 
-  documents   Document[]                   @relation("UploadedBy")
-  assignments PropertyCategoryAssignment[] @relation("AssignedBy")
-  syncRuns    SyncRun[]                    @relation("TriggeredBy")
-  auditLogs   AuditLog[]
+  // NAZORATCHI uchun bitta hudud (majburiy, app-level).
+  regionId String?
+  region   Region? @relation(fields: [regionId], references: [id])
+
+  // MODERATOR uchun: allRegions=true bo'lsa hamma hudud, aks holda moderatorRegions.
+  allRegions       Boolean      @default(false)
+  moderatorRegions UserRegion[]
+
+  documents        Document[]                   @relation("UploadedBy")
+  assignments      PropertyCategoryAssignment[] @relation("AssignedBy")
+  syncRuns         SyncRun[]                    @relation("TriggeredBy")
+  auditLogs        AuditLog[]
+  requestedChanges CategoryChangeRequest[]      @relation("RequestedBy")
+  reviewedChanges  CategoryChangeRequest[]      @relation("ReviewedBy")
+  notifications    Notification[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -40,17 +55,29 @@ model User {
   @@index([role])
 }
 
+// MODERATOR ↔ hudud (ko'p-ko'p). allRegions=true bo'lsa bu jadval e'tiborga olinmaydi.
+model UserRegion {
+  userId   String
+  regionId String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  region   Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@id([userId, regionId])
+  @@index([regionId])
+}
+
 // ─────────────────────── Hudud & Manba (source) ──────────────────────
 model Region {
   id         String               @id @default(cuid())
   code       String               @unique // masalan "TAS", "SAM"
   name       String // "Toshkent shahri" ...
   sortOrder  Int                  @default(0) // rasmiy hisobot shaklidagi tartib
-  properties Property[]
-  users      User[]
-  sources    OrganizationSource[]
-  createdAt  DateTime             @default(now())
-  updatedAt  DateTime             @updatedAt
+  properties      Property[]
+  users           User[]
+  sources         OrganizationSource[]
+  moderatorLinks  UserRegion[]
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 }
 
 // Har bir hudud+organizatsiya uchun STIR va API config (kelajakda kengayadi)
@@ -163,8 +190,9 @@ model Property {
   lastSyncError String?
 
   statusChecks ObjectStatusCheck[]
-  assignments  PropertyCategoryAssignment[]
-  documents    Document[]
+  assignments    PropertyCategoryAssignment[]
+  documents      Document[]
+  changeRequests CategoryChangeRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -281,9 +309,55 @@ model Document {
   fileSize     Int
   mimeType     String                       @default("application/pdf")
   assignments  PropertyCategoryAssignment[]
+  changeRequests CategoryChangeRequest[]
   createdAt    DateTime                     @default(now())
 
   @@index([propertyId])
+}
+
+// ─────────────────── Kategoriya o'zgartirish so'rovi (workflow) ───────────────────
+// NAZORATCHI "Bo'sh turgan" obyektni "Yaroqsiz holat"/"Chekka hudud"ga biriktirish
+// SO'ROVINI yuboradi — u darhol qo'llanmaydi, MODERATOR tasdiqlaydi yoki rad etadi.
+enum ChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CategoryChangeRequest {
+  id            String              @id @default(cuid())
+  propertyId    String
+  property      Property            @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  requestedById String
+  requestedBy   User                @relation("RequestedBy", fields: [requestedById], references: [id])
+  fromCategory  Int? // so'rov paytidagi effektiv kategoriya (odatda 11)
+  toCategory    Int // 9 (yaroqsiz) yoki 10 (chekka)
+  note          String?
+  documentId    String?
+  document      Document?           @relation(fields: [documentId], references: [id])
+  status        ChangeRequestStatus @default(PENDING)
+  reviewedById  String?
+  reviewedBy    User?               @relation("ReviewedBy", fields: [reviewedById], references: [id])
+  reviewNote    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime            @default(now())
+
+  @@index([status])
+  @@index([propertyId])
+  @@index([requestedById])
+}
+
+// Ilova ichidagi bildirishnoma (email yo'q). Nazoratchiga tasdiq/rad haqida xabar.
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  message   String
+  link      String?
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
 }
 
 // ─────────────────────── Sinxronizatsiya jurnali ─────────────────────

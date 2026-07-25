@@ -7,7 +7,7 @@ const schema = z.object({
   NEXTAUTH_URL: z.string().url().optional(),
 
   UPLOAD_DIR: z.string().default("./data/uploads"),
-  MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(20 * 1024 * 1024),
+  MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(15 * 1024 * 1024),
 
   // Worker (pg-boss) sozlamalari.
   // batchSize kichik + poll katta bo'lsa, vaqtning ko'p qismi bo'sh kutishga ketadi

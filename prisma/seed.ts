@@ -80,16 +80,16 @@ async function main() {
   }
   console.log(`✓ ${REGIONS.length} ta hudud (yangi manba: ${created})`);
 
-  // Super-admin
-  const email = process.env.SEED_ADMIN_EMAIL ?? "admin@davlatmulki.uz";
+  // Super-admin — login (username) + parol. Email YO'Q.
+  const username = process.env.SEED_ADMIN_LOGIN ?? "admin";
   const password = process.env.SEED_ADMIN_PASSWORD ?? "change-me";
   const passwordHash = await bcrypt.hash(password, 10);
   await prisma.user.upsert({
-    where: { email },
+    where: { username },
     update: { role: Role.SUPER_ADMIN, isActive: true },
-    create: { email, fullName: "Bosh administrator", passwordHash, role: Role.SUPER_ADMIN },
+    create: { username, fullName: "Bosh administrator", passwordHash, role: Role.SUPER_ADMIN },
   });
-  console.log(`✓ Super-admin: ${email}`);
+  console.log(`✓ Super-admin login: ${username}`);
 }
 
 main()

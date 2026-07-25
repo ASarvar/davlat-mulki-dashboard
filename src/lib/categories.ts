@@ -30,11 +30,21 @@ export const CATEGORIES: CategoryMeta[] = [
 export const CATEGORY_BY_CODE = new Map<number, CategoryMeta>(CATEGORIES.map((c) => [c.code, c]));
 export const MANUAL_CATEGORIES = CATEGORIES.filter((c) => c.source === "MANUAL");
 
+// Qo'lda biriktirish formasida ko'rsatiladigan kategoriyalar: faqat 9 (Yaroqsiz) va
+// 10 (Chekka). 7/11/12 formadan olib tashlangan (foydalanuvchi talabi). Nazoratchi
+// aynan shu ikkisiga "Bo'sh turgan" obyektni biriktirish so'rovini yuboradi.
+export const ASSIGNABLE_CATEGORY_CODES = [9, 10] as const;
+export const ASSIGNABLE_CATEGORIES = CATEGORIES.filter((c) =>
+  (ASSIGNABLE_CATEGORY_CODES as readonly number[]).includes(c.code),
+);
+
 // Obyektning effektiv kategoriyasi: integratsiya (1–4) > qo'lda (5–10).
+// Ikkalasi ham null bo'lsa — 11 (Bo'sh turgan), DB'da "kategoriyasiz" holati yo'q
+// (integrationCategoryCode'ga 11 hech qachon yozilmaydi, faqat shu yerda fallback sifatida).
 export function effectiveCategory(
   integrationCode: number | null,
   manualCode: number | null,
 ): CategoryMeta | null {
-  const code = integrationCode ?? manualCode;
-  return code != null ? (CATEGORY_BY_CODE.get(code) ?? null) : null;
+  const code = integrationCode ?? manualCode ?? 11;
+  return CATEGORY_BY_CODE.get(code) ?? null;
 }

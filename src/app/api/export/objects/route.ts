@@ -28,10 +28,13 @@ export async function GET(req: Request) {
   const fullyRented = sp.get("fullyRented");
   const hasRentContract = sp.get("hasRentContract");
   const onAnyAuction = sp.get("onAnyAuction");
+  // "mine" — Hudud select'idagi maxsus variant (faqat MODERATOR), haqiqiy hudud ID emas.
+  const regionRaw = sp.get("region") || undefined;
+  const myRegionsOnly = regionRaw === "mine";
 
   const filters: PropertyFilters = {
     q: sp.get("q")?.trim() || undefined,
-    regionId: sp.get("region") || undefined,
+    regionId: myRegionsOnly ? undefined : regionRaw,
     soha: sp.get("soha") || undefined,
     categoryCode: category ? Number(category) : undefined,
     inefficient: inefficient === "1" ? true : inefficient === "0" ? false : undefined,
@@ -39,6 +42,7 @@ export async function GET(req: Request) {
     fullyRented: fullyRented === "1" ? true : undefined,
     hasRentContract: hasRentContract === "1" ? true : undefined,
     onAnyAuction: onAnyAuction === "1" ? true : undefined,
+    myRegionsOnly: myRegionsOnly || undefined,
   };
 
   const passThrough = new PassThrough();

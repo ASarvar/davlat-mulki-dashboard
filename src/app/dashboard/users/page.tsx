@@ -1,8 +1,9 @@
 import { Users, UserPlus, Search, RotateCcw } from "lucide-react";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/authz";
+import { requireRole, isAdmin } from "@/lib/authz";
 import { listUsers } from "@/server/services/users";
+import { ROLE_LABEL } from "@/lib/roles";
 import { CreateUserForm } from "./CreateUserForm";
 import { UserRow } from "./UserRow";
 
@@ -12,22 +13,21 @@ const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 const selectCls =
   "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-cobalt focus:ring-2 focus:ring-cobalt/20";
 
-const ROLE_OPTIONS = [
-  { value: "SUPER_ADMIN", label: "Super admin" },
-  { value: "REGION_USER", label: "Hudud foydalanuvchisi" },
-  { value: "VIEWER", label: "Kuzatuvchi" },
-];
-
 export default async function UsersPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const actor = await requireRole("SUPER_ADMIN");
+  const actor = await requireRole("SUPER_ADMIN", "ADMIN");
   const sp = await searchParams;
 
   const regionId = str(sp.region) || undefined;
   const roleRaw = str(sp.role);
   const role = roleRaw && roleRaw in Role ? (roleRaw as Role) : undefined;
 
+  // ADMIN Super adminni ko'rmaydi.
+  const hideSuperAdmin = actor.role === "ADMIN";
+  // Filtr uchun rollar (Admin uchun SUPER_ADMIN yashiriladi).
+  const roleFilterOptions = (Object.keys(ROLE_LABEL) as Role[]).filter((r) => !(hideSuperAdmin && r === "SUPER_ADMIN"));
+
   const [users, regions, activeAdmins] = await Promise.all([
-    listUsers({ regionId, role }),
+    listUsers({ regionId, role, hideSuperAdmin }),
     prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
     prisma.user.count({ where: { role: "SUPER_ADMIN", isActive: true } }),
   ]);
@@ -47,7 +47,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           <UserPlus className="h-4 w-4" style={{ color: "var(--gold)" }} />
           Yangi foydalanuvchi
         </h2>
-        <CreateUserForm regions={regions} />
+        <CreateUserForm regions={regions} isSuperAdmin={actor.role === "SUPER_ADMIN"} />
       </div>
 
       {/* Filtr */}
@@ -71,9 +71,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           <label className="mb-1 text-xs font-medium text-muted-foreground">Rol</label>
           <select name="role" defaultValue={role ?? ""} className={`${selectCls} w-52`}>
             <option value="">Barchasi</option>
-            {ROLE_OPTIONS.map((r) => (
-              <option key={r.value} value={r.value}>
-                {r.label}
+            {roleFilterOptions.map((r) => (
+              <option key={r} value={r}>
+                {ROLE_LABEL[r]}
               </option>
             ))}
           </select>
@@ -120,16 +120,19 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                   key={u.id}
                   regions={regions}
                   currentUserId={actor.id}
+                  canManageAdmins={actor.role === "SUPER_ADMIN"}
                   isLastSuperAdmin={u.role === "SUPER_ADMIN" && u.isActive && activeAdmins <= 1}
                   user={{
                     id: u.id,
-                    email: u.email,
+                    username: u.username,
                     fullName: u.fullName,
                     role: u.role,
                     isActive: u.isActive,
                     regionId: u.region?.id ?? null,
                     regionName: u.region?.name ?? null,
-                    activityCount: u._count.documents + u._count.assignments,
+                    allRegions: u.allRegions,
+                    moderatorRegionIds: u.moderatorRegions.map((m) => m.regionId),
+                    activityCount: u._count.documents + u._count.assignments + u._count.requestedChanges,
                   }}
                 />
               ))

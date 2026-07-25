@@ -11,29 +11,40 @@ export interface UserFormState {
   error?: string;
 }
 
+// Login: harf/raqam/nuqta/pastki chiziq, email EMAS.
+const usernameSchema = z.string().regex(/^[a-z0-9._-]{3,32}$/i, "Login 3–32 belgi (harf, raqam, . _ -)");
+
 const createSchema = z.object({
-  email: z.string().email("Email noto'g'ri"),
+  username: usernameSchema,
   fullName: z.string().min(2, "F.I.SH kiritilishi kerak"),
   password: z.string().min(8, "Parol kamida 8 belgi bo'lsin"),
   role: z.nativeEnum(Role),
-  regionId: z.string().optional(),
 });
+
+// Rolga qarab hudud maydonlarini FormData'dan o'qiydi.
+function readRegions(formData: FormData, role: Role) {
+  return {
+    regionId: String(formData.get("regionId") ?? "") || null,
+    allRegions: formData.get("allRegions") === "on",
+    moderatorRegionIds: formData.getAll("moderatorRegionIds").map(String).filter(Boolean),
+  };
+}
 
 export async function createUserAction(_prev: UserFormState, formData: FormData): Promise<UserFormState> {
   try {
-    const actor = await requireRole("SUPER_ADMIN");
+    const actor = await requireRole("SUPER_ADMIN", "ADMIN");
     const parsed = createSchema.safeParse({
-      email: formData.get("email"),
+      username: formData.get("username"),
       fullName: formData.get("fullName"),
       password: formData.get("password"),
       role: formData.get("role"),
-      regionId: String(formData.get("regionId") ?? "") || undefined,
     });
-    if (!parsed.success) {
-      return { error: parsed.error.issues[0]?.message ?? "Ma'lumot noto'g'ri" };
-    }
+    if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ma'lumot noto'g'ri" };
+    // ADMIN boshqa ADMIN yoki SUPER_ADMIN yarata olmaydi.
+    if (actor.role === "ADMIN" && (parsed.data.role === "ADMIN" || parsed.data.role === "SUPER_ADMIN"))
+      return { error: "Admin bu rolni yarata olmaydi" };
 
-    await createUser(actor.id, parsed.data);
+    await createUser(actor.id, { ...parsed.data, ...readRegions(formData, parsed.data.role) });
     revalidatePath("/dashboard/users");
     return { ok: true };
   } catch (err) {
@@ -43,15 +54,14 @@ export async function createUserAction(_prev: UserFormState, formData: FormData)
 
 export async function updateUserAction(_prev: UserFormState, formData: FormData): Promise<UserFormState> {
   try {
-    const actor = await requireRole("SUPER_ADMIN");
+    const actor = await requireRole("SUPER_ADMIN", "ADMIN");
     const userId = String(formData.get("userId") ?? "");
     const role = String(formData.get("role") ?? "") as Role;
-    const regionId = String(formData.get("regionId") ?? "") || null;
     const isActive = formData.get("isActive") === "on";
 
     if (!userId || !(role in Role)) return { error: "Ma'lumot noto'g'ri" };
 
-    await updateUser(actor.id, { userId, role, regionId, isActive });
+    await updateUser(actor.id, { userId, role, isActive, ...readRegions(formData, role) });
     revalidatePath("/dashboard/users");
     return { ok: true };
   } catch (err) {
@@ -61,7 +71,7 @@ export async function updateUserAction(_prev: UserFormState, formData: FormData)
 
 export async function deleteUserAction(_prev: UserFormState, formData: FormData): Promise<UserFormState> {
   try {
-    const actor = await requireRole("SUPER_ADMIN");
+    const actor = await requireRole("SUPER_ADMIN", "ADMIN");
     const userId = String(formData.get("userId") ?? "");
     if (!userId) return { error: "Foydalanuvchi ko'rsatilmagan" };
 
@@ -75,7 +85,7 @@ export async function deleteUserAction(_prev: UserFormState, formData: FormData)
 
 export async function resetPasswordAction(_prev: UserFormState, formData: FormData): Promise<UserFormState> {
   try {
-    const actor = await requireRole("SUPER_ADMIN");
+    const actor = await requireRole("SUPER_ADMIN", "ADMIN");
     const userId = String(formData.get("userId") ?? "");
     const password = String(formData.get("password") ?? "");
     if (password.length < 8) return { error: "Parol kamida 8 belgi bo'lsin" };

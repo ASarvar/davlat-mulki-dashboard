@@ -14,7 +14,7 @@ export default async function LoginPage({
     "use server";
     try {
       await signIn("credentials", {
-        email: formData.get("email"),
+        username: formData.get("username"),
         password: formData.get("password"),
         redirectTo: "/dashboard",
       });
@@ -46,16 +46,16 @@ export default async function LoginPage({
 
         {error ? (
           <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-            Email yoki parol noto'g'ri
+            Login yoki parol noto'g'ri
           </p>
         ) : null}
 
         <form action={authenticate} className="space-y-4">
           <div>
-            <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Login</label>
             <input
-              name="email"
-              type="email"
+              name="username"
+              type="text"
               required
               autoComplete="username"
               className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-cobalt focus:ring-2 focus:ring-cobalt/30"

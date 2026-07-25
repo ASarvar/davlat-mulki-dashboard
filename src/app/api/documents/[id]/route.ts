@@ -19,8 +19,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   });
   if (!doc) return new NextResponse("Hujjat topilmadi", { status: 404 });
 
-  // REGION_USER faqat o'z hududi hujjatlarini ko'ra oladi.
-  if (user.role === "REGION_USER" && doc.property.regionId !== user.regionId) {
+  // NAZORATCHI faqat o'z hududi hujjatlarini ko'ra oladi.
+  if (user.role === "NAZORATCHI" && doc.property.regionId !== user.regionId) {
     return new NextResponse("Ruxsat yo'q", { status: 403 });
   }
 

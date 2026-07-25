@@ -16,7 +16,6 @@ import {
   deriveAuctionCategory,
   deriveRentCategory,
   computeIsInefficient,
-  CAT_VACANT,
   type StatusResultBySource,
 } from "@/server/services/classification";
 import type { JobOutcome, StatusCheckJob } from "../jobs";
@@ -229,9 +228,13 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
     const auctionCategory = deriveAuctionCategory({ ...auction, hasRentLot });
     const rentCategory = deriveRentCategory(rent);
     const otherCategory = deriveIntegrationCategory(results);
-    // Hech qanday integratsiya kategoriyasi topilmasa — obyekt BO'SH TURGAN hisoblanadi.
-    // (Ilgari kategoriyasiz qolar edi; foydalanuvchi talabi bo'yicha endi kat 11.)
-    const integrationCategoryCode = auctionCategory ?? rentCategory ?? otherCategory ?? CAT_VACANT;
+    // Hech qanday integratsiya kategoriyasi topilmasa — `null` saqlanadi (kat 11 emas!).
+    // Agar shu yerda CAT_VACANT (11) yozilsa, keyinchalik qo'lda 9/10ga biriktirilganda
+    // "integrationCategoryCode ?? manualCategoryCode" hamisha 11ni qaytaradi — qo'lda
+    // biriktirish hech qachon effektiv kategoriyaga ta'sir qilmay qoladi. "Kategoriyasiz"
+    // holati esa effectiveCategory()/buildWhere()/stats.ts'da alohida CAT_VACANT fallback
+    // bilan ko'rsatiladi (haqiqiy ustunga yozilmasdan).
+    const integrationCategoryCode = auctionCategory ?? rentCategory ?? otherCategory ?? null;
 
     const current = await tx.property.findUniqueOrThrow({
       where: { id: propertyId },

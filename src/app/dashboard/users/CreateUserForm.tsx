@@ -2,17 +2,23 @@
 
 import { useActionState, useState } from "react";
 import { UserPlus } from "lucide-react";
+import type { Role } from "@prisma/client";
+import { ASSIGNABLE_ROLES, regionMode } from "@/lib/roles";
 import { createUserAction, type UserFormState } from "./actions";
+import { RegionPicker } from "./RegionPicker";
 
-const ROLES = [
-  { value: "SUPER_ADMIN", label: "Super admin — tizim egasi" },
-  { value: "REGION_USER", label: "Hudud foydalanuvchisi — kategoriya + PDF" },
-  { value: "VIEWER", label: "Kuzatuvchi — faqat ko'rish" },
-];
-
-export function CreateUserForm({ regions }: { regions: { id: string; name: string }[] }) {
+export function CreateUserForm({
+  regions,
+  isSuperAdmin,
+}: {
+  regions: { id: string; name: string }[];
+  isSuperAdmin: boolean;
+}) {
   const [state, formAction, pending] = useActionState<UserFormState, FormData>(createUserAction, {});
-  const [role, setRole] = useState("REGION_USER");
+  const [role, setRole] = useState<Role>("NAZORATCHI");
+
+  // ADMIN faqat Moderator/Nazoratchi/Kuzatuvchi yaratadi (Admin rolini super admin beradi).
+  const roleOptions = ASSIGNABLE_ROLES.filter((r) => isSuperAdmin || r.value !== "ADMIN");
 
   return (
     <form action={formAction} className="grid gap-3 md:grid-cols-2">
@@ -21,8 +27,14 @@ export function CreateUserForm({ regions }: { regions: { id: string; name: strin
         <input name="fullName" required className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
       </div>
       <div>
-        <label className="mb-1 block text-sm font-medium text-slate-700">Email</label>
-        <input name="email" type="email" required className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm" />
+        <label className="mb-1 block text-sm font-medium text-slate-700">Login</label>
+        <input
+          name="username"
+          required
+          autoComplete="off"
+          placeholder="masalan: nazoratchi_and"
+          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+        />
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">Parol</label>
@@ -33,30 +45,18 @@ export function CreateUserForm({ regions }: { regions: { id: string; name: strin
         <select
           name="role"
           value={role}
-          onChange={(e) => setRole(e.target.value)}
+          onChange={(e) => setRole(e.target.value as Role)}
           className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
         >
-          {ROLES.map((r) => (
+          {roleOptions.map((r) => (
             <option key={r.value} value={r.value}>
-              {r.label}
+              {r.label} — {r.desc}
             </option>
           ))}
         </select>
       </div>
 
-      {role === "REGION_USER" ? (
-        <div>
-          <label className="mb-1 block text-sm font-medium text-slate-700">Hudud</label>
-          <select name="regionId" required className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-            <option value="">Tanlang...</option>
-            {regions.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      ) : null}
+      <RegionPicker mode={regionMode(role)} regions={regions} />
 
       <div className="md:col-span-2">
         {state.error ? <p className="mb-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}

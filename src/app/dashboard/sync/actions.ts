@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath, revalidateTag } from "next/cache";
-import { requireUser, requireRole, assertRegionWriteAccess } from "@/lib/authz";
+import { requireRole } from "@/lib/authz";
 import { triggerFullSync, triggerRegionSync } from "@/server/queue/enqueue";
 import { cleanupStuckSyncs } from "@/server/services/syncAdmin";
 
@@ -10,10 +10,10 @@ export interface SyncState {
   error?: string;
 }
 
-// Barcha manbalarni (14 STIR) yangilash — faqat SUPER_ADMIN.
+// Barcha manbalarni (14 STIR) yangilash — SUPER_ADMIN yoki ADMIN.
 export async function runFullSyncAction(_prev: SyncState, _formData: FormData): Promise<SyncState> {
   try {
-    const user = await requireRole("SUPER_ADMIN");
+    const user = await requireRole("SUPER_ADMIN", "ADMIN");
     const run = await triggerFullSync(user.id);
     revalidatePath("/dashboard/sync");
     revalidateTag("dashboard");
@@ -27,7 +27,7 @@ export async function runFullSyncAction(_prev: SyncState, _formData: FormData): 
 // Navbatdagi joblarni o'chiradi va faol run'larni yopadi (ma'lumot o'chmaydi).
 export async function cleanupSyncAction(_prev: SyncState, _formData: FormData): Promise<SyncState> {
   try {
-    const user = await requireRole("SUPER_ADMIN");
+    const user = await requireRole("SUPER_ADMIN", "ADMIN");
     const { runsClosed, jobsPurged } = await cleanupStuckSyncs(user.id);
     revalidatePath("/dashboard/sync");
     return { ok: `Tozalandi: ${runsClosed} ta run yopildi, ${jobsPurged} ta kutayotgan job o'chirildi` };
@@ -36,14 +36,12 @@ export async function cleanupSyncAction(_prev: SyncState, _formData: FormData): 
   }
 }
 
-// Bitta hududni yangilash — SUPER_ADMIN yoki o'z hududidagi REGION_USER.
+// Bitta hududni yangilash — SUPER_ADMIN yoki ADMIN.
 export async function runRegionSyncAction(_prev: SyncState, formData: FormData): Promise<SyncState> {
   try {
-    const user = await requireUser();
+    const user = await requireRole("SUPER_ADMIN", "ADMIN");
     const regionId = String(formData.get("regionId") ?? "");
     if (!regionId) return { error: "Hudud tanlanmagan" };
-
-    assertRegionWriteAccess(user, regionId); // VIEWER / boshqa hudud => xato
 
     const run = await triggerRegionSync(regionId, user.id);
     revalidatePath("/dashboard/sync");

@@ -4,7 +4,7 @@ const nextConfig = {
   experimental: {
     // Server Action orqali PDF yuklash: 20MB fayl + multipart overhead uchun biroz zapas.
     serverActions: {
-      bodySizeLimit: "24mb",
+      bodySizeLimit: "18mb",
     },
   },
 };

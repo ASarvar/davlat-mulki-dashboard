@@ -23,6 +23,7 @@ export const authConfig: NextAuthConfig = {
       if (user) {
         token.role = (user as { role: Role }).role;
         token.regionId = (user as { regionId: string | null }).regionId;
+        token.username = (user as { username: string }).username;
       }
       return token;
     },
@@ -31,6 +32,7 @@ export const authConfig: NextAuthConfig = {
         session.user.id = token.sub as string;
         session.user.role = token.role as Role;
         session.user.regionId = (token.regionId as string | null) ?? null;
+        session.user.username = (token.username as string) ?? "";
       }
       return session;
     },

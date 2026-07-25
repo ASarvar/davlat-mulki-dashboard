@@ -8,12 +8,14 @@ declare module "next-auth" {
       id: string;
       role: Role;
       regionId: string | null;
+      username: string;
     } & DefaultSession["user"];
   }
 
   interface User {
     role: Role;
     regionId: string | null;
+    username: string;
   }
 }
 
@@ -21,5 +23,6 @@ declare module "next-auth/jwt" {
   interface JWT {
     role: Role;
     regionId: string | null;
+    username: string;
   }
 }

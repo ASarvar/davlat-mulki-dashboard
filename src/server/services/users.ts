@@ -3,67 +3,86 @@ import { Prisma, type Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export interface CreateUserInput {
-  email: string;
+  username: string;
   fullName: string;
   password: string;
   role: Role;
-  regionId?: string | null;
+  regionId?: string | null; // NAZORATCHI uchun
+  allRegions?: boolean; // MODERATOR uchun (hamma hudud)
+  moderatorRegionIds?: string[]; // MODERATOR uchun (aniq hududlar)
 }
 
 export interface UpdateUserInput {
   userId: string;
   role: Role;
   regionId?: string | null;
+  allRegions?: boolean;
+  moderatorRegionIds?: string[];
   isActive: boolean;
 }
 
-// REGION_USER uchun hudud majburiy; SUPER_ADMIN/VIEWER uchun hudud saqlanmaydi.
-function normalizeRegion(role: Role, regionId?: string | null): string | null {
-  if (role === "REGION_USER") {
-    if (!regionId) throw new Error("REGION_USER uchun hudud tanlanishi shart");
-    return regionId;
+// Rol bo'yicha hudud ma'lumotini normallashtiradi va validatsiya qiladi.
+function resolveRegions(input: {
+  role: Role;
+  regionId?: string | null;
+  allRegions?: boolean;
+  moderatorRegionIds?: string[];
+}): { regionId: string | null; allRegions: boolean; moderatorRegionIds: string[] } {
+  if (input.role === "NAZORATCHI") {
+    if (!input.regionId) throw new Error("Nazoratchi uchun hudud tanlanishi shart");
+    return { regionId: input.regionId, allRegions: false, moderatorRegionIds: [] };
   }
-  return null;
+  if (input.role === "MODERATOR") {
+    const all = Boolean(input.allRegions);
+    const ids = all ? [] : (input.moderatorRegionIds ?? []).filter(Boolean);
+    if (!all && ids.length === 0) throw new Error("Moderator uchun kamida bitta hudud yoki 'hammasi' tanlang");
+    return { regionId: null, allRegions: all, moderatorRegionIds: ids };
+  }
+  // SUPER_ADMIN / ADMIN / VIEWER — hudud saqlanmaydi.
+  return { regionId: null, allRegions: false, moderatorRegionIds: [] };
 }
 
 export interface UserFilters {
   regionId?: string;
   role?: Role;
+  /** ADMIN uchun: SUPER_ADMIN foydalanuvchilarni ko'rsatmaymiz. */
+  hideSuperAdmin?: boolean;
 }
 
 export async function listUsers(f: UserFilters = {}) {
   return prisma.user.findMany({
     where: {
-      ...(f.regionId ? { regionId: f.regionId } : {}),
+      ...(f.regionId
+        ? { OR: [{ regionId: f.regionId }, { moderatorRegions: { some: { regionId: f.regionId } } }] }
+        : {}),
       ...(f.role ? { role: f.role } : {}),
+      ...(f.hideSuperAdmin ? { role: { not: "SUPER_ADMIN" } } : {}),
     },
     orderBy: [{ role: "asc" }, { fullName: "asc" }],
     select: {
       id: true,
-      email: true,
+      username: true,
       fullName: true,
       role: true,
       isActive: true,
+      allRegions: true,
       createdAt: true,
       region: { select: { id: true, name: true } },
-      // O'chirish mumkinligini aniqlash uchun — bu yozuvlar userga bog'liq (majburiy FK)
-      _count: { select: { documents: true, assignments: true } },
+      moderatorRegions: { select: { regionId: true } },
+      _count: { select: { documents: true, assignments: true, requestedChanges: true } },
     },
   });
 }
 
-// Foydalanuvchini butunlay o'chirish.
-// Hujjat yuklagan yoki kategoriya biriktirgan bo'lsa — O'CHIRMAYMIZ: audit izi
-// yo'qoladi va FK ham ruxsat bermaydi. Bunday holatda "bloklash" tavsiya qilinadi.
 export async function deleteUser(actorId: string, userId: string) {
   if (actorId === userId) throw new Error("O'z hisobingizni o'chira olmaysiz");
 
   const target = await prisma.user.findUnique({
     where: { id: userId },
     select: {
-      email: true,
+      username: true,
       role: true,
-      _count: { select: { documents: true, assignments: true } },
+      _count: { select: { documents: true, assignments: true, requestedChanges: true } },
     },
   });
   if (!target) throw new Error("Foydalanuvchi topilmadi");
@@ -73,10 +92,10 @@ export async function deleteUser(actorId: string, userId: string) {
     if (activeAdmins <= 1) throw new Error("Tizimda kamida bitta faol super admin qolishi kerak");
   }
 
-  const { documents, assignments } = target._count;
-  if (documents > 0 || assignments > 0) {
+  const { documents, assignments, requestedChanges } = target._count;
+  if (documents > 0 || assignments > 0 || requestedChanges > 0) {
     throw new Error(
-      `Bu foydalanuvchi ${documents} ta hujjat yuklagan va ${assignments} ta kategoriya biriktirgan — ` +
+      `Bu foydalanuvchida ${documents} hujjat, ${assignments} biriktirish, ${requestedChanges} so'rov bor — ` +
         `o'chirib bo'lmaydi (audit izi saqlanishi kerak). Uni "Faol" belgisini olib bloklang.`,
     );
   }
@@ -89,25 +108,30 @@ export async function deleteUser(actorId: string, userId: string) {
         action: "DELETE_USER",
         entityType: "User",
         entityId: userId,
-        metadata: { email: target.email, role: target.role },
+        metadata: { username: target.username, role: target.role },
       },
     });
   });
 }
 
 export async function createUser(actorId: string, input: CreateUserInput) {
-  const regionId = normalizeRegion(input.role, input.regionId);
+  const { regionId, allRegions, moderatorRegionIds } = resolveRegions(input);
   const passwordHash = await bcrypt.hash(input.password, 10);
+  const username = input.username.toLowerCase().trim();
 
   try {
-    const user = await prisma.$transaction(async (tx) => {
+    return await prisma.$transaction(async (tx) => {
       const created = await tx.user.create({
         data: {
-          email: input.email.toLowerCase().trim(),
+          username,
           fullName: input.fullName.trim(),
           passwordHash,
           role: input.role,
           regionId,
+          allRegions,
+          moderatorRegions: moderatorRegionIds.length
+            ? { create: moderatorRegionIds.map((rid) => ({ regionId: rid })) }
+            : undefined,
         },
       });
       await tx.auditLog.create({
@@ -116,26 +140,26 @@ export async function createUser(actorId: string, input: CreateUserInput) {
           action: "CREATE_USER",
           entityType: "User",
           entityId: created.id,
-          metadata: { email: created.email, role: created.role },
+          metadata: { username: created.username, role: created.role },
         },
       });
       return created;
     });
-    return user;
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      throw new Error("Bu email allaqachon ro'yxatdan o'tgan");
+      throw new Error("Bu login allaqachon band");
     }
     throw err;
   }
 }
 
 export async function updateUser(actorId: string, input: UpdateUserInput) {
-  const regionId = normalizeRegion(input.role, input.regionId);
+  const { regionId, allRegions, moderatorRegionIds } = resolveRegions(input);
 
   // O'zini bloklab qo'yishning oldini olamiz (lockout himoyasi).
   if (actorId === input.userId) {
-    if (input.role !== "SUPER_ADMIN") throw new Error("O'z rolingizni pasaytira olmaysiz");
+    if (input.role !== "SUPER_ADMIN" && input.role !== "ADMIN")
+      throw new Error("O'z rolingizni bu darajaga pasaytira olmaysiz");
     if (!input.isActive) throw new Error("O'z hisobingizni o'chira olmaysiz");
   }
 
@@ -149,9 +173,18 @@ export async function updateUser(actorId: string, input: UpdateUserInput) {
   }
 
   await prisma.$transaction(async (tx) => {
+    await tx.userRegion.deleteMany({ where: { userId: input.userId } });
     await tx.user.update({
       where: { id: input.userId },
-      data: { role: input.role, regionId, isActive: input.isActive },
+      data: {
+        role: input.role,
+        regionId,
+        allRegions,
+        isActive: input.isActive,
+        moderatorRegions: moderatorRegionIds.length
+          ? { create: moderatorRegionIds.map((rid) => ({ regionId: rid })) }
+          : undefined,
+      },
     });
     await tx.auditLog.create({
       data: {
@@ -159,7 +192,7 @@ export async function updateUser(actorId: string, input: UpdateUserInput) {
         action: "UPDATE_USER",
         entityType: "User",
         entityId: input.userId,
-        metadata: { role: input.role, isActive: input.isActive, regionId },
+        metadata: { role: input.role, isActive: input.isActive, regionId, allRegions },
       },
     });
   });
