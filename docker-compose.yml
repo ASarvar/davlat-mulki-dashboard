@@ -1,0 +1,112 @@
+# Davlat mulki monitoring platformasi — production (Linux server).
+#
+# Ishga tushirish:   docker compose up -d
+# Yangilash:         git pull && docker compose up -d --build
+# Loglar:            docker compose logs -f web worker
+# Birinchi seed:     docker compose --profile setup run --rm seed
+#
+# ⚠️ `docker compose down -v` ISHLATMANG — `-v` bazani va yuklangan hujjatlarni
+#    (pgdata, uploads volume'larini) butunlay o'chirib yuboradi.
+#
+# Barcha sozlamalar `.env.production` faylidan o'qiladi (namuna:
+# .env.production.example). Compose interpolatsiyasi ishlatilmaydi — shuning uchun
+# `--env-file` bayrog'i ham kerak emas.
+
+name: davlat-mulki
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # ───────────────────────── PostgreSQL ─────────────────────────
+  # Port hostga CHIQARILMAYDI — bazaga faqat docker tarmog'i ichidan kiriladi.
+  db:
+    image: postgres:15-alpine
+    restart: unless-stopped
+    env_file: .env.production
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # $$ — compose emas, konteyner ichidagi shell o'qishi uchun.
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 10s
+    logging: *default-logging
+
+  # ──────────────────── Migratsiya (bir martalik) ────────────────────
+  # Har `up` da ishlaydi, tugagach o'chadi. `migrate deploy` idempotent:
+  # qo'llanmagan migratsiyalarnigina qo'llaydi. So'ng pg_trgm indekslari.
+  migrate:
+    build:
+      context: .
+      target: tools
+    image: davlat-mulki-tools:latest
+    env_file: .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["sh", "-c", "npx prisma migrate deploy && npx tsx prisma/apply-indexes.ts"]
+    restart: "no"
+    logging: *default-logging
+
+  # ───────────────────────── Next.js ilova ─────────────────────────
+  # Faqat 127.0.0.1 ga bog'lanadi — tashqariga nginx chiqaradi.
+  web:
+    build:
+      context: .
+      target: web
+    image: davlat-mulki-web:latest
+    restart: unless-stopped
+    env_file: .env.production
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - uploads:/app/data/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    logging: *default-logging
+
+  # ───────────────────── pg-boss worker (sync) ─────────────────────
+  # Sync ISHLASHI UCHUN SHART. Alohida jarayon — Redis kerak emas, navbat Postgres'da.
+  worker:
+    build:
+      context: .
+      target: tools
+    image: davlat-mulki-tools:latest
+    restart: unless-stopped
+    env_file: .env.production
+    volumes:
+      - uploads:/app/data/uploads
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    logging: *default-logging
+
+  # ─────────────── Boshlang'ich seed (qo'lda, bir marta) ───────────────
+  # Kategoriyalar + 14 hudud + super-admin. Odatiy `up` da ISHLAMAYDI.
+  # ⚠️ Jonli bazada takror ishlatmang — CLAUDE.md dagi ogohlantirishga qarang.
+  seed:
+    build:
+      context: .
+      target: tools
+    image: davlat-mulki-tools:latest
+    env_file: .env.production
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["npx", "tsx", "prisma/seed.ts"]
+    profiles: ["setup"]
+    restart: "no"
+
+volumes:
+  # ⚠️ Ikkalasi ham yo'qotib bo'lmaydigan ma'lumot:
+  #    pgdata  — butun baza
+  #    uploads — asoslovchi PDF va rasmlar (tasdiqlash workflow'ining dalil bazasi)
+  pgdata:
+  uploads:

@@ -23,6 +23,9 @@ yarn-error.log*
 # local env files
 .env
 .env*.local
+# production sirlari (serverda qo'lda yaratiladi) — namunasi git'da qoladi
+.env.production
+!.env.production.example
 
 # prisma
 /prisma/*.db

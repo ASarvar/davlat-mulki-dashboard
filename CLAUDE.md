@@ -8,8 +8,11 @@ Davlat mulki obyektlaridan foydalanish samaradorligini kuzatuvchi **ichki (inter
 Next.js 15 (App Router) · TypeScript strict · Prisma + PostgreSQL · **pg-boss** (navbat, Redis YO'Q) ·
 Auth.js v5 (Credentials) · Tailwind · lucide-react · exceljs.
 
-**Docker ishlatilmaydi.** Postgres native (bu mashinada **5433-portda**), ilova `npm run dev`/`start`,
-worker alohida jarayon.
+**Ikki muhit — chalkashtirmang:**
+- **Dev (Windows) — Docker YO'Q.** Postgres native (**5433-portda**), `.env`, `npm run dev`,
+  worker alohida jarayon. Ish tartibi o'zgarmagan.
+- **Production (Linux) — Docker.** 4 servis: `db` (postgres:15) · `migrate` (bir martalik) ·
+  `web` · `worker`. Sozlamalar `.env.production` da, batafsil — `DEPLOY.md`.
 
 ## Buyruqlar
 
@@ -19,6 +22,32 @@ npm run worker       # fon jarayoni — sync ISHLASHI UCHUN SHART
 npm run typecheck    # tsc --noEmit
 npm run db:seed      # kategoriyalar + hududlar + super-admin
 npm run prisma:migrate
+```
+
+Serverda (`DEPLOY.md`da to'liq): `docker compose up -d --build` — migratsiya avtomatik.
+
+⚠️ **`docker compose down -v` — HECH QACHON.** `-v` `pgdata` va `uploads` volume'larini
+o'chiradi: butun baza + barcha asoslovchi PDF/rasmlar yo'qoladi.
+
+### Docker'ga tegishli ikki fayl (o'zgartirsangiz — ikkalasini birga)
+- `next.config.mjs` → `output: "standalone"` — Dockerfile'ning `web` bosqichi shunga tayanadi.
+- `prisma/schema.prisma` → `binaryTargets = ["native", "debian-openssl-3.0.x"]` — `native`
+  Windows uchun, ikkinchisi konteyner uchun. Olib tashlansa konteynerda "Query engine not found".
+
+Dockerfile ikkita runtime bosqichi beradi: **`web`** (standalone, `node server.js`) va
+**`tools`** (to'liq `node_modules` — `tsx` bilan worker va `prisma` CLI bilan migratsiya shu yerdan).
+Worker `tsx` orqali ishlagani uchun uni standalone image'ga sig'dirib bo'lmaydi — shuning uchun
+ikki bosqich.
+
+⚠️ **`package-lock.json` LINUX'da yaratilishi shart.** Windows'da `npm install` qilgan lock
+Windows'da `npm ci` dan o'tadi, lekin Docker build'da **yiqiladi**
+(`npm error code EUSAGE ... lock file's picomatch@2.3.2 does not satisfy picomatch@4.0.5`).
+Sabab platformaga bog'liq bog'liqlik daraxti — npm versiyasi emas (10.9.0 va 10.9.8 ikkalasi ham
+Linuxda bir xil yiqilgan). Linux'da yaratilgan lock esa **ikkala platformada ham** ishlaydi.
+Shuning uchun `npm install` bilan bog'liqlik qo'shsangiz, lockni shunday qayta yarating:
+
+```bash
+docker run --rm -v "$PWD":/w -w /w node:22-bookworm-slim npm install --package-lock-only
 ```
 
 ## Arxitektura

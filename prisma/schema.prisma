@@ -4,6 +4,9 @@
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["fullTextSearchPostgres"]
+  // "native" — Windows'dagi dev uchun; "debian-openssl-3.0.x" — Docker image uchun
+  // (node:22-bookworm-slim). Ikkinchisisiz konteynerda "Query engine not found" chiqadi.
+  binaryTargets   = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
