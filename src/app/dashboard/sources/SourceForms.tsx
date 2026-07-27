@@ -4,7 +4,13 @@ import { useActionState } from "react";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { createSourceAction, updateSourceAction, deleteSourceAction, type SourceState } from "./actions";
 
-export function CreateSourceForm({ regions }: { regions: { id: string; name: string }[] }) {
+export function CreateSourceForm({
+  regions,
+  sohaList,
+}: {
+  regions: { id: string; name: string }[];
+  sohaList: string[];
+}) {
   const [state, action, pending] = useActionState<SourceState, FormData>(createSourceAction, {});
 
   return (
@@ -22,7 +28,21 @@ export function CreateSourceForm({ regions }: { regions: { id: string; name: str
       </div>
       <div className="flex flex-col">
         <label className="mb-1 text-xs text-muted-foreground">Manba nomi</label>
-        <input name="name" required defaultValue="Ijara markazi" className="w-52 rounded-md border border-slate-300 px-3 py-1.5 text-sm" />
+        {/* Mavjud sohalardan tanlash YOKI yangisini yozish — datalist ikkalasiga ham ruxsat beradi. */}
+        <input
+          name="name"
+          required
+          list="soha-datalist"
+          autoComplete="off"
+          defaultValue={sohaList[0] ?? "Ijara markazi"}
+          placeholder="Mavjudini tanlang yoki yangisini yozing"
+          className="w-56 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+        />
+        <datalist id="soha-datalist">
+          {sohaList.map((n) => (
+            <option key={n} value={n} />
+          ))}
+        </datalist>
       </div>
       <div className="flex flex-col">
         <label className="mb-1 text-xs text-muted-foreground">STIR (9 raqam)</label>
@@ -63,60 +83,65 @@ export function SourceRow({ source }: { source: SourceRowData }) {
     <tr className="border-b border-border last:border-0">
       <td className="px-4 py-3">{source.regionName}</td>
       <td className="px-4 py-3" colSpan={3}>
-        <form action={action} className="flex flex-wrap items-center gap-2">
-          <input type="hidden" name="sourceId" value={source.id} />
-          <input name="name" defaultValue={source.name} className="w-44 rounded-md border border-slate-300 px-2 py-1 text-sm" />
-          <input
-            name="stir"
-            defaultValue={source.stir}
-            inputMode="numeric"
-            pattern="\d{9}"
-            className="w-32 rounded-md border border-slate-300 px-2 py-1 font-mono text-sm"
-          />
-          <label className="flex items-center gap-1.5 text-sm text-slate-600">
-            <input type="checkbox" name="isActive" defaultChecked={source.isActive} className="h-4 w-4" />
-            Faol
-          </label>
-          <button
-            type="submit"
-            disabled={pending}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
-          >
-            <Save className="h-3.5 w-3.5" />
-            {pending ? "..." : "Saqlash"}
-          </button>
-          {state.error ? <span className="text-xs text-red-700">{state.error}</span> : null}
-          {state.ok ? <span className="text-xs text-emerald-700">✓</span> : null}
-        </form>
+        {/* Ikkala forma bitta flex qatorda — o'chirish tugmasi saqlashdan darhol keyin turadi. */}
+        <div className="flex flex-wrap items-center gap-2">
+          <form action={action} className="flex flex-wrap items-center gap-2">
+            <input type="hidden" name="sourceId" value={source.id} />
+            <input name="name" defaultValue={source.name} className="w-44 rounded-md border border-slate-300 px-2 py-1 text-sm" />
+            <input
+              name="stir"
+              defaultValue={source.stir}
+              inputMode="numeric"
+              pattern="\d{9}"
+              className="w-32 rounded-md border border-slate-300 px-2 py-1 font-mono text-sm"
+            />
+            <label className="flex items-center gap-1.5 text-sm text-slate-600">
+              <input type="checkbox" name="isActive" defaultChecked={source.isActive} className="h-4 w-4" />
+              Faol
+            </label>
+            <button
+              type="submit"
+              disabled={pending}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1 text-sm shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+            >
+              <Save className="h-3.5 w-3.5" />
+              {pending ? "..." : "Saqlash"}
+            </button>
+          </form>
 
-        <form
-          action={delAction}
-          className="mt-2"
-          onSubmit={(e) => {
-            if (!confirm(`"${source.name}" (STIR ${source.stir}) manbasi o'chirilsinmi?\n\nBu amalni qaytarib bo'lmaydi.`)) {
-              e.preventDefault();
-            }
-          }}
-        >
-          <input type="hidden" name="sourceId" value={source.id} />
-          <button
-            type="submit"
-            disabled={delPending || hasProperties}
-            title={
-              hasProperties
-                ? `${source.propertyCount} ta obyekt bog'langan — o'chirib bo'lmaydi, "Faol" belgisini oling`
-                : "Manbani o'chirish"
-            }
-            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1 text-sm text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-white"
+          <form
+            action={delAction}
+            onSubmit={(e) => {
+              if (!confirm(`"${source.name}" (STIR ${source.stir}) manbasi o'chirilsinmi?\n\nBu amalni qaytarib bo'lmaydi.`)) {
+                e.preventDefault();
+              }
+            }}
           >
-            <Trash2 className="h-3.5 w-3.5" />
-            {delPending ? "..." : "O'chirish"}
-          </button>
+            <input type="hidden" name="sourceId" value={source.id} />
+            <button
+              type="submit"
+              disabled={delPending || hasProperties}
+              title={
+                hasProperties
+                  ? `${source.propertyCount} ta obyekt bog'langan — o'chirib bo'lmaydi, "Faol" belgisini oling`
+                  : "Manbani o'chirish"
+              }
+              className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1 text-sm text-red-700 shadow-sm transition hover:bg-red-50 disabled:cursor-not-allowed disabled:border-slate-200 disabled:text-slate-300 disabled:hover:bg-white"
+            >
+              <Trash2 className="h-3.5 w-3.5" />
+              {delPending ? "..." : "O'chirish"}
+            </button>
+          </form>
+        </div>
+
+        <div className="mt-1 flex flex-wrap items-center gap-3">
+          {state.error ? <span className="text-xs text-red-700">{state.error}</span> : null}
+          {state.ok ? <span className="text-xs text-emerald-700">Saqlandi ✓</span> : null}
           {hasProperties ? (
-            <span className="ml-2 text-xs text-muted-foreground">obyektlari bor — bloklang</span>
+            <span className="text-xs text-muted-foreground">obyektlari bor — o'chirish bloklangan</span>
           ) : null}
-          {delState.error ? <p className="mt-1 text-xs text-red-700">{delState.error}</p> : null}
-        </form>
+          {delState.error ? <span className="text-xs text-red-700">{delState.error}</span> : null}
+        </div>
       </td>
       <td className="px-4 py-3 text-muted-foreground">{source.propertyCount}</td>
     </tr>

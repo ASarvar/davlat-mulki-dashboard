@@ -53,7 +53,7 @@ export default async function SourcesPage({ searchParams }: { searchParams: Prom
           <Plus className="h-4 w-4" style={{ color: "var(--gold)" }} />
           Yangi manba
         </h2>
-        <CreateSourceForm regions={regions} />
+        <CreateSourceForm regions={regions} sohaList={sohaList} />
       </div>
 
       {/* Filtr: hudud va soha */}

@@ -1,4 +1,5 @@
 import { unstable_cache } from "next/cache";
+import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { CATEGORIES } from "@/lib/categories";
 
@@ -97,15 +98,33 @@ export interface DashboardStats {
 }
 
 // DIQQAT: unstable_cache natijani serializatsiya qiladi — faqat oddiy tiplar.
-async function computeDashboardStats(): Promise<DashboardStats> {
-  const [total, inefficient, synced, pending, failed, regionRows, byCategoryRaw] = await Promise.all([
-    prisma.property.count(),
-    prisma.property.count({ where: { isInefficient: true } }),
-    prisma.property.count({ where: { syncStatus: "SYNCED" } }),
-    prisma.property.count({ where: { syncStatus: "PENDING" } }),
-    prisma.property.count({ where: { syncStatus: "FAILED" } }),
+//
+// `sourceName` — manba (soha) nomi bo'yicha kesim: "Ijara markazi", "Davlat aktivlari"...
+// Berilmasa — umumiy statistika (barcha manbalar). Obyektlar ro'yxatidagi `soha` filtri
+// bilan AYNAN bir xil mezon (`OrganizationSource.name`) — shunda jadvaldagi raqamni
+// bosganda ro'yxat mos keladi.
+// Eksport qilingan — keshdan tashqari chaqirish (skript/sinov) uchun ham kerak.
+export async function computeDashboardStats(sourceName?: string): Promise<DashboardStats> {
+  // Prisma tomon (count) uchun filtr.
+  const srcWhere: Prisma.PropertyWhereInput = sourceName ? { source: { name: sourceName } } : {};
+
+  // Raw SQL uchun filtr — PARAMETRLANGAN (Prisma.sql), satr sifatida yopishtirilmaydi:
+  // sourceName foydalanuvchi kiritgan query paramdan keladi.
+  const srcCond = sourceName
+    ? Prisma.sql`p."sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${sourceName})`
+    : Prisma.sql`TRUE`;
+  // Alias'siz variant (CTE va oddiy FROM "Property" uchun).
+  const srcCondNoAlias = sourceName
+    ? Prisma.sql`"sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${sourceName})`
+    : Prisma.sql`TRUE`;
+
+  const [total, synced, pending, failed, regionRows, byCategoryRaw] = await Promise.all([
+    prisma.property.count({ where: srcWhere }),
+    prisma.property.count({ where: { syncStatus: "SYNCED", ...srcWhere } }),
+    prisma.property.count({ where: { syncStatus: "PENDING", ...srcWhere } }),
+    prisma.property.count({ where: { syncStatus: "FAILED", ...srcWhere } }),
     // Hudud kesimi — bitta so'rovda (obyekt, ijara, shartnoma, maydon, summa).
-    prisma.$queryRawUnsafe<
+    prisma.$queryRaw<
       {
         id: string;
         name: string;
@@ -117,7 +136,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
         area: string | null;
         sum: string | null;
       }[]
-    >(`
+    >(Prisma.sql`
       SELECT r.id, r.name, r."sortOrder",
              COUNT(p.id)                                              AS total,
              COUNT(p.id) FILTER (WHERE p."isInefficient")             AS inefficient,
@@ -126,33 +145,51 @@ async function computeDashboardStats(): Promise<DashboardStats> {
              COALESCE(SUM(p."rentTotalArea"), 0)                      AS area,
              COALESCE(SUM(p."rentTotalSum"), 0)                       AS sum
       FROM "Region" r
-      LEFT JOIN "Property" p ON p."regionId" = r.id
+      -- Manba filtri JOIN shartida: shunda o'sha manbada obyekti yo'q hudud ham
+      -- jadvalda 0 bilan qoladi (WHERE'da bo'lsa hudud butunlay tushib qolardi).
+      LEFT JOIN "Property" p ON p."regionId" = r.id AND ${srcCond}
       GROUP BY r.id, r.name, r."sortOrder"
       ORDER BY r."sortOrder", r.name
     `),
-    prisma.$queryRaw<{ code: number | null; count: number }[]>`
+    prisma.$queryRaw<{ code: number | null; count: number }[]>(Prisma.sql`
       SELECT COALESCE("integrationCategoryCode", "manualCategoryCode", 11) AS code,
              COUNT(*)::int AS count
       FROM "Property"
+      WHERE ${srcCondNoAlias}
       GROUP BY 1
       ORDER BY 1
-    `,
+    `),
   ]);
 
+  // ⚠️ "Bo'sh turgan" (samarasiz) soni `Property.isInefficient` ustunidan ALOHIDA
+  // so'rov bilan EMAS, shu yerdagi `byCategoryRaw`dan (code=11) olinadi. Ilgari
+  // alohida `prisma.property.count({isInefficient:true})` so'rovi bo'lgan — u
+  // `byCategoryRaw` bilan bir xil `Promise.all` ichida, lekin alohida ulanishda
+  // bajarilgani uchun fon worker'i aynan shu ikki so'rov orasida bitta obyektni
+  // yangilab qo'ysa, tepadagi karta va pastdagi jadval bir necha obyektga farq
+  // qilib qolardi (poyga holati — worker faol sinxronlanayotganda ko'rinadi,
+  // isInefficient ustuni o'zi buzilmagan bo'lsa ham). Effektiv kategoriya=11
+  // bo'lish sharti `computeIsInefficient()` bilan matematik teng (manualCategoryCode
+  // faqat 9/10/null bo'ladi, integrationCategoryCode 1–7/null — demak effektiv
+  // faqat ikkalasi ham null bo'lganda 11ga tushadi), shuning uchun bitta manbadan
+  // olish xavfsiz va HAR DOIM jadval bilan mos keladi.
+  const inefficient = byCategoryRaw.find((c) => c.code === 11)?.count ?? 0;
+
   // Hudud × kategoriya (effektiv kategoriya bo'yicha).
-  const regionCategoryRaw = await prisma.$queryRawUnsafe<
+  const regionCategoryRaw = await prisma.$queryRaw<
     { regionId: string; code: number | null; count: bigint }[]
-  >(`
+  >(Prisma.sql`
     SELECT p."regionId",
            COALESCE(p."integrationCategoryCode", p."manualCategoryCode", 11) AS code,
            COUNT(*) AS count
     FROM "Property" p
+    WHERE ${srcCond}
     GROUP BY 1, 2
   `);
 
   // Ijara xususiyati bo'yicha kesim — kategoriyaga BOG'LIQ EMAS.
   // "Bo'sh maydon" = foydali maydon (buildingArea) − ijaraga berilgan (rentTotalArea).
-  const rentRaw = await prisma.$queryRawUnsafe<
+  const rentRaw = await prisma.$queryRaw<
     {
       regionId: string;
       freeCount: bigint; freeUseful: string | null; freeRented: string | null; freeVacant: string | null;
@@ -166,7 +203,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
       cat1RentedObjects: bigint; cat7RentedObjects: bigint;
       onAnyAuctionCount: bigint;
     }[]
-  >(`
+  >(Prisma.sql`
     WITH r AS (
       SELECT "regionId",
              COALESCE("buildingArea", 0)      AS useful,
@@ -179,6 +216,7 @@ async function computeDashboardStats(): Promise<DashboardStats> {
              "hasRentLot"                     AS rentlot,
              COALESCE("integrationCategoryCode", "manualCategoryCode", 11) AS cat
       FROM "Property"
+      WHERE ${srcCondNoAlias}
     )
     SELECT "regionId",
            COUNT(*) FILTER (WHERE cnt > 0 AND sum = 0)  AS "freeCount",
@@ -313,7 +351,9 @@ async function computeDashboardStats(): Promise<DashboardStats> {
 }
 
 // Keshlash: "dashboard" tegi + 60s TTL (worker alohida process — revalidateTag chaqira olmaydi).
-export const getDashboardStats = unstable_cache(computeDashboardStats, ["dashboard-stats-v7"], {
+// `sourceName` argumenti kesh kalitiga avtomatik kiradi — ya'ni har bir manba
+// (va "hammasi") o'z keshiga ega bo'ladi.
+export const getDashboardStats = unstable_cache(computeDashboardStats, ["dashboard-stats-v8"], {
   tags: ["dashboard"],
   revalidate: 60,
 });

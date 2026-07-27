@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getDashboardStats, buildDashboardColumns, type DashboardColumnSub, type RegionCategoryRow } from "@/server/services/stats";
+import { listSourceNames } from "@/server/services/sources";
 
 // "Davlat obyektlaridan foydalanish markazi balansidagi obyektlar" (hudud × kategoriya)
 // jadvalini .xlsx qilib beradi. Kategoriya ustunlari buildDashboardColumns() dan — sahifadagi
@@ -15,11 +16,16 @@ function standaloneCol(title: string, get: (r: RegionCategoryRow) => number): Ex
   return { title, subs: [{ label: title, get }] };
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const session = await auth();
   if (!session?.user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
 
-  const stats = await getDashboardStats();
+  // Dashboard'dagi manba (soha) kesimi eksportga ham o'tadi — aks holda ekranda
+  // bir manba ko'rinib turib, yuklangan faylda hamma manba chiqib ketardi.
+  const sohaRaw = new URL(req.url).searchParams.get("soha")?.trim() || undefined;
+  const soha = sohaRaw && (await listSourceNames()).includes(sohaRaw) ? sohaRaw : undefined;
+
+  const stats = await getDashboardStats(soha);
   const columns = buildDashboardColumns();
 
   // Yagona tartiblangan ustunlar ro'yxati — kengligi, sarlavhasi va qiymati BIR marta,

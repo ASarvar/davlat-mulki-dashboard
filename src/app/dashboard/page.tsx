@@ -23,7 +23,9 @@ import {
   buildDashboardColumns,
   type DashboardColumnSub,
 } from "@/server/services/stats";
+import { listSourceNames } from "@/server/services/sources";
 import { SyncRunStatusBadge } from "@/components/badges";
+import { SourceFilter } from "./SourceFilter";
 
 type Tone = "navy" | "gold" | "green" | "amber" | "red" | "cobalt";
 
@@ -97,14 +99,33 @@ function SectionTitle({
   );
 }
 
-export default async function DashboardPage() {
-  const user = await requireUser();
+type SP = Record<string, string | string[] | undefined>;
+const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-  // Aggregatlar keshlangan (tag: dashboard, TTL 60s). Oxirgi run — jonli.
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<SP> }) {
+  const user = await requireUser();
+  const sp = await searchParams;
+
+  // Manba (soha) kesimi. Obyektlar ro'yxatidagi filtr bilan bir xil `soha` nomi —
+  // shunda jadvaldagi raqamni bosganda filtr saqlanib qoladi.
+  const sohaList = await listSourceNames();
+  const sohaRaw = str(sp.soha) || undefined;
+  // Faqat bazadagi haqiqiy manba nomi qabul qilinadi (noto'g'ri qiymat = "hammasi").
+  const soha = sohaRaw && sohaList.includes(sohaRaw) ? sohaRaw : undefined;
+
+  // Aggregatlar keshlangan (tag: dashboard, TTL 60s; kesh kaliti manbaga bog'liq).
+  // Oxirgi run — jonli.
   const [s, latestRun] = await Promise.all([
-    getDashboardStats(),
+    getDashboardStats(soha),
     prisma.syncRun.findFirst({ orderBy: { createdAt: "desc" } }),
   ]);
+
+  // Drill-down havolalari manba filtrini olib yuradi.
+  const sohaParam = soha ? `soha=${encodeURIComponent(soha)}` : "";
+  const objHref = (qs = "") => {
+    const parts = [qs, sohaParam].filter(Boolean);
+    return `/dashboard/objects${parts.length ? `?${parts.join("&")}` : ""}`;
+  };
 
   const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
   // Rasmiy hisobot shakli: mingliklar ajratilgan, kerak bo'lsa o'nlik bilan.
@@ -128,8 +149,12 @@ export default async function DashboardPage() {
   const totalObjects = s.byRegionCategory.reduce((a, r) => a + r.total, 0);
   const sumSub = (sub: DashboardColumnSub) =>
     s.byRegionCategory.reduce((a, r) => a + sub.get(r), 0);
+  // "Bo'sh turgan maydoni" kartasi — kat 11 (Bo'sh turgan, ijarasi umuman yo'q)
+  // obyektlarining FOYDALI MAYDONI. `hasVacant.area` (kat 12 — "Bo'sh maydoni bor")
+  // BILAN ARALASHTIRMANG: u ijara shartnomasi bor, lekin qisman bo'sh qolgan
+  // obyektlarning bo'sh qismi — butunlay boshqa ustun.
   const vacantAreaTotal = s.byRegionCategory.reduce(
-    (a, r) => a + r.rentBreakdown.hasVacant.area,
+    (a, r) => a + r.rentBreakdown.vacant.usefulArea,
     0,
   );
 
@@ -144,9 +169,12 @@ export default async function DashboardPage() {
             Boshqaruv paneli
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            Davlat mulki obyektlari bo'yicha umumiy holat
+            {soha
+              ? `Manba kesimi: ${soha}`
+              : "Davlat mulki obyektlari bo'yicha umumiy holat"}
           </p>
         </div>
+        <SourceFilter names={sohaList} current={soha} />
         {isAdmin(user.role) ? (
           <Link
             href="/dashboard/sync"
@@ -165,14 +193,14 @@ export default async function DashboardPage() {
           value={s.total}
           icon={Building2}
           tone="navy"
-          href="/dashboard/objects"
+          href={objHref()}
         />
         <StatCard
           label="Bo'sh turgan"
           value={s.inefficient}
           icon={TrendingDown}
           tone="gold"
-          href="/dashboard/objects?inefficient=1"
+          href={objHref("inefficient=1")}
         />
         <StatCard
           label="Bo'sh turgan maydoni"
@@ -197,7 +225,7 @@ export default async function DashboardPage() {
             Davlat obyektlaridan foydalanish markazi balansidagi obyektlar
           </SectionTitle>
           <a
-            href="/api/export/dashboard-categories"
+            href={`/api/export/dashboard-categories${sohaParam ? `?${sohaParam}` : ""}`}
             className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-slate-50 hover:text-slate-700"
           >
             <Download className="h-3.5 w-3.5" />
@@ -388,7 +416,7 @@ export default async function DashboardPage() {
                       className={`sticky left-4 right-4 z-10 ${zebra} py-2.5 pr-4 whitespace-nowrap group-hover:bg-slate-50`}
                     >
                       <Link
-                        href={`/dashboard/objects?region=${r.regionId}`}
+                        href={objHref(`region=${r.regionId}`)}
                         className="font-medium hover:underline"
                         style={{ color: "var(--cobalt)" }}
                       >
@@ -422,7 +450,7 @@ export default async function DashboardPage() {
                                 </span>
                               ) : (
                                 <Link
-                                  href={`/dashboard/objects?region=${r.regionId}&category=${c.code}`}
+                                  href={objHref(`region=${r.regionId}&category=${c.code}`)}
                                   className="hover:underline"
                                   style={{ color: "var(--cobalt)" }}
                                 >
@@ -438,7 +466,7 @@ export default async function DashboardPage() {
                               <span className="text-slate-300">0</span>
                             ) : (
                               <Link
-                                href={`/dashboard/objects?region=${r.regionId}&onAnyAuction=1`}
+                                href={objHref(`region=${r.regionId}&onAnyAuction=1`)}
                                 className="hover:underline"
                                 style={{ color: "var(--cobalt)" }}
                               >
@@ -454,7 +482,7 @@ export default async function DashboardPage() {
                               <span className="text-slate-300">0</span>
                             ) : (
                               <Link
-                                href={`/dashboard/objects?region=${r.regionId}&hasRentContract=1`}
+                                href={objHref(`region=${r.regionId}&hasRentContract=1`)}
                                 className="hover:underline"
                                 style={{ color: "var(--cobalt)" }}
                               >
@@ -472,7 +500,7 @@ export default async function DashboardPage() {
                         <span className="text-slate-300">0</span>
                       ) : (
                         <Link
-                          href={`/dashboard/objects?region=${r.regionId}&fullyRented=1`}
+                          href={objHref(`region=${r.regionId}&fullyRented=1`)}
                           className="hover:underline"
                           style={{ color: "var(--cobalt)" }}
                         >
@@ -600,7 +628,7 @@ export default async function DashboardPage() {
                     </td>
                     <td className="py-2.5 pr-4">
                       <Link
-                        href={`/dashboard/objects?region=${r.regionId}`}
+                        href={objHref(`region=${r.regionId}`)}
                         className="font-medium hover:underline"
                         style={{ color: "var(--cobalt)" }}
                       >

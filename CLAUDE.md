@@ -210,6 +210,35 @@ ro'yxatga havola. `/dashboard/objects?category=12` da "Maydon" ustuni "Bo'sh may
 ⚠️ `buildDashboardColumns()` **markazlashtirilgan** — sahifa va `/api/export/dashboard-categories`
 (Excel eksporti) bir xil funksiyani chaqiradi (`buildWhere()` bilan bir xil printsip); ustun
 qo'shsangiz/o'zgartirsangiz ikkalasi ham avtomatik yangilanadi.
+
+### Manba (soha) kesimi — `?soha=`
+`OrganizationSource.name` = soha ("Ijara markazi", "Davlat aktivlari"...). Bitta soha 14 hududda
+14 ta yozuv sifatida yashaydi (har birida o'z STIR'i) — ya'ni "manba turi" uchun alohida jadval YO'Q,
+guruhlash **nom bo'yicha** ketadi (`listSourceNames()` noyob nomlarni beradi).
+
+Bir xil `soha` query param **uch joyda** ishlatiladi va bir xil mezonni bildiradi:
+- `/dashboard?soha=` → `getDashboardStats(soha)` (umumiy = param yo'q)
+- `/dashboard/objects?soha=` → `buildWhere()` → `{ source: { name: soha } }`
+- `/api/export/dashboard-categories?soha=` → o'sha statistika
+
+Dashboard'dagi barcha drill-down havolalar `objHref()` orqali quriladi — u `soha`ni avtomatik
+qo'shadi, shuning uchun yangi havola qo'shsangiz **`objHref()` ishlating**, qo'lda URL yozmang.
+⚠️ `stats.ts`dagi raw SQL'lar `Prisma.sql` bilan **parametrlangan** (`$queryRawUnsafe` emas) —
+`soha` foydalanuvchi kiritadigan qiymat. Yangi so'rov qo'shsangiz shu uslubni saqlang.
+⚠️ Hudud kesimida filtr **JOIN shartida** (`LEFT JOIN ... AND ${srcCond}`), `WHERE`da emas — aks
+holda o'sha manbada obyekti yo'q hudud jadvaldan butunlay tushib qolardi (0 o'rniga yo'qoladi).
+Kesh kaliti `dashboard-stats-v8` + argument, ya'ni har bir soha o'z keshiga ega.
+
+⚠️ **`computeDashboardStats()`dagi `inefficient` (Bo'sh turgan) soni `byCategoryRaw`dan (code=11)
+olinadi, `Property.isInefficient` ustunidan ALOHIDA so'rov bilan EMAS.** Ilgari alohida
+`prisma.property.count({isInefficient:true})` so'rovi bor edi — bir xil `Promise.all` ichida bo'lsa
+ham, u `byCategoryRaw`dan mustaqil so'rov bo'lgani uchun worker faol sinxronlanayotganda ikkisi
+orasida bitta obyekt yangilanib qolsa, tepadagi karta pastdagi jadvaldan bir necha songa farq qilib
+qolardi (poyga holati — `isInefficient` ustuni o'zi buzilmagan bo'lsa ham ko'rinadi). Effektiv
+kategoriya=11 sharti `computeIsInefficient()` bilan matematik teng (`manualCategoryCode` faqat
+9/10/null, `integrationCategoryCode` faqat 1–7/null bo'ladi), shuning uchun bitta so'rovdan olish
+xavfsiz. Yangi dashboard agregat qo'shsangiz shu naqshni saqlang: bir xil hisoblanadigan ikki son
+hech qachon ikkita alohida so'rovdan kelmasin.
 ⚠️ **Kat 3/4 "Ijara shartnoma soni"** — `rentContractCount` (API 5) EFFEKTIV kategoriyadan emas,
 `hasPrivatizationLot`/`hasRentLot` bayroqlaridan taqsimlanadi (foydalanuvchi tasdiqlagan qoida):
 obyekt xususiylashtirish lotida bo'lsa (ijara lotida ham bo'lsa ham) — kat 3 ga; **faqat** ijara
