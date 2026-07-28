@@ -394,6 +394,7 @@ enum SyncRunType {
   FULL_ALL
   REGION
   SINGLE
+  STATUS_REFRESH // API1/2 siz — mavjud obyektlarga to'g'ridan-to'g'ri holat-API'lar (3-6)
 }
 
 enum SyncRunStatus {
@@ -411,6 +412,13 @@ model SyncRun {
   triggeredById String?
   triggeredBy   User?         @relation("TriggeredBy", fields: [triggeredById], references: [id])
   regionId      String?
+  // Soha (OrganizationSource.name) bo'yicha kesim — hudud bilan birga qo'llanadi.
+  sourceName    String?
+  // STATUS_REFRESH uchun: qaysi modullar tashqi API'dan qayta so'raladi.
+  // FULL_ALL/REGION/SINGLE uchun uchalasi ham true (to'liq zanjir, o'zgarmagan xulq-atvor).
+  refreshBase    Boolean @default(true) // API2 — asosiy ma'lumot
+  refreshAuction Boolean @default(true) // API3/4 + API6 — auksion va ijara loti (birga, AuctionLot bitta jadval)
+  refreshRent    Boolean @default(true) // API5 — ijara shartnomalari
   totalCount    Int           @default(0)
   successCount  Int           @default(0)
   failCount     Int           @default(0)

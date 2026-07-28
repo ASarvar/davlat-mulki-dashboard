@@ -35,3 +35,16 @@ export async function enqueueStatusCheck(job: StatusCheckJob): Promise<void> {
   const boss = await getBoss();
   await boss.send(QUEUE.STATUS_CHECK, job, { singletonKey: `sc:${job.cadNumber}` });
 }
+
+// STATUS_REFRESH uchun: mavjud obyektlarga to'g'ridan-to'g'ri (API1/2 discovery'siz)
+// bulk insert (80k obyektgacha tez ishlashi uchun — enqueueStatusCheck bittalab yuboradi).
+export async function insertStatusCheckBulk(jobs: StatusCheckJob[]): Promise<void> {
+  const boss = await getBoss();
+  await boss.insert(
+    jobs.map((data) => ({
+      name: QUEUE.STATUS_CHECK,
+      data,
+      singletonKey: `sc:${data.cadNumber}`,
+    })),
+  );
+}

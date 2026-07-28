@@ -9,6 +9,7 @@ import { processSyncSource } from "./processors/syncSource";
 import { processPropertyBase } from "./processors/syncPropertyBase";
 import { processStatusCheck } from "./processors/checkPropertyStatus";
 import { incrementSuccess, incrementFail, finalizeIfComplete } from "@/server/services/runProgress";
+import { triggerFullSync } from "./enqueue";
 
 const leafOpts: PgBoss.WorkOptions = {
   batchSize: env.WORKER_CONCURRENCY,
@@ -92,6 +93,22 @@ async function main() {
         .catch(() => {});
     }),
   );
+
+  // Kunlik avtomatik to'liq sinxronizatsiya — kadastr ro'yxati/asosiy ma'lumot kamdan-kam
+  // o'zgaradi, shuning uchun kuniga bir marta (03:00, Toshkent) yetarli. `.schedule()`
+  // idempotent — worker qayta ishga tushganda bir xil jadval qayta yozilaveradi, xato bermaydi.
+  // Faqat WORKER process chaqiradi (Next.js web process'da emas) — ishga tushirish shu yerda.
+  await boss.work(QUEUE.DAILY_FULL_SYNC, async () => {
+    try {
+      await triggerFullSync();
+      console.log("[daily-full-sync] navbatga qo'yildi");
+    } catch (err) {
+      // Odatiy sabab: shu payt boshqa sync allaqachon ketayotgan edi — bu xato emas,
+      // ertangi jadval o'zi qayta urinadi.
+      console.warn("[daily-full-sync] o'tkazib yuborildi:", msg(err));
+    }
+  });
+  await boss.schedule(QUEUE.DAILY_FULL_SYNC, "0 3 * * *", {}, { tz: "Asia/Tashkent" });
 
   console.log(
     `🚀 Worker (pg-boss) ishga tushdi. batchSize=${env.WORKER_CONCURRENCY}, poll=${env.WORKER_POLL_SECONDS}s. Queue'lar: ${Object.values(QUEUE).join(", ")}`,

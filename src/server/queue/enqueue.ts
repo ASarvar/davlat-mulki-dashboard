@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { enqueuePropertyBase, enqueueSyncSources } from "./dispatch";
-import type { SyncSourceJob } from "./jobs";
+import { enqueuePropertyBase, enqueueSyncSources, insertStatusCheckBulk } from "./dispatch";
+import type { SyncSourceJob, StatusCheckJob } from "./jobs";
 
 // UI/Server Action'lardan chaqiriladigan sync trigger'lar.
 // Har biri SyncRun yaratadi va tegishli job(lar)ni navbatga qo'yadi.
@@ -24,12 +24,14 @@ async function assertNoActiveRun(): Promise<void> {
   );
 }
 
-// Barcha manbalarni (14 STIR) sinxronlash.
-export async function triggerFullSync(userId?: string) {
+// Barcha manbalarni (yoki bitta soha bo'yicha barchasini) sinxronlash.
+export async function triggerFullSync(userId?: string, sourceName?: string) {
   await assertNoActiveRun();
-  const sources = await prisma.organizationSource.findMany({ where: { isActive: true } });
+  const sources = await prisma.organizationSource.findMany({
+    where: { isActive: true, ...(sourceName ? { name: sourceName } : {}) },
+  });
   const run = await prisma.syncRun.create({
-    data: { type: "FULL_ALL", status: "QUEUED", triggeredById: userId ?? null },
+    data: { type: "FULL_ALL", status: "QUEUED", triggeredById: userId ?? null, sourceName: sourceName ?? null },
   });
   await enqueueSyncSources(
     sources.map<SyncSourceJob>((s) => ({ syncRunId: run.id, sourceId: s.id, stir: s.stir, regionId: s.regionId })),
@@ -37,16 +39,87 @@ export async function triggerFullSync(userId?: string) {
   return run;
 }
 
-// Bitta hudud manbalarini sinxronlash.
-export async function triggerRegionSync(regionId: string, userId?: string) {
+// Bitta hudud (ixtiyoriy: + bitta soha) manbalarini sinxronlash.
+export async function triggerRegionSync(regionId: string, userId?: string, sourceName?: string) {
   await assertNoActiveRun();
-  const sources = await prisma.organizationSource.findMany({ where: { isActive: true, regionId } });
+  const sources = await prisma.organizationSource.findMany({
+    where: { isActive: true, regionId, ...(sourceName ? { name: sourceName } : {}) },
+  });
   const run = await prisma.syncRun.create({
-    data: { type: "REGION", status: "QUEUED", regionId, triggeredById: userId ?? null },
+    data: {
+      type: "REGION",
+      status: "QUEUED",
+      regionId,
+      sourceName: sourceName ?? null,
+      triggeredById: userId ?? null,
+    },
   });
   await enqueueSyncSources(
     sources.map<SyncSourceJob>((s) => ({ syncRunId: run.id, sourceId: s.id, stir: s.stir, regionId: s.regionId })),
   );
+  return run;
+}
+
+export interface StatusRefreshInput {
+  regionId?: string;
+  sourceName?: string;
+  refreshBase: boolean;
+  refreshAuction: boolean;
+  refreshRent: boolean;
+  userId?: string;
+}
+
+// "Faqat holat yangilash" — API1 (kashfiyot) va ixtiyoriy ravishda API2 ni ham o'tkazib,
+// MAVJUD obyektlarga to'g'ridan-to'g'ri holat-API tekshiruvini qo'yadi. Yangi kadastr
+// QIDIRILMAYDI — faqat bazada bor obyektlar (hudud/soha doirasida) yangilanadi.
+export async function triggerStatusRefresh(input: StatusRefreshInput) {
+  const { regionId, sourceName, refreshBase, refreshAuction, refreshRent, userId } = input;
+  if (!refreshBase && !refreshAuction && !refreshRent) {
+    throw new Error("Kamida bitta modul tanlanishi kerak");
+  }
+  await assertNoActiveRun();
+
+  const properties = await prisma.property.findMany({
+    where: {
+      ...(regionId ? { regionId } : {}),
+      ...(sourceName ? { source: { name: sourceName } } : {}),
+    },
+    select: { id: true, cadNumber: true, cadNumberOld: true },
+  });
+  if (properties.length === 0) {
+    throw new Error("Tanlangan doirada obyekt topilmadi");
+  }
+
+  const run = await prisma.syncRun.create({
+    data: {
+      type: "STATUS_REFRESH",
+      status: "QUEUED",
+      regionId: regionId ?? null,
+      sourceName: sourceName ?? null,
+      refreshBase,
+      refreshAuction,
+      refreshRent,
+      totalCount: properties.length,
+      triggeredById: userId ?? null,
+    },
+  });
+
+  await insertStatusCheckBulk(
+    properties.map<StatusCheckJob>((p) => ({
+      syncRunId: run.id,
+      propertyId: p.id,
+      cadNumber: p.cadNumber,
+      cadNumberOld: p.cadNumberOld,
+      refreshBase,
+      refreshAuction,
+      refreshRent,
+    })),
+  );
+
+  // Fan-out siz to'g'ridan-to'g'ri "RUNNING" — property-base bosqichi yo'q, shuning uchun
+  // sync-source kabi alohida "totalCount oshirish" qadami kerak emas (yuqorida hisoblangan).
+  await prisma.syncRun.update({ where: { id: run.id }, data: { status: "RUNNING", startedAt: new Date() } });
+
   return run;
 }
 

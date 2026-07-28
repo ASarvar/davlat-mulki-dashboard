@@ -57,7 +57,7 @@ docker run --rm -v "$PWD":/w -w /w node:22-bookworm-slim npm install --package-l
 ```
 sync-source    API 1: STIR → kadastrlar ro'yxati (fan-out)
 property-base  API 2: kadastr → asosiy ma'lumot (cad_number_old shu yerdan)
-status-check   API 3+4 (auksion zanjiri) + API 5 (ijara) → kategoriya
+status-check   API 3+4 (auksion zanjiri) + API 5 (ijara) + API 6 (ijara loti) → kategoriya
 ```
 
 - `src/server/integrations/` — tashqi API mijozlari. `http.ts` markaziy: retry/backoff, rate-limit,
@@ -66,6 +66,36 @@ status-check   API 3+4 (auksion zanjiri) + API 5 (ijara) → kategoriya
   `properties.ts` `buildWhere()` orqali rol/hudud doirasini **bir joyda** saqlaydi (ro'yxat + eksport ishlatadi).
 - **Eski kadastr fallback:** har bir tekshiruv avval yangi, topilmasa eski kadastr bilan urinadi.
   Real ma'lumotda obyektlarning ~86% ida eski kadastr bor — bu asosiy yo'l, istisno emas.
+
+### Sinxronizatsiya turlari (`SyncRunType`) — 2026-07-27
+
+`FULL_ALL`/`REGION`/`SINGLE` — to'liq zanjir (kashfiyot: API1/2 + holat: API3-6), o'zgarmagan.
+Yangi **`STATUS_REFRESH`** — kashfiyotni (API1/2 fan-out) o'tkazib, MAVJUD obyektlarga
+to'g'ridan-to'g'ri holat-API qo'yadi (`triggerStatusRefresh()`). Doirasi hudud **va/yoki**
+soha (`OrganizationSource.name`) bilan cheklanadi, ikkalasi ham ixtiyoriy va birga ishlaydi.
+
+**Uchta mustaqil modul** (`SyncRun.refreshBase/refreshAuction/refreshRent`, har biri checkbox):
+- `refreshBase` — API2 (asosiy ma'lumot: maydon, manzil, `rawApi2`)
+- `refreshAuction` — API3/4 (auksion) **+** API6 (ijara loti) **BIRGA** — ajratib bo'lmaydi,
+  chunki ikkalasi ham bitta `deriveAuctionCategory()` chaqiruviga kiradi va `AuctionLot`
+  jadvalida birga saqlanadi (PRIVATIZATION + RENT turlari, bitta deleteMany+createMany).
+- `refreshRent` — API5 (ijara shartnomalari), mustaqil (5/6 kod diapazoni auksiondan alohida)
+
+⚠️ **Yangilanmagan modul tashqi API'ga UMUMAN chaqirilmaydi** — uning oldingi hissasi
+`checkPropertyStatus.ts`dagi `AUCTION_RANGE`/`RENT_RANGE` orqali bazadagi joriy
+`integrationCategoryCode`dan tiklanadi (auksion={1,2,3,4,7}, ijara={5,6} — kesishmaydi,
+ustuvorlik har doim auksion>ijara>boshqa bo'lgani uchun joriy qiymat qaysi diapazonda
+ekani o'sha modulning oxirgi natijasini aniq bildiradi — qayta hisoblash shart emas).
+`refreshBase=false` bo'lsa `rawApi2`/maydon o'zgarmaydi; live API4dan `rentedArea` kerak
+bo'lganda (maydon tuzatish) `refreshRent=false` bo'lsa saqlangan `rentTotalArea` ishlatiladi.
+Jonli API bilan ikki yo'nalishda tekshirildi (auksion-ustuvor va ijara-ustuvor obyektlarda) —
+qisman yangilash boshqa modulning kategoriyasini **hech qachon** `null`ga almashtirmaydi.
+
+**Kunlik avtomatik to'liq sinxronizatsiya** — `worker.ts` ishga tushganda pg-boss
+`.schedule("daily-full-sync", "0 3 * * *", {}, {tz:"Asia/Tashkent"})` chaqiradi (faqat worker
+process, Next.js emas). Idempotent — qayta ishga tushganda jadval qayta yozilaveradi.
+Faol run bor bo'lsa `assertNoActiveRun()` xato tashlaydi — kunlik ishga tushirish buni
+`try/catch` bilan jim o'tkazib yuboradi (log'ga yozadi, keyingi kunga qoldiradi).
 
 ### Rollar (6 ta)
 - `SUPER_ADMIN` — hammasi.

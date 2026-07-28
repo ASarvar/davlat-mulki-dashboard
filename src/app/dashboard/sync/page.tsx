@@ -2,6 +2,7 @@ import { RefreshCw, History, AlertTriangle } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/authz";
 import { getPendingJobCounts, getQueueHealth } from "@/server/services/syncAdmin";
+import { listSourceNames } from "@/server/services/sources";
 import { SyncRunStatusBadge } from "@/components/badges";
 import { SyncControls } from "./SyncControls";
 import { AutoRefresh } from "./AutoRefresh";
@@ -10,14 +11,25 @@ const RUN_TYPE_LABEL: Record<string, string> = {
   FULL_ALL: "To'liq",
   REGION: "Hudud",
   SINGLE: "Bitta kadastr",
+  STATUS_REFRESH: "Holat yangilash",
 };
+
+// STATUS_REFRESH run'ida qaysi modullar yangilangani (tarix jadvalida ko'rsatish uchun).
+function refreshedModules(r: { refreshBase: boolean; refreshAuction: boolean; refreshRent: boolean }): string {
+  const parts: string[] = [];
+  if (r.refreshBase) parts.push("Asosiy ma'lumot");
+  if (r.refreshAuction) parts.push("Auksion");
+  if (r.refreshRent) parts.push("Ijara");
+  return parts.join(" + ") || "—";
+}
 
 export default async function SyncPage() {
   // Sinxronizatsiya faqat SUPER_ADMIN va ADMIN uchun.
   await requireRole("SUPER_ADMIN", "ADMIN");
 
-  const [regions, runs] = await Promise.all([
+  const [regions, sohaList, runs] = await Promise.all([
     prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
+    listSourceNames(),
     prisma.syncRun.findMany({
       orderBy: { createdAt: "desc" },
       take: 20,
@@ -65,7 +77,7 @@ export default async function SyncPage() {
       ) : null}
 
       <div className="mb-6">
-        <SyncControls regions={regions} canFullSync lockedRegionId={null} pendingJobs={pendingJobs} />
+        <SyncControls regions={regions} sohaList={sohaList} canFullSync lockedRegionId={null} pendingJobs={pendingJobs} />
       </div>
 
       <h2 className="mb-3 flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--navy)" }}>
@@ -84,7 +96,7 @@ export default async function SyncPage() {
           <thead>
             <tr className="border-b border-border bg-slate-50 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <th className="px-4 py-3 font-medium">Turi</th>
-              <th className="px-4 py-3 font-medium">Hudud</th>
+              <th className="px-4 py-3 font-medium">Hudud / Soha</th>
               <th className="px-4 py-3 font-medium">Holat</th>
               <th className="px-4 py-3 font-medium">Jarayon</th>
               <th className="px-4 py-3 font-medium">Kim</th>
@@ -104,8 +116,16 @@ export default async function SyncPage() {
                 const pct = r.totalCount > 0 ? Math.min(100, Math.round((done / r.totalCount) * 100)) : 0;
                 return (
                   <tr key={r.id} className="border-b border-border last:border-0">
-                    <td className="px-4 py-3 font-medium">{RUN_TYPE_LABEL[r.type] ?? r.type}</td>
-                    <td className="px-4 py-3">{r.regionId ? (regionName.get(r.regionId) ?? "—") : "Barchasi"}</td>
+                    <td className="px-4 py-3 font-medium">
+                      {RUN_TYPE_LABEL[r.type] ?? r.type}
+                      {r.type === "STATUS_REFRESH" ? (
+                        <p className="mt-0.5 text-xs font-normal text-muted-foreground">{refreshedModules(r)}</p>
+                      ) : null}
+                    </td>
+                    <td className="px-4 py-3">
+                      {r.regionId ? (regionName.get(r.regionId) ?? "—") : "Barcha hudud"}
+                      {r.sourceName ? <p className="text-xs text-muted-foreground">{r.sourceName}</p> : null}
+                    </td>
                     <td className="px-4 py-3">
                       <SyncRunStatusBadge status={r.status} />
                     </td>
