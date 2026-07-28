@@ -40,10 +40,18 @@ export async function triggerFullSync(userId?: string, sourceName?: string) {
 }
 
 // Bitta hudud (ixtiyoriy: + bitta soha) manbalarini sinxronlash.
+// ⚠️ Shu hududga biriktirilgan manbalardan tashqari, RESPUBLIKA darajasidagi
+// (regionId = null) manbalar ham qo'shiladi — ularning obyektlari ham shu hududda
+// bo'lishi mumkin. API 1 tashkilotning barcha kadastrlarini qaytargani uchun,
+// fan-out bosqichida `filterRegionId` bo'yicha faqat shu hudud kadastrlari olinadi.
 export async function triggerRegionSync(regionId: string, userId?: string, sourceName?: string) {
   await assertNoActiveRun();
   const sources = await prisma.organizationSource.findMany({
-    where: { isActive: true, regionId, ...(sourceName ? { name: sourceName } : {}) },
+    where: {
+      isActive: true,
+      OR: [{ regionId }, { regionId: null }],
+      ...(sourceName ? { name: sourceName } : {}),
+    },
   });
   const run = await prisma.syncRun.create({
     data: {
@@ -55,7 +63,13 @@ export async function triggerRegionSync(regionId: string, userId?: string, sourc
     },
   });
   await enqueueSyncSources(
-    sources.map<SyncSourceJob>((s) => ({ syncRunId: run.id, sourceId: s.id, stir: s.stir, regionId: s.regionId })),
+    sources.map<SyncSourceJob>((s) => ({
+      syncRunId: run.id,
+      sourceId: s.id,
+      stir: s.stir,
+      regionId: s.regionId,
+      filterRegionId: regionId,
+    })),
   );
   return run;
 }

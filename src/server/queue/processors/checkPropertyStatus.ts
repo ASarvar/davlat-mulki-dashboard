@@ -228,9 +228,18 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
 
     // Kategoriya ustuvorligi: auksion (sotilgan/savdoda) > ijara shartnomasi > boshqa API'lar.
     // ── Auksion lotlari ──
+    // ⚠️ `hasPrivatizationLot` — FAQAT "hozir savdoda turibdi" bayrog'i (kat 3 hisobi
+    // shunga tayanadi, shuning uchun sotilganlar `!isSold` bilan chiqarib tashlanadi —
+    // aks holda kat 3 1427 ta chiqadi, 524 o'rniga). Bu bayroqni lot YOZUVINI saqlash
+    // shartiga ISHLATMANG: ilgari shunday qilingan edi va natijada obyekt sotilgach
+    // uning `AuctionLot` qatori HAR safar qayta sinxronlanganda o'chirilib, qayta
+    // yaratilmasdi — ro'yxatda (Property.lotNumber, pastda alohida yoziladi) lot
+    // ko'rinardi, obyekt sahifasida (auctionLots relation) esa "0" chiqardi.
     const hasPrivatizationLot = refreshAuction
       ? Boolean(auction!.found && auction!.lotNumber && !auction!.isSold)
       : current.hasPrivatizationLot;
+    // Tarixiy yozuv uchun: lot mavjudligining o'zi yetarli — sotilgan-sotilmaganidan qat'i nazar.
+    const auctionLotExists = refreshAuction ? Boolean(auction!.found && auction!.lotNumber) : false;
     const hasRentLot = refreshAuction ? rentLot!.found : current.hasRentLot;
     const auctionTotalAreaNum = refreshAuction
       ? rentLot!.totalArea
@@ -242,7 +251,7 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
       await tx.auctionLot.deleteMany({ where: { propertyId } });
       const lotRows: Prisma.AuctionLotCreateManyInput[] = [];
 
-      if (hasPrivatizationLot) {
+      if (auctionLotExists) {
         lotRows.push({
           propertyId,
           type: "PRIVATIZATION",

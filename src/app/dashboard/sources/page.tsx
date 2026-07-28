@@ -108,7 +108,7 @@ export default async function SourcesPage({ searchParams }: { searchParams: Prom
             <tr className="border-b border-border bg-slate-50 text-left text-xs uppercase tracking-wide text-muted-foreground">
               <th className="px-4 py-3 font-medium">Hudud</th>
               <th className="px-4 py-3 font-medium" colSpan={3}>
-                Manba / STIR / holat
+                Soha / tashkilot / STIR / holat
               </th>
               <th className="px-4 py-3 font-medium">Obyektlar</th>
             </tr>
@@ -127,9 +127,10 @@ export default async function SourcesPage({ searchParams }: { searchParams: Prom
                 source={{
                   id: s.id,
                   name: s.name,
+                  orgName: s.orgName,
                   stir: s.stir,
                   isActive: s.isActive,
-                  regionName: s.region.name,
+                  regionName: s.region?.name ?? null,
                   propertyCount: s._count.properties,
                 }}
               />

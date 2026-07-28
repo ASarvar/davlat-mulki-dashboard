@@ -13,9 +13,11 @@ export interface SourceState {
 // O'zbekiston STIR — 9 raqam.
 const stirSchema = z.string().regex(/^\d{9}$/, "STIR 9 ta raqamdan iborat bo'lishi kerak");
 
+// Hudud IXTIYORIY — bo'sh bo'lsa respublika darajasidagi manba (Agentlik, Direksiya).
 const createSchema = z.object({
-  regionId: z.string().min(1, "Hudud tanlanmagan"),
-  name: z.string().min(2, "Manba nomi kiritilsin"),
+  regionId: z.string().optional(),
+  name: z.string().min(2, "Soha nomi kiritilsin"),
+  orgName: z.string().optional(),
   stir: stirSchema,
 });
 
@@ -23,8 +25,9 @@ export async function createSourceAction(_prev: SourceState, formData: FormData)
   try {
     const actor = await requireRole("SUPER_ADMIN", "ADMIN");
     const parsed = createSchema.safeParse({
-      regionId: formData.get("regionId"),
+      regionId: String(formData.get("regionId") ?? "") || undefined,
       name: formData.get("name"),
+      orgName: String(formData.get("orgName") ?? "") || undefined,
       stir: formData.get("stir"),
     });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ma'lumot noto'g'ri" };
@@ -53,7 +56,8 @@ export async function deleteSourceAction(_prev: SourceState, formData: FormData)
 
 const updateSchema = z.object({
   sourceId: z.string().min(1),
-  name: z.string().min(2, "Manba nomi kiritilsin"),
+  name: z.string().min(2, "Soha nomi kiritilsin"),
+  orgName: z.string().optional(),
   stir: stirSchema,
 });
 
@@ -63,12 +67,14 @@ export async function updateSourceAction(_prev: SourceState, formData: FormData)
     const parsed = updateSchema.safeParse({
       sourceId: formData.get("sourceId"),
       name: formData.get("name"),
+      orgName: String(formData.get("orgName") ?? "") || undefined,
       stir: formData.get("stir"),
     });
     if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Ma'lumot noto'g'ri" };
 
     await updateSource(actor.id, parsed.data.sourceId, {
       name: parsed.data.name,
+      orgName: parsed.data.orgName ?? null,
       stir: parsed.data.stir,
       isActive: formData.get("isActive") === "on",
     });

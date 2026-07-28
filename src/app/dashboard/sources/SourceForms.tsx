@@ -17,8 +17,10 @@ export function CreateSourceForm({
     <form action={action} className="flex flex-wrap items-end gap-3">
       <div className="flex flex-col">
         <label className="mb-1 text-xs text-muted-foreground">Hudud</label>
-        <select name="regionId" required className="w-52 rounded-md border border-slate-300 px-2 py-1.5 text-sm">
-          <option value="">Tanlang...</option>
+        {/* Bo'sh = respublika darajasi (Agentlik, Direksiya) — obyektlari kadastr
+            raqamidan tegishli hududga taqsimlanadi. */}
+        <select name="regionId" defaultValue="" className="w-48 rounded-md border border-slate-300 px-2 py-1.5 text-sm">
+          <option value="">Respublika (hududsiz)</option>
           {regions.map((r) => (
             <option key={r.id} value={r.id}>
               {r.name}
@@ -27,8 +29,8 @@ export function CreateSourceForm({
         </select>
       </div>
       <div className="flex flex-col">
-        <label className="mb-1 text-xs text-muted-foreground">Manba nomi</label>
-        {/* Mavjud sohalardan tanlash YOKI yangisini yozish — datalist ikkalasiga ham ruxsat beradi. */}
+        <label className="mb-1 text-xs text-muted-foreground">Soha</label>
+        {/* Mavjud sohalardan tanlash YOKI yangisini yozish. */}
         <input
           name="name"
           required
@@ -36,13 +38,21 @@ export function CreateSourceForm({
           autoComplete="off"
           defaultValue={sohaList[0] ?? "Ijara markazi"}
           placeholder="Mavjudini tanlang yoki yangisini yozing"
-          className="w-56 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+          className="w-52 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
         />
         <datalist id="soha-datalist">
           {sohaList.map((n) => (
             <option key={n} value={n} />
           ))}
         </datalist>
+      </div>
+      <div className="flex flex-col">
+        <label className="mb-1 text-xs text-muted-foreground">Tashkilot nomi (ixtiyoriy)</label>
+        <input
+          name="orgName"
+          placeholder="Andijon viloyati ... boshqarmasi"
+          className="w-64 rounded-md border border-slate-300 px-3 py-1.5 text-sm"
+        />
       </div>
       <div className="flex flex-col">
         <label className="mb-1 text-xs text-muted-foreground">STIR (9 raqam)</label>
@@ -66,9 +76,10 @@ export function CreateSourceForm({
 export interface SourceRowData {
   id: string;
   name: string;
+  orgName: string | null;
   stir: string;
   isActive: boolean;
-  regionName: string;
+  regionName: string | null;
   propertyCount: number;
 }
 
@@ -81,13 +92,27 @@ export function SourceRow({ source }: { source: SourceRowData }) {
 
   return (
     <tr className="border-b border-border last:border-0">
-      <td className="px-4 py-3">{source.regionName}</td>
+      <td className="px-4 py-3 align-top">
+        {source.regionName ?? <span className="text-muted-foreground">Respublika</span>}
+      </td>
       <td className="px-4 py-3" colSpan={3}>
         {/* Ikkala forma bitta flex qatorda — o'chirish tugmasi saqlashdan darhol keyin turadi. */}
         <div className="flex flex-wrap items-center gap-2">
           <form action={action} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="sourceId" value={source.id} />
-            <input name="name" defaultValue={source.name} className="w-44 rounded-md border border-slate-300 px-2 py-1 text-sm" />
+            <input
+              name="name"
+              defaultValue={source.name}
+              title="Soha (guruh) nomi"
+              className="w-44 rounded-md border border-slate-300 px-2 py-1 text-sm"
+            />
+            <input
+              name="orgName"
+              defaultValue={source.orgName ?? ""}
+              placeholder="Tashkilot nomi"
+              title="To'liq rasmiy tashkilot nomi"
+              className="w-72 rounded-md border border-slate-300 px-2 py-1 text-sm"
+            />
             <input
               name="stir"
               defaultValue={source.stir}
@@ -138,12 +163,12 @@ export function SourceRow({ source }: { source: SourceRowData }) {
           {state.error ? <span className="text-xs text-red-700">{state.error}</span> : null}
           {state.ok ? <span className="text-xs text-emerald-700">Saqlandi ✓</span> : null}
           {hasProperties ? (
-            <span className="text-xs text-muted-foreground">obyektlari bor — o'chirish bloklangan</span>
+            <span className="text-xs text-muted-foreground">obyektlari bor — o&apos;chirish bloklangan</span>
           ) : null}
           {delState.error ? <span className="text-xs text-red-700">{delState.error}</span> : null}
         </div>
       </td>
-      <td className="px-4 py-3 text-muted-foreground">{source.propertyCount}</td>
+      <td className="px-4 py-3 align-top text-muted-foreground">{source.propertyCount}</td>
     </tr>
   );
 }

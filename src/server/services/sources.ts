@@ -2,8 +2,12 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 
 export interface SourceInput {
-  regionId: string;
+  /** Bo'sh bo'lsa — respublika darajasidagi manba (hududga biriktirilmaydi). */
+  regionId?: string | null;
+  /** SOHA (guruh) nomi — filtrlar shu bo'yicha guruhlaydi. */
   name: string;
+  /** To'liq rasmiy tashkilot nomi (ixtiyoriy, faqat ko'rsatish uchun). */
+  orgName?: string | null;
   stir: string;
   isActive?: boolean;
 }
@@ -20,7 +24,8 @@ export async function listSources(f: SourceFilters = {}) {
       ...(f.regionId ? { regionId: f.regionId } : {}),
       ...(f.name ? { name: f.name } : {}),
     },
-    orderBy: [{ region: { name: "asc" } }, { name: "asc" }],
+    // Soha bo'yicha guruhlab ko'rsatamiz; hududsiz (respublika) manbalar birinchi.
+    orderBy: [{ name: "asc" }, { region: { sortOrder: "asc" } }],
     include: {
       region: { select: { id: true, name: true } },
       _count: { select: { properties: true } },
@@ -73,8 +78,9 @@ export async function createSource(actorId: string, input: SourceInput) {
     return await prisma.$transaction(async (tx) => {
       const created = await tx.organizationSource.create({
         data: {
-          regionId: input.regionId,
+          regionId: input.regionId || null,
           name: input.name.trim(),
+          orgName: input.orgName?.trim() || null,
           stir: input.stir.trim(),
           isActive: input.isActive ?? true,
         },
@@ -92,7 +98,7 @@ export async function createSource(actorId: string, input: SourceInput) {
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      throw new Error("Bu hudud uchun ushbu STIR allaqachon mavjud");
+      throw new Error("Bu STIR allaqachon boshqa manbada ishlatilgan (STIR global unikal)");
     }
     throw err;
   }
@@ -101,13 +107,18 @@ export async function createSource(actorId: string, input: SourceInput) {
 export async function updateSource(
   actorId: string,
   sourceId: string,
-  input: { name: string; stir: string; isActive: boolean },
+  input: { name: string; orgName?: string | null; stir: string; isActive: boolean },
 ) {
   try {
     await prisma.$transaction(async (tx) => {
       await tx.organizationSource.update({
         where: { id: sourceId },
-        data: { name: input.name.trim(), stir: input.stir.trim(), isActive: input.isActive },
+        data: {
+          name: input.name.trim(),
+          ...(input.orgName !== undefined ? { orgName: input.orgName?.trim() || null } : {}),
+          stir: input.stir.trim(),
+          isActive: input.isActive,
+        },
       });
       await tx.auditLog.create({
         data: {
@@ -121,7 +132,7 @@ export async function updateSource(
     });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2002") {
-      throw new Error("Bu hudud uchun ushbu STIR allaqachon mavjud");
+      throw new Error("Bu STIR allaqachon boshqa manbada ishlatilgan (STIR global unikal)");
     }
     throw err;
   }

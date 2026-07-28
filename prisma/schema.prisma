@@ -79,6 +79,11 @@ model Region {
   code       String               @unique // masalan "TAS", "SAM"
   name       String // "Toshkent shahri" ...
   sortOrder  Int                  @default(0) // rasmiy hisobot shaklidagi tartib
+  // Kadastr raqamining birinchi bo'lagi ("10".."23") — masalan 17:15:40:01:02:0184 => Andijon.
+  // Hududga biriktirilmagan (respublika darajasidagi) manbaning obyektlari SHU orqali
+  // to'g'ri hududga joylashtiriladi. 2419 ta jonli obyektda tekshirilgan: har bir hududda
+  // aynan bitta prefiks, hech qanday chalkashish yo'q.
+  cadastrePrefix String?           @unique
   properties      Property[]
   users           User[]
   sources         OrganizationSource[]
@@ -89,18 +94,28 @@ model Region {
 
 // Har bir hudud+organizatsiya uchun STIR va API config (kelajakda kengayadi)
 model OrganizationSource {
-  id         String     @id @default(cuid())
-  name       String // "Ijara markazi", "Sog'liqni saqlash"...
-  stir       String // API 1 uchun kalit
-  regionId   String
-  region     Region     @relation(fields: [regionId], references: [id])
+  id String @id @default(cuid())
+  // SOHA (guruh) nomi — "Ijara markazi", "Davlat aktivlari agentligi"...
+  // Dashboard/ro'yxat filtrlari SHU maydon bo'yicha guruhlaydi, shuning uchun bitta
+  // sohaning barcha yozuvlarida u AYNAN bir xil bo'lishi shart.
+  name String
+  // To'liq rasmiy tashkilot nomi — faqat ko'rsatish uchun ("Andijon viloyati Davlat
+  // aktivlarini boshqarish boshqarmasi"). `name` bilan aralashtirmang: ilgari ikkalasi
+  // bitta maydon edi va seed uzun nomlarni yozgani uchun soha guruhlash buzilardi.
+  orgName    String?
+  stir       String     @unique // API 1 uchun kalit; tashkilotga xos, global unikal
+  // Hududga biriktirilmagan (respublika darajasidagi) manba uchun null — masalan
+  // Agentlikning o'zi yoki Direksiya. Ularning obyektlari kadastr prefiksi orqali
+  // tegishli hududga taqsimlanadi (`Region.cadastrePrefix`).
+  regionId   String?
+  region     Region?    @relation(fields: [regionId], references: [id])
   isActive   Boolean    @default(true)
   properties Property[]
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
-  @@unique([regionId, stir])
   @@index([stir])
+  @@index([name])
 }
 
 // ─────────────────────────── Kategoriyalar ───────────────────────────

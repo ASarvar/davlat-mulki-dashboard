@@ -11,7 +11,14 @@ export interface SyncSourceJob {
   syncRunId: string;
   sourceId: string;
   stir: string;
-  regionId: string;
+  /** Manbaning hududi. `null` = respublika darajasi — hudud har bir kadastr prefiksidan aniqlanadi. */
+  regionId: string | null;
+  /**
+   * Faqat shu hududga tegishli kadastrlarni olish (hudud bo'yicha sinxronizatsiya).
+   * API 1 tashkilotning BARCHA kadastrlarini qaytaradi — hududsiz manbani bitta hudud
+   * doirasida yangilash uchun natijani shu yerda filtrlaymiz.
+   */
+  filterRegionId?: string;
 }
 
 export interface PropertyBaseJob {

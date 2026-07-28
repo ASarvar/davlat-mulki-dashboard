@@ -225,6 +225,14 @@ savdosida bo'lishi mumkin (44 ta shunday). Shuning uchun `AuctionLot` jadvali (`
 va `Property.hasPrivatizationLot` / `hasRentLot` bayroqlari bor. **"Savdoda" = hozir savdoda turgan:**
 sotilgan obyektning ham loti bor, shuning uchun `hasPrivatizationLot` da `!isSold` sharti bor
 (aks holda kat 3 da 1427 ta chiqadi, 524 o'rniga).
+⚠️ **`hasPrivatizationLot`ni `AuctionLot` YOZUVI saqlanadimi degan shartga ISHLATMANG** —
+`checkPropertyStatus.ts`da bir marta shunday qilingan edi: natijada obyekt sotilgach uning
+`AuctionLot` qatori har qayta sinxronlanganda o'chirilib, qayta yaratilmasdi (sabab: bayroq
+`!isSold`ni talab qiladi). Ro'yxatda (`Property.lotNumber`, alohida materiallashtirilgan) lot
+ko'rinar, obyekt sahifasida (`auctionLots` relation) esa "0" chiqardi. To'g'ri: yozuv saqlash
+sharti — `auction.found && auction.lotNumber`, sotilgan-sotilmaganidan qat'i nazar (`auctionLotExists`
+o'zgaruvchisi). Tuzatilgandan keyin ham eski obyektlar uchun tarixiy qayta tiklash kerak —
+`/dashboard/sync` → "Holat yangilash" → faqat **Auksion** belgilab, hudud/soha bo'sh (=hammasi).
 
 **Dashboard jadvalida 3, 4, 5, 6 va 12-ustunlar effektiv kategoriyadan EMAS, xususiyatdan hisoblanadi**
 (`stats.ts` → `rentBreakdown`): sotilgan yoki savdodagi obyekt ham ijara shartnomasiga ega bo'lishi
@@ -242,9 +250,32 @@ ro'yxatga havola. `/dashboard/objects?category=12` da "Maydon" ustuni "Bo'sh may
 qo'shsangiz/o'zgartirsangiz ikkalasi ham avtomatik yangilanadi.
 
 ### Manba (soha) kesimi — `?soha=`
-`OrganizationSource.name` = soha ("Ijara markazi", "Davlat aktivlari"...). Bitta soha 14 hududda
-14 ta yozuv sifatida yashaydi (har birida o'z STIR'i) — ya'ni "manba turi" uchun alohida jadval YO'Q,
-guruhlash **nom bo'yicha** ketadi (`listSourceNames()` noyob nomlarni beradi).
+⚠️ `OrganizationSource`da **ikkita nom** bor, aralashtirmang:
+- **`name` = SOHA (guruh)** — "Ijara markazi", "Davlat aktivlari agentligi",
+  "Bino va mol-mulklarni vaqtinchalik saqlash direksiyasi". Barcha filtrlar SHU bo'yicha
+  guruhlaydi, shuning uchun bitta sohaning hamma yozuvida harfma-harf bir xil bo'lishi shart.
+- **`orgName` = to'liq rasmiy tashkilot nomi** — faqat ko'rsatish uchun.
+
+Ilgari ikkalasi bitta maydon edi va `seed.ts` uzun rasmiy nomlarni `name`ga yozardi — natijada
+toza o'rnatishda 1 ta emas, 14 ta "soha" paydo bo'lardi va filtr butunlay buzilardi (bazada
+qo'lda "Ijara markazi" deb tuzatilgani uchun bilinmay kelgan). Seed endi `name`ni **hech qachon
+qayta yozmaydi** (admin UI'da qayta nomlagan bo'lishi mumkin), faqat `orgName`ni yangilaydi;
+upsert kaliti — **STIR** (endi global unikal, `@@unique([regionId, stir])` emas: `regionId`
+NULL bo'lganda Postgres NULL'larni farqli deb hisoblab dublikatni o'tkazib yuborardi).
+
+**Respublika darajasidagi manba** — `regionId = null` (Agentlik, Direksiya). Ularning obyektlari
+istalgan hududda bo'lishi mumkin, shuning uchun hudud **kadastr raqamining birinchi bo'lagidan**
+aniqlanadi (`Region.cadastrePrefix`, 2419 jonli obyektda 100% mos tekshirilgan):
+`10`=Toshkent sh. `11`=Toshkent v. `12`=Sirdaryo `13`=Jizzax `14`=Samarqand `15`=Farg'ona
+`16`=Namangan `17`=Andijon `18`=Qashqadaryo `19`=Surxondaryo `20`=Buxoro `21`=Navoiy
+`22`=Xorazm `23`=Qoraqalpog'iston.
+⚠️ Prefiks noma'lum bo'lsa obyekt **o'tkazib yuboriladi** (log'ga yoziladi), tasodifiy hududga
+yozilmaydi — butun dashboard hudud kesimida qurilgan.
+⚠️ `triggerRegionSync()` hududsiz manbalarni ham qo'shadi (`OR: [{regionId}, {regionId: null}]`)
+va `SyncSourceJob.filterRegionId` orqali fan-out'da faqat mos prefiksli kadastrlarni oladi —
+API 1 tashkilotning BARCHA kadastrlarini qaytargani uchun filtr shu bosqichda bo'lishi shart.
+`syncSource.ts`da `totalCount` `cadastres.length` emas, **`jobs.length`** bilan oshiriladi
+(filtrlangan kadastr leaf job bermaydi — aks holda run hech qachon yakunlanmasdi).
 
 Bir xil `soha` query param **uch joyda** ishlatiladi va bir xil mezonni bildiradi:
 - `/dashboard?soha=` → `getDashboardStats(soha)` (umumiy = param yo'q)

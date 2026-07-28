@@ -7,9 +7,16 @@ export function SourceFilter({ names, current }: { names: string[]; current?: st
   // Bitta manba bo'lsa tanlashning ma'nosi yo'q — ko'rsatmaymiz.
   if (names.length < 2) return null;
 
+  // Tartib: "Ijara markazi" har doim birinchi (asosiy manba), qolganlari o'z tartibida,
+  // "Hammasi" esa oxirida.
+  const ordered = [...names].sort((a, b) => {
+    if (a === "Ijara markazi") return -1;
+    if (b === "Ijara markazi") return 1;
+    return 0;
+  });
   const items: { label: string; value?: string }[] = [
+    ...ordered.map((n) => ({ label: n, value: n })),
     { label: "Hammasi" },
-    ...names.map((n) => ({ label: n, value: n })),
   ];
 
   return (

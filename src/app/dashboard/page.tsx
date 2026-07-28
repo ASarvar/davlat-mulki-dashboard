@@ -174,17 +174,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               : "Davlat mulki obyektlari bo'yicha umumiy holat"}
           </p>
         </div>
-        <SourceFilter names={sohaList} current={soha} />
-        {isAdmin(user.role) ? (
-          <Link
-            href="/dashboard/sync"
-            className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
-            style={{ background: "var(--cobalt)" }}
-          >
-            <RefreshCw className="h-4 w-4" />
-            Sinxronizatsiya
-          </Link>
-        ) : null}
+        {/* SourceFilter + Sinxronizatsiya bitta guruh sifatida o'ng chetga tekislanadi —
+            aks holda soha o'zgarganda sarlavha ostidagi matn uzunligi o'zgarib,
+            `justify-between` bu ikkisini gorizontal siljitib qo'yardi. */}
+        <div className="ml-auto flex items-center gap-3">
+          <SourceFilter names={sohaList} current={soha} />
+          {isAdmin(user.role) ? (
+            <Link
+              href="/dashboard/sync"
+              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+              style={{ background: "var(--cobalt)" }}
+            >
+              <RefreshCw className="h-4 w-4" />
+              Sinxronizatsiya
+            </Link>
+          ) : null}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-4  md:grid-cols-3 xl:grid-cols-5">
