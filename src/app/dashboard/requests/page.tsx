@@ -1,8 +1,9 @@
-import { ClipboardCheck, History, ExternalLink, ImageIcon } from "lucide-react";
+import { ClipboardCheck, History, ExternalLink, ImageIcon, Search, RotateCcw } from "lucide-react";
 import type { ChangeRequestStatus } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authz";
-import { listPendingRequests, listRequestHistory, reviewableStages } from "@/server/services/assignment";
-import { CATEGORY_BY_CODE } from "@/lib/categories";
+import { listPendingRequests, listRequestHistory, reviewableStages, type RequestFilters } from "@/server/services/assignment";
+import { ASSIGNABLE_CATEGORIES, CATEGORY_BY_CODE } from "@/lib/categories";
 import { objectHref } from "@/lib/cadastre";
 import { RequestRow } from "./RequestRow";
 
@@ -12,6 +13,16 @@ const STATUS_STYLE: Record<ChangeRequestStatus, { label: string; cls: string }> 
   APPROVED: { label: "Tasdiqlangan", cls: "bg-emerald-100 text-emerald-800" },
   REJECTED: { label: "Rad etilgan", cls: "bg-red-100 text-red-800" },
 };
+
+const STATUS_OPTIONS: { value: ChangeRequestStatus; label: string }[] = [
+  { value: "PENDING_MODERATOR", label: "Moderatorda" },
+  { value: "PENDING_RAHBARIYAT", label: "Rahbariyatda" },
+  { value: "APPROVED", label: "Tasdiqlangan" },
+  { value: "REJECTED", label: "Rad etilgan" },
+];
+
+const selectCls =
+  "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-cobalt focus:ring-2 focus:ring-cobalt/20";
 
 // Bosqich qarori: kim + izoh (izoh rad etishda majburiy bo'lgani uchun doim mazmunli).
 function Decision({ name, note }: { name: string | null; note: string | null }) {
@@ -24,14 +35,40 @@ function Decision({ name, note }: { name: string | null; note: string | null }) 
   );
 }
 
-export default async function RequestsPage() {
+type SP = Record<string, string | string[] | undefined>;
+const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
+
+export default async function RequestsPage({ searchParams }: { searchParams: Promise<SP> }) {
   const user = await requireUser();
+  const sp = await searchParams;
   const canReview = reviewableStages(user.role).length > 0;
 
+  const categoryStr = str(sp.category);
+  const categoryCode = categoryStr ? Number(categoryStr) : undefined;
+  const regionId = str(sp.region) || undefined;
+  const statusRaw = str(sp.status) || undefined;
+  const status = statusRaw && statusRaw in STATUS_STYLE ? (statusRaw as ChangeRequestStatus) : undefined;
+  const q = str(sp.q)?.trim() || undefined;
+  const cad = str(sp.cad)?.trim() || undefined;
+
+  const baseFilters: RequestFilters = { categoryCode, regionId, q, cad };
+
+  // Hudud tanlagichi IJROCHI'ga ko'rsatilmaydi — u har doim faqat o'z hududini ko'radi,
+  // filtr befoyda bo'lardi.
+  const regions =
+    user.role === "IJROCHI"
+      ? []
+      : await prisma.region.findMany({
+          orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+          select: { id: true, name: true },
+        });
+
   const [pending, history] = await Promise.all([
-    canReview ? listPendingRequests(user) : Promise.resolve([]),
-    listRequestHistory(user),
+    canReview ? listPendingRequests(user, baseFilters) : Promise.resolve([]),
+    listRequestHistory(user, { ...baseFilters, status }),
   ]);
+
+  const hasFilters = Boolean(categoryCode || regionId || status || q || cad);
 
   const hint =
     user.role === "MODERATOR"
@@ -51,6 +88,84 @@ export default async function RequestsPage() {
         </h1>
         <p className="text-sm text-muted-foreground">{hint}</p>
       </div>
+
+      {/* Filtr: kadastr, kategoriya, holat, hudud, so'rovchi — ikkala jadvalga ham (holat faqat tarixga) qo'llanadi. */}
+      <form
+        method="get"
+        action="/dashboard/requests"
+        className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
+      >
+        <div className="flex flex-col">
+          <label className="mb-1 text-xs font-medium text-muted-foreground">Kadastr (yangi/eski)</label>
+          <input
+            name="cad"
+            defaultValue={cad ?? ""}
+            placeholder="Qidirish..."
+            className={`${selectCls} w-48`}
+          />
+        </div>
+        <div className="flex flex-col">
+          <label className="mb-1 text-xs font-medium text-muted-foreground">Kategoriya</label>
+          <select name="category" defaultValue={categoryStr ?? ""} className={`${selectCls} w-48`}>
+            <option value="">Barchasi</option>
+            {ASSIGNABLE_CATEGORIES.map((c) => (
+              <option key={c.code} value={c.code}>
+                {c.nameUz}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="flex flex-col">
+          <label className="mb-1 text-xs font-medium text-muted-foreground">Holat (tarixda)</label>
+          <select name="status" defaultValue={statusRaw ?? ""} className={`${selectCls} w-44`}>
+            <option value="">Barchasi</option>
+            {STATUS_OPTIONS.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        {regions.length > 0 ? (
+          <div className="flex flex-col">
+            <label className="mb-1 text-xs font-medium text-muted-foreground">Hudud</label>
+            <select name="region" defaultValue={regionId ?? ""} className={`${selectCls} w-52`}>
+              <option value="">Barchasi</option>
+              {regions.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+        <div className="flex flex-col">
+          <label className="mb-1 text-xs font-medium text-muted-foreground">So'rovchi</label>
+          <input
+            name="q"
+            defaultValue={q ?? ""}
+            placeholder="Ism yoki login"
+            className={`${selectCls} w-44`}
+          />
+        </div>
+        <button
+          type="submit"
+          className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+          style={{ background: "var(--cobalt)" }}
+        >
+          <Search className="h-4 w-4" />
+          Filtrlash
+        </button>
+        {hasFilters ? (
+          <a
+            href="/dashboard/requests"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition hover:bg-slate-50"
+          >
+            <RotateCcw className="h-4 w-4" />
+            Tozalash
+          </a>
+        ) : null}
+      </form>
 
       {canReview ? (
         <section>
@@ -73,7 +188,7 @@ export default async function RequestsPage() {
                 {pending.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">
-                      Kutilayotgan so'rov yo'q.
+                      {hasFilters ? "Filtrga mos so'rov yo'q." : "Kutilayotgan so'rov yo'q."}
                     </td>
                   </tr>
                 ) : (
@@ -126,7 +241,7 @@ export default async function RequestsPage() {
               {history.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-4 py-10 text-center text-muted-foreground">
-                    Hozircha so'rov yo'q.
+                    {hasFilters ? "Filtrga mos so'rov yo'q." : "Hozircha so'rov yo'q."}
                   </td>
                 </tr>
               ) : (

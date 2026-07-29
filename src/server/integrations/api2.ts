@@ -16,6 +16,8 @@ export interface Api2Response {
 
   region?: string | null;
   district?: string | null;
+  /** UZKAD tuman kodi — District jadvalining kaliti (nom emas, chunki imlo o'zgaruvchan). */
+  district_id?: number | string | null;
   address?: string | null;
   short_address?: string | null;
 
@@ -110,6 +112,7 @@ export async function fetchPropertyBase(cadNumber: string): Promise<Api2Result> 
       buildingArea: num(res.object_area_u),
       region: str(res.region),
       district: str(res.district),
+      districtCode: num(res.district_id),
       holderName: str(holder?.name),
       holderInn: str(holder?.inn),
       raw: res,

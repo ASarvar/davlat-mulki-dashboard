@@ -15,17 +15,23 @@ import {
   type LucideIcon,
   MapPinPlus,
   Layers,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser, isAdmin } from "@/lib/authz";
 import {
   getDashboardStats,
+  computeDistrictStats,
   buildDashboardColumns,
+  computeDistrictRentStats,
   type DashboardColumnSub,
+  type RegionCategoryRow,
+  type RegionStat,
 } from "@/server/services/stats";
 import { listSourceNames } from "@/server/services/sources";
 import { SyncRunStatusBadge } from "@/components/badges";
-import { SourceFilter } from "./SourceFilter";
+import { SourceFilter, ALL_SOHA } from "./SourceFilter";
 
 type Tone = "navy" | "gold" | "green" | "amber" | "red" | "cobalt";
 
@@ -99,6 +105,126 @@ function SectionTitle({
   );
 }
 
+/**
+ * Kategoriyalar jadvalining bitta qatori. Hudud va TUMAN qatorlari uchun BIR XIL —
+ * shuning uchun ustun mantiqi (COLUMNS, kat 4/6 qo'shimcha ustunlari, "To'liq ijara")
+ * faqat shu yerda yoziladi. `scope` — drill-down havolasining filtr qismi
+ * ("region=..." yoki "region=...&district=...").
+ */
+function CategoryTableRow({
+  row,
+  columns,
+  zebra,
+  objHref,
+  scope,
+  nf,
+  km,
+  label,
+  lead,
+}: {
+  row: RegionCategoryRow;
+  columns: ReturnType<typeof buildDashboardColumns>;
+  zebra: string;
+  objHref: (qs?: string) => string;
+  scope: string;
+  nf: (n: number, digits?: number) => string;
+  km: (m2: number) => string;
+  label: React.ReactNode;
+  lead: React.ReactNode;
+}) {
+  const numCell = (value: number, qs: string, extraCls = "") => (
+    <td className={`px-2 py-2.5 text-center tabular-nums ${extraCls}`}>
+      {value === 0 ? (
+        <span className="text-slate-300">0</span>
+      ) : (
+        <Link href={objHref(qs)} className="hover:underline" style={{ color: "var(--cobalt)" }}>
+          {nf(value)}
+        </Link>
+      )}
+    </td>
+  );
+
+  return (
+    <tr className={`group border-b border-border last:border-0 hover:bg-slate-50/70 ${zebra}`}>
+      <td className={`sticky left-0 z-10 ${zebra} py-2.5 pr-3 tabular-nums text-muted-foreground group-hover:bg-slate-50`}>
+        {lead}
+      </td>
+      <td className={`sticky left-4 right-4 z-10 ${zebra} py-2.5 pr-4 whitespace-nowrap group-hover:bg-slate-50`}>
+        {label}
+      </td>
+      <td className="py-2.5 text-center font-semibold tabular-nums">{nf(row.total)}</td>
+      {columns.map((c) => (
+        <Fragment key={c.code}>
+          {c.subs.map((sub, si) => {
+            const v = sub.get(row);
+            const cls = `px-2 py-2.5 text-center tabular-nums ${si === 0 ? "border-l border-border" : ""}`;
+            if (v === 0) {
+              return (
+                <td key={`${c.code}-${sub.label}`} className={cls}>
+                  <span className="text-slate-300">0</span>
+                </td>
+              );
+            }
+            // Faqat "Soni" katagi ro'yxatga havola bo'ladi (maydon ustunlari — matn).
+            return (
+              <td key={`${c.code}-${sub.label}`} className={cls}>
+                {sub.area ? (
+                  <span className="text-muted-foreground">{km(v)}</span>
+                ) : (
+                  <Link
+                    href={objHref(`${scope}&category=${c.code}`)}
+                    className="hover:underline"
+                    style={{ color: "var(--cobalt)" }}
+                  >
+                    {nf(v)}
+                  </Link>
+                )}
+              </td>
+            );
+          })}
+          {c.code === 4
+            ? numCell(row.rentBreakdown.onAnyAuction.count, `${scope}&onAnyAuction=1`, "border-l border-border")
+            : null}
+          {c.code === 6
+            ? numCell(row.rentBreakdown.onlyFreeOrPaidCategory.count, `${scope}&hasRentContract=1`, "border-l border-border")
+            : null}
+        </Fragment>
+      ))}
+      {numCell(row.rentBreakdown.fullyRented.count, `${scope}&fullyRented=1`, "border-l border-border")}
+    </tr>
+  );
+}
+
+/**
+ * "Hududlar kesimi — ijara shartnomalari" jadvalining bitta qatori.
+ * Hudud va TUMAN qatorlari uchun bir xil — ikkalasi ham `RegionStat` shaklida keladi.
+ */
+function RentTableRow({
+  row,
+  zebra,
+  nf,
+  label,
+  lead,
+}: {
+  row: RegionStat;
+  zebra: string;
+  nf: (n: number, digits?: number) => string;
+  label: React.ReactNode;
+  lead: React.ReactNode;
+}) {
+  return (
+    <tr className={`border-b border-border last:border-0 hover:bg-slate-50/70 ${zebra}`}>
+      <td className="py-2.5 pr-3 tabular-nums text-muted-foreground">{lead}</td>
+      <td className="py-2.5 pr-4">{label}</td>
+      <td className="py-2.5 pr-4 text-right tabular-nums">{nf(row.total)}</td>
+      <td className="py-2.5 pr-4 text-right tabular-nums">{nf(row.rentedObjects)}</td>
+      <td className="py-2.5 pr-4 text-right tabular-nums">{nf(row.contractCount)}</td>
+      <td className="py-2.5 pr-4 text-right tabular-nums">{nf(row.rentArea, 1)}</td>
+      <td className="py-2.5 text-right tabular-nums">{nf(row.rentSum / 1_000_000, 1)}</td>
+    </tr>
+  );
+}
+
 type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -110,14 +236,30 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // shunda jadvaldagi raqamni bosganda filtr saqlanib qoladi.
   const sohaList = await listSourceNames();
   const sohaRaw = str(sp.soha) || undefined;
-  // Faqat bazadagi haqiqiy manba nomi qabul qilinadi (noto'g'ri qiymat = "hammasi").
-  const soha = sohaRaw && sohaList.includes(sohaRaw) ? sohaRaw : undefined;
+  // ⚠️ Standart holat "Hammasi" emas — "Ijara markazi" (agar mavjud bo'lsa).
+  // "Hammasi"ni ko'rish uchun ANIQ `?soha=__all__` kerak (SourceFilter shu havolani beradi);
+  // aks holda sahifa birinchi ochilganda "Ijara markazi" tanlangan bo'lib turadi.
+  const soha =
+    sohaRaw === ALL_SOHA
+      ? undefined
+      : sohaRaw && sohaList.includes(sohaRaw)
+        ? sohaRaw
+        : !sohaRaw && sohaList.includes("Ijara markazi")
+          ? "Ijara markazi"
+          : undefined;
+
+  // Qaysi hudud tumanlarga ochilgan (`?tuman=<regionId>`). Bir vaqtda bittasi —
+  // jadval juda keng, hammasini ochish o'qishni qiyinlashtirardi.
+  const tuman = str(sp.tuman) || undefined;
 
   // Aggregatlar keshlangan (tag: dashboard, TTL 60s; kesh kaliti manbaga bog'liq).
-  // Oxirgi run — jonli.
-  const [s, latestRun] = await Promise.all([
+  // Oxirgi run — jonli. Tuman kesimi faqat ochilgan hudud uchun so'raladi (keshlanmaydi:
+  // arzon va kamdan-kam chaqiriladi).
+  const [s, latestRun, districts, districtRent] = await Promise.all([
     getDashboardStats(soha),
     prisma.syncRun.findFirst({ orderBy: { createdAt: "desc" } }),
+    tuman ? computeDistrictStats(tuman, soha) : Promise.resolve([] as RegionCategoryRow[]),
+    tuman ? computeDistrictRentStats(tuman, soha) : Promise.resolve([] as RegionStat[]),
   ]);
 
   // Drill-down havolalari manba filtrini olib yuradi.
@@ -125,6 +267,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const objHref = (qs = "") => {
     const parts = [qs, sohaParam].filter(Boolean);
     return `/dashboard/objects${parts.length ? `?${parts.join("&")}` : ""}`;
+  };
+  // Dashboard'ning o'ziga havola — manba tanlovini saqlab, tuman ochish/yopish.
+  const dashHref = (expandRegionId?: string) => {
+    const parts = [sohaParam, expandRegionId ? `tuman=${expandRegionId}` : ""].filter(Boolean);
+    return `/dashboard${parts.length ? `?${parts.join("&")}` : ""}`;
   };
 
   const pct = (n: number, d: number) => (d > 0 ? Math.round((n / d) * 100) : 0);
@@ -407,113 +554,68 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 // Zebra: juft qatorlar oq, toq qatorlar och-oltin (light-golden).
                 const zebra =
                   i % 2 === 1 ? "bg-[var(--gold-lighter)]" : "bg-white";
+                const expanded = tuman === r.regionId;
                 return (
-                  <tr
-                    key={r.regionId}
-                    className={`group border-b border-border last:border-0 hover:bg-slate-50/70 ${zebra}`}
-                  >
-                    <td
-                      className={`sticky left-0 z-10 ${zebra} py-2.5 pr-3 tabular-nums text-muted-foreground group-hover:bg-slate-50`}
-                    >
-                      {i + 1}
-                    </td>
-                    <td
-                      className={`sticky left-4 right-4 z-10 ${zebra} py-2.5 pr-4 whitespace-nowrap group-hover:bg-slate-50`}
-                    >
-                      <Link
-                        href={objHref(`region=${r.regionId}`)}
-                        className="font-medium hover:underline"
-                        style={{ color: "var(--cobalt)" }}
-                      >
-                        {r.name}
-                      </Link>
-                    </td>
-                    <td className="py-2.5 text-center font-semibold tabular-nums">
-                      {nf(r.total)}
-                    </td>
-                    {COLUMNS.map((c) => (
-                      <Fragment key={c.code}>
-                        {c.subs.map((sub, si) => {
-                          const v = sub.get(r);
-                          const cls = `px-2 py-2.5 text-center tabular-nums ${si === 0 ? "border-l border-border" : ""}`;
-                          if (v === 0) {
-                            return (
-                              <td
-                                key={`${c.code}-${sub.label}`}
-                                className={cls}
-                              >
-                                <span className="text-slate-300">0</span>
-                              </td>
-                            );
-                          }
-                          // Faqat "Soni" katagi ro'yxatga havola bo'ladi.
-                          return (
-                            <td key={`${c.code}-${sub.label}`} className={cls}>
-                              {sub.area ? (
-                                <span className="text-muted-foreground">
-                                  {km(v)}
-                                </span>
-                              ) : (
-                                <Link
-                                  href={objHref(`region=${r.regionId}&category=${c.code}`)}
-                                  className="hover:underline"
-                                  style={{ color: "var(--cobalt)" }}
-                                >
-                                  {nf(v)}
-                                </Link>
-                              )}
-                            </td>
-                          );
-                        })}
-                        {c.code === 4 ? (
-                          <td className="border-l border-border px-2 py-2.5 text-center tabular-nums">
-                            {r.rentBreakdown.onAnyAuction.count === 0 ? (
-                              <span className="text-slate-300">0</span>
-                            ) : (
-                              <Link
-                                href={objHref(`region=${r.regionId}&onAnyAuction=1`)}
-                                className="hover:underline"
-                                style={{ color: "var(--cobalt)" }}
-                              >
-                                {nf(r.rentBreakdown.onAnyAuction.count)}
-                              </Link>
-                            )}
-                          </td>
-                        ) : null}
-                        {c.code === 6 ? (
-                          <td className="border-l border-border px-2 py-2.5 text-center tabular-nums">
-                            {r.rentBreakdown.onlyFreeOrPaidCategory.count ===
-                            0 ? (
-                              <span className="text-slate-300">0</span>
-                            ) : (
-                              <Link
-                                href={objHref(`region=${r.regionId}&hasRentContract=1`)}
-                                className="hover:underline"
-                                style={{ color: "var(--cobalt)" }}
-                              >
-                                {nf(
-                                  r.rentBreakdown.onlyFreeOrPaidCategory.count,
-                                )}
-                              </Link>
-                            )}
-                          </td>
-                        ) : null}
-                      </Fragment>
-                    ))}
-                    <td className="border-l border-border px-2 py-2.5 text-center tabular-nums">
-                      {r.rentBreakdown.fullyRented.count === 0 ? (
-                        <span className="text-slate-300">0</span>
-                      ) : (
+                  <Fragment key={r.regionId}>
+                    <CategoryTableRow
+                      row={r}
+                      columns={COLUMNS}
+                      zebra={zebra}
+                      objHref={objHref}
+                      scope={`region=${r.regionId}`}
+                      nf={nf}
+                      km={km}
+                      label={
                         <Link
-                          href={objHref(`region=${r.regionId}&fullyRented=1`)}
-                          className="hover:underline"
+                          href={objHref(`region=${r.regionId}`)}
+                          className="font-medium hover:underline"
                           style={{ color: "var(--cobalt)" }}
                         >
-                          {nf(r.rentBreakdown.fullyRented.count)}
+                          {r.name}
                         </Link>
-                      )}
-                    </td>
-                  </tr>
+                      }
+                      lead={
+                        // Tumanlarni ochish/yopish — server tomonda, `?tuman=` orqali.
+                        <Link
+                          href={expanded ? dashHref() : dashHref(r.regionId)}
+                          scroll={false}
+                          title={expanded ? "Tumanlarni yopish" : "Tumanlar bo'yicha"}
+                          className="inline-flex items-center gap-1 tabular-nums text-muted-foreground hover:text-slate-700"
+                        >
+                          {expanded ? (
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          )}
+                          {i + 1}
+                        </Link>
+                      }
+                    />
+                    {expanded
+                      ? districts.map((d) => (
+                          <CategoryTableRow
+                            key={d.regionId}
+                            row={d}
+                            columns={COLUMNS}
+                            zebra="bg-slate-50/60"
+                            objHref={objHref}
+                            scope={`region=${r.regionId}&district=${d.regionId}`}
+                            nf={nf}
+                            km={km}
+                            lead={<span className="text-slate-300">·</span>}
+                            label={
+                              <Link
+                                href={objHref(`region=${r.regionId}&district=${d.regionId}`)}
+                                className="pl-4 text-[13px] hover:underline"
+                                style={{ color: "var(--cobalt)" }}
+                              >
+                                {d.name}
+                              </Link>
+                            }
+                          />
+                        ))
+                      : null}
+                  </Fragment>
                 );
               })}
             </tbody>
@@ -623,40 +725,61 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 // Zebra: juft qatorlar oq, toq qatorlar och-oltin (light-golden).
                 const zebra =
                   i % 2 === 1 ? "bg-[var(--gold-lighter)]" : "bg-white";
+                const expanded = tuman === r.regionId;
                 return (
-                  <tr
-                    key={r.regionId}
-                    className={`border-b border-border last:border-0 hover:bg-slate-50/70 ${zebra}`}
-                  >
-                    <td className="py-2.5 pr-3 tabular-nums text-muted-foreground">
-                      {i + 1}
-                    </td>
-                    <td className="py-2.5 pr-4">
-                      <Link
-                        href={objHref(`region=${r.regionId}`)}
-                        className="font-medium hover:underline"
-                        style={{ color: "var(--cobalt)" }}
-                      >
-                        {r.name}
-                      </Link>
-                    </td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">
-                      {nf(r.total)}
-                    </td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">
-                      {nf(r.rentedObjects)}
-                    </td>
-                    {/* <td className="py-2.5 pr-4 text-right tabular-nums">{r.rentedPct}</td> */}
-                    <td className="py-2.5 pr-4 text-right tabular-nums">
-                      {nf(r.contractCount)}
-                    </td>
-                    <td className="py-2.5 pr-4 text-right tabular-nums">
-                      {nf(r.rentArea, 1)}
-                    </td>
-                    <td className="py-2.5 text-right tabular-nums">
-                      {nf(r.rentSum / 1_000_000, 1)}
-                    </td>
-                  </tr>
+                  <Fragment key={r.regionId}>
+                    <RentTableRow
+                      row={r}
+                      zebra={zebra}
+                      nf={nf}
+                      label={
+                        <Link
+                          href={objHref(`region=${r.regionId}`)}
+                          className="font-medium hover:underline"
+                          style={{ color: "var(--cobalt)" }}
+                        >
+                          {r.name}
+                        </Link>
+                      }
+                      lead={
+                        // Birinchi jadval bilan BIR XIL `?tuman=` parametri — bittasini
+                        // ochsangiz ikkalasi ham o'sha hududning tumanlarini ko'rsatadi.
+                        <Link
+                          href={expanded ? dashHref() : dashHref(r.regionId)}
+                          scroll={false}
+                          title={expanded ? "Tumanlarni yopish" : "Tumanlar bo'yicha"}
+                          className="inline-flex items-center gap-1 tabular-nums text-muted-foreground hover:text-slate-700"
+                        >
+                          {expanded ? (
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          )}
+                          {i + 1}
+                        </Link>
+                      }
+                    />
+                    {expanded
+                      ? districtRent.map((d) => (
+                          <RentTableRow
+                            key={d.regionId}
+                            row={d}
+                            zebra="bg-slate-50/60"
+                            nf={nf}
+                            lead={<span className="text-slate-300">·</span>}
+                            label={
+                              <Link
+                                href={objHref(`region=${r.regionId}&district=${d.regionId}`)}
+                                className="pl-4 text-[13px] hover:underline"
+                                style={{ color: "var(--cobalt)" }}
+                              >
+                                {d.name}
+                              </Link>
+                            }
+                          />
+                        ))
+                      : null}
+                  </Fragment>
                 );
               })}
             </tbody>

@@ -19,6 +19,7 @@ import {
   computeIsInefficient,
   type StatusResultBySource,
 } from "@/server/services/classification";
+import { resolveDistrictId } from "@/server/services/districts";
 import type { JobOutcome, StatusCheckJob } from "../jobs";
 
 // Auksion (1,2,3,4,7) va ijara-shartnoma (5,6) kod diapazonlari bir-biriga kesishmaydi
@@ -128,10 +129,17 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
     const base = await fetchPropertyBase(cadNumber);
     if (base.ok) {
       const b = base.data;
+      // Tuman API 2 bilan birga keladi — obyekt hududi bo'yicha District upsert qilamiz.
+      const { regionId } = await prisma.property.findUniqueOrThrow({
+        where: { id: propertyId },
+        select: { regionId: true },
+      });
+      const districtId = await resolveDistrictId(b.districtCode, b.district, regionId);
       await prisma.property.update({
         where: { id: propertyId },
         data: {
           cadNumberOld: b.cadNumberOld,
+          districtId,
           name: b.name,
           address: b.address,
           area: b.area != null ? new Prisma.Decimal(b.area) : null,

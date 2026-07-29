@@ -88,8 +88,28 @@ model Region {
   users           User[]
   sources         OrganizationSource[]
   moderatorLinks  UserRegion[]
+  districts       District[]
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
+}
+
+// Tuman/shahar — API 2 javobidagi `district_id` + `district` dan keladi.
+// ⚠️ Kalit sifatida NOM emas, `code` (UZKAD `district_id`) ishlatiladi: jonli
+// ma'lumotda bitta tumanning nomi ikki xil yozilishi mumkin ("Buxoro sh." /
+// "Buxoro shahar"), lekin `district_id` barqaror — 5441 obyektda tekshirilgan:
+// bitta nom hech qachon ikki `code`ga, bitta `code` hech qachon ikki hududga
+// tegishli bo'lmagan. `name` — kanonik (eng ko'p uchragan) imlo.
+model District {
+  id         String     @id @default(cuid())
+  code       Int        @unique // API 2 `district_id`
+  name       String
+  regionId   String
+  region     Region     @relation(fields: [regionId], references: [id])
+  properties Property[]
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  @@index([regionId])
 }
 
 // Har bir hudud+organizatsiya uchun STIR va API config (kelajakda kengayadi)
@@ -154,6 +174,9 @@ model Property {
 
   regionId String
   region   Region             @relation(fields: [regionId], references: [id])
+  // Tuman — API 2 `district_id` orqali (ixtiyoriy: 5443 obyektdan 2 tasida yo'q).
+  districtId String?
+  district   District? @relation(fields: [districtId], references: [id])
   sourceId String
   source   OrganizationSource @relation(fields: [sourceId], references: [id])
 
@@ -222,6 +245,7 @@ model Property {
   // ── Indekslar (80k+ uchun) ──
   @@index([cadNumberOld])
   @@index([regionId, isInefficient])
+  @@index([districtId])
   @@index([sourceId])
   @@index([syncStatus])
   @@index([integrationCategoryCode])

@@ -13,6 +13,8 @@ import { userRegionScope, type SessionUser } from "@/lib/authz";
 export interface PropertyFilters {
   q?: string; // kadastr (yangi/eski) bo'yicha qidiruv
   regionId?: string;
+  /** Tuman (District.id) — hudud ichida torroq kesim. */
+  districtId?: string;
   categoryCode?: number; // effektiv kategoriya (1–10)
   inefficient?: boolean;
   syncStatus?: SyncStatus;
@@ -49,6 +51,10 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
       if (scope !== null) and.push({ regionId: { in: scope } });
     }
   }
+
+  // Tuman — hudud ichidagi torroq kesim. Rol doirasi bilan AND birikadi, ya'ni
+  // IJROCHI boshqa hududning tumanini so'rasa ham natija bo'sh chiqadi (kengaytirmaydi).
+  if (f.districtId) and.push({ districtId: f.districtId });
 
   // Kadastr qidiruvi (pg_trgm GIN indeks orqali ILIKE %q%).
   if (f.q?.trim()) {
@@ -126,6 +132,7 @@ export interface PropertyListItem {
   cadNumber: string;
   cadNumberOld: string | null;
   regionName: string;
+  districtName: string | null;
   address: string | null;
   area: string | null;
   integrationCategoryCode: number | null;
@@ -178,6 +185,7 @@ export async function listProperties(
       lotStatus: true,
       vacantArea: true,
       region: { select: { name: true } },
+      district: { select: { name: true } },
     },
   });
 
@@ -190,6 +198,7 @@ export async function listProperties(
       cadNumber: r.cadNumber,
       cadNumberOld: r.cadNumberOld,
       regionName: r.region.name,
+      districtName: r.district?.name ?? null,
       address: r.address,
       area: r.area ? r.area.toString() : null,
       integrationCategoryCode: r.integrationCategoryCode,
@@ -207,6 +216,7 @@ export interface PropertyExportRow {
   cadNumber: string;
   cadNumberOld: string | null;
   regionName: string;
+  districtName: string | null;
   sourceName: string;
   name: string | null;
   address: string | null;
@@ -265,6 +275,7 @@ export async function* iteratePropertiesForExport(
         rentTotalArea: true,
         rentMatchedByOldCad: true,
         region: { select: { name: true } },
+        district: { select: { name: true } },
         source: { select: { name: true } },
       },
     });
@@ -274,6 +285,7 @@ export async function* iteratePropertiesForExport(
       cadNumber: r.cadNumber,
       cadNumberOld: r.cadNumberOld,
       regionName: r.region.name,
+      districtName: r.district?.name ?? null,
       sourceName: r.source.name,
       name: r.name,
       address: r.address,
@@ -305,6 +317,7 @@ export async function getPropertyDetail(user: SessionUser, cadNumber: string) {
     where: { cadNumber },
     include: {
       region: true,
+      district: true,
       source: true,
       integrationCategory: true,
       manualCategory: true,

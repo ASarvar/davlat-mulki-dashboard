@@ -13,6 +13,8 @@ export interface PropertyBaseData {
   // ustun sifatida qo'shilsa shu maydonlardan foydalaniladi.
   region?: string | null;
   district?: string | null;
+  /** UZKAD `district_id` — District jadvalining kaliti (nom emas: imlo o'zgaruvchan). */
+  districtCode?: number | null;
   holderName?: string | null; // balansdagi tashkilot (subjects[0].name)
   holderInn?: string | null; // uning STIR'i (subjects[0].inn)
   raw: unknown;

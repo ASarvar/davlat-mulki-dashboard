@@ -249,6 +249,46 @@ ro'yxatga havola. `/dashboard/objects?category=12` da "Maydon" ustuni "Bo'sh may
 (Excel eksporti) bir xil funksiyani chaqiradi (`buildWhere()` bilan bir xil printsip); ustun
 qo'shsangiz/o'zgartirsangiz ikkalasi ham avtomatik yangilanadi.
 
+### Tuman (District) kesimi
+
+⚠️ **Kalit — NOM emas, `District.code` (API 2 `district_id`).** Jonli 5441 obyektda tekshirilgan:
+bitta nom hech qachon ikki kodga tegishli emas, bitta kod hech qachon ikki hududda uchramaydi —
+lekin bitta kodning NOMI ikki xil yozilishi mumkin ("Buxoro sh." / "Buxoro shahar"). Shuning uchun
+`resolveDistrictId()` (`services/districts.ts`) kod bo'yicha upsert qiladi, nomni har safar yangilaydi.
+"Urganch" va "Urganch tumani" — bu **turli kodlar** (shahar va tuman), dublikat emas.
+
+Tuman API 2 bilan birga keladi, ya'ni faqat `refreshBase` yoqilgan sinxronizatsiyada yangilanadi
+(`syncPropertyBase` va `checkPropertyStatus`). 205 tuman, 5443 obyektdan 5441 tasi bog'langan.
+
+**Dashboard:** `?tuman=<regionId>` — bitta hudud qatorini ochadi va **IKKALA jadvalda ham**
+(kategoriyalar + ijara shartnomalari) o'sha hududning tumanlarini ko'rsatadi. Bitta parametr,
+ikkita toggle — qaysi jadvaldan ochsangiz ham ikkalasi birga ochiladi.
+Ma'lumot: `computeDistrictStats` (kategoriyalar, `RegionCategoryRow`) va `computeDistrictRentStats`
+(ijara, `RegionStat`) — ikkalasi ham keshlanmaydi. Tuman qatorlari hudud qatori bilan **bir xil
+ustunlarni** ishlatadi, chunki bir xil tuzilma qaytaradi va bitta komponentdan render bo'ladi
+(`CategoryTableRow` / `RentTableRow`).
+⚠️ `stats.ts` → `groupTotalsRows()` — hudud va tuman darajasidagi umumiy jamlanma (obyekt, ijara,
+shartnoma, maydon, summa) BITTA parametrlangan so'rovdan keladi; `toRegionStat()` ikkalasini ham
+`RegionStat`ga aylantiradi.
+⚠️ `RegionCategoryRow.regionId` tuman kesimida **tuman id'sini** saqlaydi — u "guruh identifikatori",
+qat'iy hudud emas.
+⚠️ `stats.ts`dagi `categoryCountRows()`/`rentBreakdownRows()` — hudud va tuman kesimining IKKALASI
+ham shu ikki funksiyani chaqiradi (guruh ustuni parametr). Yangi ustun qo'shsangiz bir joyda
+o'zgartirasiz; SQL'ni takrorlab yozmang.
+
+**Obyektlar:** `?district=<District.id>` filtri (`buildWhere`), jadvalda "Tuman" ustuni, obyekt
+sahifasida "Tuman" maydoni, Excel eksportida ustun. Tuman tanlagichi faqat **hudud tanlanganda**
+ko'rinadi — aks holda 205 ta variant bitta ro'yxatga tushib ketardi.
+
+**Dashboard Excel eksporti** — ikki varaq: "Hududlar" va "Tumanlar". Ikkalasini ham
+`services/dashboardExport.ts` → `writeSheet()` quradi (ustunlar bitta `exportCols` massividan),
+shuning uchun yangi ustun ikkala varaqda avtomatik paydo bo'ladi.
+⚠️ "Tumanlar" varag'idagi JAMI "Hududlar"nikidan **kichik bo'lishi normal** — tumani aniqlanmagan
+obyektlar (API 2 da `district_id` yo'q, hozir 2 ta) u yerga kirmaydi.
+⚠️ `buildDashboardWorkbook()` ma'lumotni o'zi olmaydi — chaqiruvchi beradi. Sabab: route keshlangan
+`getDashboardStats()` ni ishlatadi, lekin `unstable_cache` Next so'rov konteksti tashqarisida
+yiqiladi, ya'ni skript/sinovdan chaqirib bo'lmasdi.
+
 ### Manba (soha) kesimi — `?soha=`
 ⚠️ `OrganizationSource`da **ikkita nom** bor, aralashtirmang:
 - **`name` = SOHA (guruh)** — "Ijara markazi", "Davlat aktivlari agentligi",
@@ -382,3 +422,10 @@ Kategoriya kodini o'zgartirishdan oldin `manualCategoryCode` ishlatilganini teks
   bo'lgani uchun `revalidateTag` chaqira olmaydi, shuning uchun TTL kerak.
 - Rasmiy hisobot jadvallarida **J A M I qatori birinchi** (oltin fon, qizil raqamlar),
   hududlar `Region.sortOrder` bo'yicha.
+- **Versiya + CHANGELOG.** `package.json` → `version` Sidebar'da ko'rsatiladi (foydalanuvchi ko'radi).
+  ⚠️ **Faqat git'ga PUSH qilinganda oshiriladi** — ish davomida har bir tugallangan funksiya/bug fix
+  uchun EMAS (foydalanuvchi tuzatgan, 2026-07-29). Push paytida shu oxirgi versiyadan beri to'plangan
+  BARCHA o'zgarishlar bitta yangi versiya raqami ostida `CHANGELOG.md`ga yoziladi (bir nechta kichik
+  fix bitta punkt sifatida jamlanishi mumkin). `CHANGELOG.md` ilova UI'sida **ko'rsatilmaydi**, faqat
+  repo ichida — kichik tuzatish/refaktoring alohida punkt bo'lishi shart emas, faqat foydalanuvchi
+  sezadigan/muhim o'zgarishlar.

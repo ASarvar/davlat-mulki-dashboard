@@ -7,17 +7,20 @@ const selectCls =
 // Server-rendered GET form — submit qilinganda URL searchParams yangilanadi (client JS shart emas).
 export function ObjectFilters({
   regions,
+  districts,
   sohaList,
   canFilterRegion,
   showMyRegionsToggle,
   current,
 }: {
   regions: { id: string; name: string }[];
+  /** Tanlangan hududning tumanlari. Hudud tanlanmagan bo'lsa bo'sh — tanlagich ko'rinmaydi. */
+  districts: { id: string; name: string }[];
   sohaList: string[];
   canFilterRegion: boolean;
   /** MODERATOR uchun: "Faqat mening hududlarim" — Hudud select'ining birinchi varianti sifatida. */
   showMyRegionsToggle?: boolean;
-  current: { q?: string; region?: string; soha?: string; category?: string; inefficient?: string };
+  current: { q?: string; region?: string; district?: string; soha?: string; category?: string; inefficient?: string };
 }) {
   return (
     <form
@@ -42,6 +45,20 @@ export function ObjectFilters({
             {regions.map((r) => (
               <option key={r.id} value={r.id}>
                 {r.name}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+
+      {districts.length > 0 ? (
+        <div className="flex flex-col">
+          <label className="mb-1 text-xs font-medium text-muted-foreground">Tuman</label>
+          <select name="district" defaultValue={current.district ?? ""} className={`${selectCls} w-48`}>
+            <option value="">Barchasi</option>
+            {districts.map((d) => (
+              <option key={d.id} value={d.id}>
+                {d.name}
               </option>
             ))}
           </select>

@@ -34,6 +34,7 @@ export async function GET(req: Request) {
   const filters: PropertyFilters = {
     q: sp.get("q")?.trim() || undefined,
     regionId: myRegionsOnly ? undefined : regionRaw,
+    districtId: sp.get("district") || undefined,
     soha: sp.get("soha") || undefined,
     categoryCode: category ? Number(category) : undefined,
     inefficient: inefficient === "1" ? true : inefficient === "0" ? false : undefined,
@@ -52,6 +53,7 @@ export async function GET(req: Request) {
     { header: "Kadastr raqami", key: "cad", width: 26 },
     { header: "Eski kadastr", key: "cadOld", width: 26 },
     { header: "Hudud", key: "region", width: 24 },
+    { header: "Tuman", key: "district", width: 22 },
     { header: "Manba", key: "source", width: 18 },
     { header: "Nomi", key: "name", width: 28 },
     { header: "Manzil", key: "address", width: 34 },
@@ -90,6 +92,7 @@ export async function GET(req: Request) {
               cad: r.cadNumber,
               cadOld: r.cadNumberOld ?? "",
               region: r.regionName,
+              district: r.districtName ?? "",
               source: r.sourceName,
               name: r.name ?? "",
               address: r.address ?? "",

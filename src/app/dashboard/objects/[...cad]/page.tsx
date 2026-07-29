@@ -130,6 +130,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
               <Field label="Yangi kadastr" value={p.cadNumber} />
               <Field label="Eski kadastr" value={p.cadNumberOld} />
               <Field label="Hudud" value={p.region.name} />
+              <Field label="Tuman" value={p.district?.name ?? null} />
               <Field label="Manba" value={p.source.name} />
               <Field label="Nomi" value={p.name} />
               <Field label="Manzil" value={p.address} />

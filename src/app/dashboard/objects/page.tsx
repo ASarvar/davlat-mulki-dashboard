@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authz";
 import { listProperties, PROPERTY_PAGE_SIZE, type PropertyFilters } from "@/server/services/properties";
 import { listSourceNames } from "@/server/services/sources";
+import { listDistricts } from "@/server/services/districts";
 import { CAT_HAS_VACANT_AREA } from "@/server/services/classification";
 import { objectHref } from "@/lib/cadastre";
 import { CategoryBadge, InefficientBadge, SyncStatusBadge } from "@/components/badges";
@@ -24,6 +25,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   // "mine" — Hudud select'idagi maxsus variant (faqat MODERATOR), haqiqiy hudud ID emas.
   const myRegionsOnly = regionRaw === "mine";
   const region = myRegionsOnly ? undefined : regionRaw;
+  const district = str(sp.district) || undefined;
   const soha = str(sp.soha) || undefined;
   const categoryStr = str(sp.category);
   const inefficientStr = str(sp.inefficient);
@@ -37,6 +39,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   const filters: PropertyFilters = {
     q,
     regionId: region,
+    districtId: district,
     soha,
     categoryCode: categoryStr ? Number(categoryStr) : undefined,
     inefficient: inefficientStr === "1" ? true : inefficientStr === "0" ? false : undefined,
@@ -55,10 +58,14 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   // Hudud select'ining birinchi varianti "Faqat mening hududlarim" (ObjectFilters) bilan
   // o'ziga biriktirilganlar bo'yicha saralay oladi (myRegionsOnly, buildWhere()da qo'llanadi).
   const showMyRegionsToggle = user.role === "MODERATOR";
-  const [regions, sohaList, result] = await Promise.all([
+  // Tuman tanlagichi tanlangan HUDUDGA bog'liq: hudud tanlanmasa 205 ta tuman
+  // bitta ro'yxatda chiqib, foydasiz bo'lardi. IJROCHI uchun esa o'z hududi olinadi.
+  const districtRegionId = canFilterRegion ? region : (user.regionId ?? undefined);
+  const [regions, districts, sohaList, result] = await Promise.all([
     canFilterRegion
       ? prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } })
       : Promise.resolve([]),
+    districtRegionId ? listDistricts(districtRegionId) : Promise.resolve([]),
     listSourceNames(),
     listProperties(user, filters, requestedPage),
   ]);
@@ -67,6 +74,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   const baseParams = new URLSearchParams();
   if (q) baseParams.set("q", q);
   if (regionRaw) baseParams.set("region", regionRaw);
+  if (district) baseParams.set("district", district);
   if (soha) baseParams.set("soha", soha);
   if (categoryStr) baseParams.set("category", categoryStr);
   if (inefficientStr) baseParams.set("inefficient", inefficientStr);
@@ -106,10 +114,11 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
 
       <ObjectFilters
         regions={regions}
+        districts={districts}
         sohaList={sohaList}
         canFilterRegion={canFilterRegion}
         showMyRegionsToggle={showMyRegionsToggle}
-        current={{ q, region: regionRaw, soha, category: categoryStr, inefficient: inefficientStr }}
+        current={{ q, region: regionRaw, district, soha, category: categoryStr, inefficient: inefficientStr }}
       />
 
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
@@ -119,6 +128,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
               <th className="px-4 py-3 font-medium">Kadastr</th>
               <th className="px-4 py-3 font-medium">Eski kadastr</th>
               <th className="px-4 py-3 font-medium">Hudud</th>
+              <th className="px-4 py-3 font-medium">Tuman</th>
               <th className="px-4 py-3 font-medium">Manzil</th>
               <th className="px-4 py-3 font-medium">{showVacant ? "Bo'sh maydon" : "Maydon"}</th>
               <th className="px-4 py-3 font-medium">Lot</th>
@@ -129,7 +139,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
           <tbody>
             {result.items.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-10 text-center text-muted-foreground">
+                <td colSpan={10} className="px-4 py-10 text-center text-muted-foreground">
                   Obyekt topilmadi. Ma'lumot yuklash uchun sinxronizatsiyani ishga tushiring.
                 </td>
               </tr>
@@ -143,6 +153,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
                   </td>
                   <td className="px-4 py-3 text-muted-foreground">{p.cadNumberOld ?? "—"}</td>
                   <td className="px-4 py-3">{p.regionName}</td>
+                  <td className="px-4 py-3 text-muted-foreground">{p.districtName ?? "—"}</td>
                   <td className="px-4 py-3 text-muted-foreground">{p.address ?? "—"}</td>
                   <td className="px-4 py-3">
                     {showVacant

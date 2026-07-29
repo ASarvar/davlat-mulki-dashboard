@@ -1,6 +1,11 @@
 import Link from "next/link";
 import { Layers3 } from "lucide-react";
 
+// `?soha=` bo'lmasa sahifa "Ijara markazi"ni standart qilib oladi (page.tsx'da),
+// shuning uchun "Hammasi"ni ANIQ so'rash uchun alohida belgi kerak — aks holda
+// unga qaytishning umuman yo'li bo'lmasdi.
+export const ALL_SOHA = "__all__";
+
 // Manba (soha) kesimi tanlagichi. Oddiy havolalar — client JS kerak emas.
 // "Hammasi" = umumiy statistika, qolganlari = alohida manba bo'yicha.
 export function SourceFilter({ names, current }: { names: string[]; current?: string }) {
@@ -31,7 +36,7 @@ export function SourceFilter({ names, current }: { names: string[]; current?: st
           return (
             <Link
               key={it.label}
-              href={it.value ? `/dashboard?soha=${encodeURIComponent(it.value)}` : "/dashboard"}
+              href={`/dashboard?soha=${encodeURIComponent(it.value ?? ALL_SOHA)}`}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
                 active ? "text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
               }`}

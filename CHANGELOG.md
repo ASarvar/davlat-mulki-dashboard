@@ -1,0 +1,59 @@
+# Changelog
+
+Faqat kod ichida — ilova UI'sida ko'rsatilmaydi. `package.json`dagi `version`
+**git'ga push qilinganda** oshiriladi (Sidebar'dagi versiya belgisi bilan bir xil
+raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
+"Chiqarilmagan" bo'limda yig'iladi, push paytida versiya raqami beriladi.
+
+## Chiqarilmagan
+
+- **Tuman kesimi** — API 2 dagi `district_id` asosida `District` jadvali (205 tuman,
+  mavjud 5441 obyekt backfill qilindi). Dashboard'da hudud qatorini ochib tumanlar
+  statistikasini ko'rish, obyektlar ro'yxatida tuman filtri va ustuni, obyekt
+  sahifasida tuman maydoni, Excel eksportida tuman ustuni.
+- **Dashboard Excel eksporti — "Tumanlar" varag'i** — barcha 205 tuman hudud bo'yicha
+  guruhlangan holda, "Hududlar" varag'i bilan bir xil ustunlarda.
+- **"Hududlar kesimi — ijara shartnomalari" jadvalida ham tumanlar** — hudud qatorini
+  ochish ikkala jadvalda ham bir vaqtda ishlaydi (bitta `?tuman=` parametri).
+
+- **Sidebar'da versiya belgisi** — `package.json` → `version`dan avtomatik o'qiladi.
+- **Tasdiqlash so'rovlari sahifasida filtr** — kategoriya, holat (faqat tarixda),
+  hudud va so'rovchi (ism/login) bo'yicha. Ikkala jadval (kutilayotgan + tarix)
+  bitta forma orqali boshqariladi.
+- **Bug fix: dashboard manba tugmalari joyidan siljib ketishi** — sarlavha
+  ostidagi matn uzunligi o'zgarganda tugmalar guruhi endi o'ng chetga qat'iy
+  tekislangan, `justify-between` orqali siljimaydi.
+- Dashboard manba tugmalari tartibi: **Ijara markazi** har doim birinchi,
+  **Hammasi** oxirida.
+
+## 1.1.0
+
+- **Rollar va tasdiqlash workflow** — `RAHBARIYAT` roli qo'shildi, ikki bosqichli
+  zanjir (Ijrochi → Moderator qabul qiladi → Rahbariyat tasdiqlaydi/rad etadi).
+  Rad etishda sabab majburiy, kategoriya qaytarilganda ham izoh saqlanadi
+  (Biriktirishlar tarixida ko'rinadi). Har bir rol uchun so'rovlar tarixi
+  (`/dashboard/requests`).
+- **Fayl yuklashda rasm** — asoslovchi PDF'dan tashqari 4tagacha ixtiyoriy rasm
+  (JPG/PNG/WEBP), PDF hujjatning bolasi sifatida saqlanadi.
+- **Docker** — production (Linux) uchun to'liq konteynerlashtirish (`web`,
+  `worker`, `migrate`, `db`), Windows'dagi dev muhitiga tegmaydi. `DEPLOY.md`.
+- **Manba (soha) kesimi** — dashboard endi manba bo'yicha filtrlanadi
+  (Ijara markazi / Davlat aktivlari agentligi / Direksiya / Hammasi),
+  drill-down havolalar va Excel eksporti ham shu kesimda.
+- **Bug fix: "Bo'sh turgan" statistikasi** — karta va jadval soni orasidagi
+  poyga holati (race condition) bartaraf etildi; maydon kartasi endi to'g'ri
+  ustunga (kat 11, kat 12 emas) ulanadi.
+- **Bug fix: sotilgan obyektlarda auksion lot ma'lumoti** — `AuctionLot`
+  yozuvi endi obyekt sotilgandan keyin ham saqlanadi (ilgari qayta
+  sinxronlanganda o'chib ketardi).
+- **Bug fix: rol o'zgarishi** — sessiya endi rol/hududni har so'rovda DB'dan
+  o'qiydi (JWT'dan emas) — eski token bilan noto'g'ri huquqda qolish bug'i
+  tuzatildi.
+- Manbalar sahifasida soha nomi mavjudlaridan tanlash yoki yangisini yozish
+  (datalist), tashkilot to'liq nomi alohida maydon.
+
+## 0.1.0
+
+- Boshlang'ich versiya: 3 bosqichli sinxronizatsiya pipeline (API 1-6),
+  12 kategoriya, hudud/kategoriya kesimidagi boshqaruv paneli, auksion lotlari,
+  ijara shartnomalari, Excel eksporti, SUPER_ADMIN/REGION_USER/VIEWER rollari.

@@ -17,6 +17,11 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/app/dashboard/actions";
+import packageJson from "../../package.json";
+
+// Katta o'zgarish qilinganda `package.json` → `version` qo'lda oshiriladi —
+// sidebar shuni ko'rsatadi, alohida joyda saqlash shart emas.
+const APP_VERSION = packageJson.version;
 
 export interface SidebarUser {
   name: string;
@@ -63,7 +68,9 @@ export function Sidebar({ user, unreadCount = 0 }: { user: SidebarUser; unreadCo
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/logo-dm-light.svg" alt="Davlat mulki" className="h-10 w-auto shrink-0" />
         <div className="min-w-0">
-          <p className="truncate text-[16px] font-bold pl-10" style={{ color: "var(--gold)"}}>Monitoring</p>
+          <p className="truncate text-[16px] font-bold pl-10" style={{ color: "var(--gold)"}}>
+            Monitoring <sup className="text-xs font-mono text-white animate-pulse">beta</sup>
+          </p>
         </div>
       </div>
 
@@ -99,6 +106,7 @@ export function Sidebar({ user, unreadCount = 0 }: { user: SidebarUser; unreadCo
 
       {/* Foydalanuvchi */}
       <div className="border-t border-white/10 p-4">
+        <p className="pr-2 text-right mb-2 text-[12px] font-mono text-white/50">v{APP_VERSION}</p>
         <div className="flex items-center gap-3">
           <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-xs font-semibold text-white">
             {initials(user.name || user.username)}

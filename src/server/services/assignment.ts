@@ -1,5 +1,5 @@
 import { unlink } from "node:fs/promises";
-import type { Prisma } from "@prisma/client";
+import type { Prisma, ChangeRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { assertRegionWriteAccess, userRegionScope, isAdmin, type SessionUser } from "@/lib/authz";
 import { computeIsInefficient, CAT_VACANT } from "./classification";
@@ -267,21 +267,62 @@ export function reviewableStages(role: SessionUser["role"]): ("PENDING_MODERATOR
   return [];
 }
 
+// Ikkala ro'yxat (kutilayotgan + tarix) uchun umumiy filtrlar. `q` — so'rovchi
+// ismi/login bo'yicha qidiruv, `cad` — kadastr raqami (yangi/eski). Hudud/kategoriya
+// filtrlari mavjud rol doirasini FAQAT torайтади — kengaytirmaydi (rol doirasi
+// bilan AND birikadi).
+export interface RequestFilters {
+  categoryCode?: number;
+  regionId?: string;
+  q?: string;
+  cad?: string;
+}
+
+function cadCondition(cad?: string): Prisma.CategoryChangeRequestWhereInput | null {
+  const query = cad?.trim();
+  if (!query) return null;
+  return {
+    property: {
+      OR: [
+        { cadNumber: { contains: query, mode: "insensitive" } },
+        { cadNumberOld: { contains: query, mode: "insensitive" } },
+      ],
+    },
+  };
+}
+
+function requestedByCondition(q?: string): Prisma.CategoryChangeRequestWhereInput | null {
+  const query = q?.trim();
+  if (!query) return null;
+  return {
+    requestedBy: {
+      OR: [
+        { fullName: { contains: query, mode: "insensitive" } },
+        { username: { contains: query, mode: "insensitive" } },
+      ],
+    },
+  };
+}
+
 // Foydalanuvchining ko'rib chiqish doirasidagi kutilayotgan so'rovlar.
-export async function listPendingRequests(user: SessionUser) {
+export async function listPendingRequests(user: SessionUser, filters: RequestFilters = {}) {
   const stages = reviewableStages(user.role);
   if (stages.length === 0) return [];
 
   // Hudud doirasi faqat moderator bosqichida ma'noga ega — rahbariyat hamma hududni ko'radi.
   const scope = await userRegionScope(user); // null = cheklovsiz
 
-  const where: Prisma.CategoryChangeRequestWhereInput = {
-    status: { in: stages },
-    ...(scope === null ? {} : { property: { regionId: { in: scope } } }),
-  };
+  const and: Prisma.CategoryChangeRequestWhereInput[] = [{ status: { in: stages } }];
+  if (scope !== null) and.push({ property: { regionId: { in: scope } } });
+  if (filters.regionId) and.push({ property: { regionId: filters.regionId } });
+  if (filters.categoryCode) and.push({ toCategory: filters.categoryCode });
+  const reqCond = requestedByCondition(filters.q);
+  if (reqCond) and.push(reqCond);
+  const cadCond = cadCondition(filters.cad);
+  if (cadCond) and.push(cadCond);
 
   return prisma.categoryChangeRequest.findMany({
-    where,
+    where: { AND: and },
     orderBy: { createdAt: "asc" },
     include: {
       property: { select: { cadNumber: true, region: { select: { name: true } } } },
@@ -305,18 +346,30 @@ export async function listPendingRequests(user: SessionUser) {
  *  - RAHBARIYAT / ADMIN / SUPER_ADMIN / VIEWER → hammasi
  * Kutilayotganlar ham kiradi (ijrochi o'z so'rovi qayerda turganini ko'rishi kerak).
  */
-export async function listRequestHistory(user: SessionUser, limit = 200) {
-  const where: Prisma.CategoryChangeRequestWhereInput = {};
+export async function listRequestHistory(
+  user: SessionUser,
+  filters: RequestFilters & { status?: ChangeRequestStatus } = {},
+  limit = 200,
+) {
+  const and: Prisma.CategoryChangeRequestWhereInput[] = [];
 
   if (user.role === "IJROCHI") {
-    where.requestedById = user.id;
+    and.push({ requestedById: user.id });
   } else if (user.role === "MODERATOR") {
     const scope = await userRegionScope(user);
-    if (scope !== null) where.property = { regionId: { in: scope } };
+    if (scope !== null) and.push({ property: { regionId: { in: scope } } });
   }
 
+  if (filters.regionId) and.push({ property: { regionId: filters.regionId } });
+  if (filters.categoryCode) and.push({ toCategory: filters.categoryCode });
+  if (filters.status) and.push({ status: filters.status });
+  const reqCond = requestedByCondition(filters.q);
+  if (reqCond) and.push(reqCond);
+  const cadCond = cadCondition(filters.cad);
+  if (cadCond) and.push(cadCond);
+
   return prisma.categoryChangeRequest.findMany({
-    where,
+    where: and.length > 0 ? { AND: and } : {},
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {

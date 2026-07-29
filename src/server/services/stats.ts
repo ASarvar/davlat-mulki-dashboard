@@ -27,7 +27,12 @@ export interface CategoryStat {
   count: number;
 }
 
-/** Hudud × kategoriya kesishmasi. `counts` kaliti: kategoriya kodi. */
+/**
+ * Hudud × kategoriya kesishmasi. `counts` kaliti: kategoriya kodi.
+ * ⚠️ Bu tuzilma TUMAN kesimida ham ishlatiladi (`computeDistrictStats`) — o'shanda
+ * `regionId` maydonida TUMAN id'si turadi. Ya'ni u "guruh identifikatori", jadval
+ * qatorining kaliti; ustun mantiqi (`buildDashboardColumns`) ikkalasiga bir xil.
+ */
 export interface RegionCategoryRow {
   regionId: string;
   name: string;
@@ -103,122 +108,56 @@ export interface DashboardStats {
 // Berilmasa — umumiy statistika (barcha manbalar). Obyektlar ro'yxatidagi `soha` filtri
 // bilan AYNAN bir xil mezon (`OrganizationSource.name`) — shunda jadvaldagi raqamni
 // bosganda ro'yxat mos keladi.
-// Eksport qilingan — keshdan tashqari chaqirish (skript/sinov) uchun ham kerak.
-export async function computeDashboardStats(sourceName?: string): Promise<DashboardStats> {
-  // Prisma tomon (count) uchun filtr.
-  const srcWhere: Prisma.PropertyWhereInput = sourceName ? { source: { name: sourceName } } : {};
+// ── Guruhlangan agregatlar (hudud yoki tuman kesimi uchun BIR XIL mantiq) ──
+// `gid` — guruh kaliti: hudud kesimida "regionId", tuman kesimida "districtId".
+// ⚠️ Ikkala kesim ham SHU ikki funksiyani chaqiradi — SQL takrorlanmaydi, aks holda
+// yangi ustun qo'shilganda biri yangilanib, ikkinchisi eskirib qolardi.
+type CatRow = { gid: string | null; code: number | null; count: bigint };
+type RentRow = {
+  gid: string | null;
+  freeCount: bigint; freeUseful: string | null; freeRented: string | null; freeVacant: string | null;
+  paidCount: bigint; paidUseful: string | null; paidRented: string | null; paidVacant: string | null;
+  hasVacantCount: bigint; hasVacantArea: string | null;
+  vacantCount: bigint; vacantUseful: string | null;
+  privLotCount: bigint; rentLotCount: bigint; rentLotArea: string | null;
+  privLotContracts: string | null; rentLotOnlyContracts: string | null;
+  fullyRentedCount: bigint;
+  privLotRentedObjects: bigint; rentLotOnlyRentedObjects: bigint;
+  cat1RentedObjects: bigint; cat7RentedObjects: bigint;
+  onAnyAuctionCount: bigint;
+};
 
-  // Raw SQL uchun filtr — PARAMETRLANGAN (Prisma.sql), satr sifatida yopishtirilmaydi:
-  // sourceName foydalanuvchi kiritgan query paramdan keladi.
-  const srcCond = sourceName
-    ? Prisma.sql`p."sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${sourceName})`
-    : Prisma.sql`TRUE`;
-  // Alias'siz variant (CTE va oddiy FROM "Property" uchun).
-  const srcCondNoAlias = sourceName
-    ? Prisma.sql`"sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${sourceName})`
-    : Prisma.sql`TRUE`;
-
-  const [total, synced, pending, failed, regionRows, byCategoryRaw] = await Promise.all([
-    prisma.property.count({ where: srcWhere }),
-    prisma.property.count({ where: { syncStatus: "SYNCED", ...srcWhere } }),
-    prisma.property.count({ where: { syncStatus: "PENDING", ...srcWhere } }),
-    prisma.property.count({ where: { syncStatus: "FAILED", ...srcWhere } }),
-    // Hudud kesimi — bitta so'rovda (obyekt, ijara, shartnoma, maydon, summa).
-    prisma.$queryRaw<
-      {
-        id: string;
-        name: string;
-        sortOrder: number;
-        total: bigint;
-        inefficient: bigint;
-        rented: bigint;
-        contracts: bigint;
-        area: string | null;
-        sum: string | null;
-      }[]
-    >(Prisma.sql`
-      SELECT r.id, r.name, r."sortOrder",
-             COUNT(p.id)                                              AS total,
-             COUNT(p.id) FILTER (WHERE p."isInefficient")             AS inefficient,
-             COUNT(p.id) FILTER (WHERE p."rentContractCount" > 0)     AS rented,
-             COALESCE(SUM(p."rentContractCount"), 0)                  AS contracts,
-             COALESCE(SUM(p."rentTotalArea"), 0)                      AS area,
-             COALESCE(SUM(p."rentTotalSum"), 0)                       AS sum
-      FROM "Region" r
-      -- Manba filtri JOIN shartida: shunda o'sha manbada obyekti yo'q hudud ham
-      -- jadvalda 0 bilan qoladi (WHERE'da bo'lsa hudud butunlay tushib qolardi).
-      LEFT JOIN "Property" p ON p."regionId" = r.id AND ${srcCond}
-      GROUP BY r.id, r.name, r."sortOrder"
-      ORDER BY r."sortOrder", r.name
-    `),
-    prisma.$queryRaw<{ code: number | null; count: number }[]>(Prisma.sql`
-      SELECT COALESCE("integrationCategoryCode", "manualCategoryCode", 11) AS code,
-             COUNT(*)::int AS count
-      FROM "Property"
-      WHERE ${srcCondNoAlias}
-      GROUP BY 1
-      ORDER BY 1
-    `),
-  ]);
-
-  // ⚠️ "Bo'sh turgan" (samarasiz) soni `Property.isInefficient` ustunidan ALOHIDA
-  // so'rov bilan EMAS, shu yerdagi `byCategoryRaw`dan (code=11) olinadi. Ilgari
-  // alohida `prisma.property.count({isInefficient:true})` so'rovi bo'lgan — u
-  // `byCategoryRaw` bilan bir xil `Promise.all` ichida, lekin alohida ulanishda
-  // bajarilgani uchun fon worker'i aynan shu ikki so'rov orasida bitta obyektni
-  // yangilab qo'ysa, tepadagi karta va pastdagi jadval bir necha obyektga farq
-  // qilib qolardi (poyga holati — worker faol sinxronlanayotganda ko'rinadi,
-  // isInefficient ustuni o'zi buzilmagan bo'lsa ham). Effektiv kategoriya=11
-  // bo'lish sharti `computeIsInefficient()` bilan matematik teng (manualCategoryCode
-  // faqat 9/10/null bo'ladi, integrationCategoryCode 1–7/null — demak effektiv
-  // faqat ikkalasi ham null bo'lganda 11ga tushadi), shuning uchun bitta manbadan
-  // olish xavfsiz va HAR DOIM jadval bilan mos keladi.
-  const inefficient = byCategoryRaw.find((c) => c.code === 11)?.count ?? 0;
-
-  // Hudud × kategoriya (effektiv kategoriya bo'yicha).
-  const regionCategoryRaw = await prisma.$queryRaw<
-    { regionId: string; code: number | null; count: bigint }[]
-  >(Prisma.sql`
-    SELECT p."regionId",
+// Effektiv kategoriya bo'yicha sanoq.
+function categoryCountRows(groupCol: Prisma.Sql, cond: Prisma.Sql) {
+  return prisma.$queryRaw<CatRow[]>(Prisma.sql`
+    SELECT ${groupCol} AS gid,
            COALESCE(p."integrationCategoryCode", p."manualCategoryCode", 11) AS code,
            COUNT(*) AS count
     FROM "Property" p
-    WHERE ${srcCond}
+    WHERE ${cond}
     GROUP BY 1, 2
   `);
+}
 
-  // Ijara xususiyati bo'yicha kesim — kategoriyaga BOG'LIQ EMAS.
-  // "Bo'sh maydon" = foydali maydon (buildingArea) − ijaraga berilgan (rentTotalArea).
-  const rentRaw = await prisma.$queryRaw<
-    {
-      regionId: string;
-      freeCount: bigint; freeUseful: string | null; freeRented: string | null; freeVacant: string | null;
-      paidCount: bigint; paidUseful: string | null; paidRented: string | null; paidVacant: string | null;
-      hasVacantCount: bigint; hasVacantArea: string | null;
-      vacantCount: bigint; vacantUseful: string | null;
-      privLotCount: bigint; rentLotCount: bigint; rentLotArea: string | null;
-      privLotContracts: string | null; rentLotOnlyContracts: string | null;
-      fullyRentedCount: bigint;
-      privLotRentedObjects: bigint; rentLotOnlyRentedObjects: bigint;
-      cat1RentedObjects: bigint; cat7RentedObjects: bigint;
-      onAnyAuctionCount: bigint;
-    }[]
-  >(Prisma.sql`
+// Ijara xususiyati bo'yicha kesim — kategoriyaga BOG'LIQ EMAS.
+// "Bo'sh maydon" = foydali maydon (buildingArea) − ijaraga berilgan (rentTotalArea).
+function rentBreakdownRows(groupCol: Prisma.Sql, cond: Prisma.Sql) {
+  return prisma.$queryRaw<RentRow[]>(Prisma.sql`
     WITH r AS (
-      SELECT "regionId",
-             COALESCE("buildingArea", 0)      AS useful,
-             COALESCE("rentTotalArea", 0)     AS rented,
-             COALESCE("rentTotalSum", 0)      AS sum,
-             COALESCE("rentContractCount", 0) AS cnt,
-             COALESCE("vacantArea", 0)        AS vacant,
-             COALESCE("auctionTotalArea", 0)  AS lotarea,
-             "hasPrivatizationLot"            AS priv,
-             "hasRentLot"                     AS rentlot,
-             COALESCE("integrationCategoryCode", "manualCategoryCode", 11) AS cat
-      FROM "Property"
-      WHERE ${srcCondNoAlias}
+      SELECT ${groupCol} AS gid,
+             COALESCE(p."buildingArea", 0)      AS useful,
+             COALESCE(p."rentTotalArea", 0)     AS rented,
+             COALESCE(p."rentTotalSum", 0)      AS sum,
+             COALESCE(p."rentContractCount", 0) AS cnt,
+             COALESCE(p."vacantArea", 0)        AS vacant,
+             COALESCE(p."auctionTotalArea", 0)  AS lotarea,
+             p."hasPrivatizationLot"            AS priv,
+             p."hasRentLot"                     AS rentlot,
+             COALESCE(p."integrationCategoryCode", p."manualCategoryCode", 11) AS cat
+      FROM "Property" p
+      WHERE ${cond}
     )
-    SELECT "regionId",
+    SELECT gid,
            COUNT(*) FILTER (WHERE cnt > 0 AND sum = 0)  AS "freeCount",
            COALESCE(SUM(useful) FILTER (WHERE cnt > 0 AND sum = 0), 0) AS "freeUseful",
            COALESCE(SUM(rented) FILTER (WHERE cnt > 0 AND sum = 0), 0) AS "freeRented",
@@ -250,79 +189,289 @@ export async function computeDashboardStats(sourceName?: string): Promise<Dashbo
            COUNT(*) FILTER (WHERE cat = 7 AND cnt > 0)            AS "cat7RentedObjects"
     FROM r GROUP BY 1
   `);
+}
 
-  const byRegion: RegionStat[] = regionRows.map((r) => {
-    const t = Number(r.total);
-    const rented = Number(r.rented);
-    return {
-      regionId: r.id,
-      name: r.name,
-      sortOrder: r.sortOrder,
-      total: t,
-      inefficient: Number(r.inefficient),
-      rentedObjects: rented,
-      rentedPct: t > 0 ? Math.round((rented / t) * 1000) / 10 : 0,
-      contractCount: Number(r.contracts),
-      rentArea: Number(r.area ?? 0),
-      rentSum: Number(r.sum ?? 0),
-    };
+const n0 = (v: string | null | undefined) => Number(v ?? 0);
+
+// Guruh (hudud/tuman) uchun bitta qatorni yig'adi — jadval ustunlari shu tuzilmadan o'qiydi.
+function buildRow(
+  id: string,
+  name: string,
+  counts: Record<string, number>,
+  rr: RentRow | undefined,
+): RegionCategoryRow {
+  const mk = (
+    count: bigint | undefined,
+    useful: string | null | undefined,
+    rented: string | null | undefined,
+    vacant: string | null | undefined,
+  ): RentAreaStat => ({
+    count: Number(count ?? 0),
+    usefulArea: n0(useful),
+    rentedArea: n0(rented),
+    vacantArea: n0(vacant),
   });
+
+  return {
+    regionId: id,
+    name,
+    total: Object.values(counts).reduce((a, b) => a + b, 0),
+    counts,
+    rentBreakdown: {
+      free: mk(rr?.freeCount, rr?.freeUseful, rr?.freeRented, rr?.freeVacant),
+      paid: mk(rr?.paidCount, rr?.paidUseful, rr?.paidRented, rr?.paidVacant),
+      hasVacant: { count: Number(rr?.hasVacantCount ?? 0), area: n0(rr?.hasVacantArea) },
+      onlyFreeOrPaidCategory: { count: (counts["5"] ?? 0) + (counts["6"] ?? 0) },
+      vacant: { count: Number(rr?.vacantCount ?? 0), usefulArea: n0(rr?.vacantUseful) },
+      fullyRented: { count: Number(rr?.fullyRentedCount ?? 0) },
+      privatizationLot: {
+        count: Number(rr?.privLotCount ?? 0),
+        rentContracts: n0(rr?.privLotContracts),
+        rentedObjects: Number(rr?.privLotRentedObjects ?? 0),
+      },
+      rentLot: {
+        count: Number(rr?.rentLotCount ?? 0),
+        area: n0(rr?.rentLotArea),
+        rentContracts: n0(rr?.rentLotOnlyContracts),
+        rentedObjects: Number(rr?.rentLotOnlyRentedObjects ?? 0),
+      },
+      onAnyAuction: { count: Number(rr?.onAnyAuctionCount ?? 0) },
+      installmentSoldRented: { count: Number(rr?.cat1RentedObjects ?? 0) },
+      onAuctionProcessRented: { count: Number(rr?.cat7RentedObjects ?? 0) },
+    },
+  };
+}
+
+// gid → kategoriya sanoqlari xaritasi.
+function countsByGid(rows: CatRow[]): Map<string, Record<string, number>> {
+  const m = new Map<string, Record<string, number>>();
+  for (const row of rows) {
+    if (row.gid == null) continue;
+    const key = row.code == null ? "none" : String(row.code);
+    const rec = m.get(row.gid) ?? {};
+    rec[key] = (rec[key] ?? 0) + Number(row.count);
+    m.set(row.gid, rec);
+  }
+  return m;
+}
+
+// Hudud/tuman darajasidagi umumiy jamlanma (obyekt, ijara, shartnoma, maydon, summa).
+// `RegionStat` shakliga to'g'ridan-to'g'ri mos keladi.
+// ⚠️ Filtr JOIN shartida — shunda o'sha manbada obyekti yo'q guruh ham jadvalda 0 bilan
+// qoladi (WHERE'da bo'lsa guruh butunlay tushib qolardi).
+type TotalsRow = {
+  id: string;
+  name: string;
+  sortOrder: number;
+  total: bigint;
+  inefficient: bigint;
+  rented: bigint;
+  contracts: bigint;
+  area: string | null;
+  sum: string | null;
+};
+
+function groupTotalsRows(opts: {
+  table: Prisma.Sql;      // Prisma.sql`"Region"` yoki `"District"`
+  joinOn: Prisma.Sql;     // p."regionId" = g.id  /  p."districtId" = g.id
+  sortExpr: Prisma.Sql;   // g."sortOrder" yoki 0
+  groupExtra: Prisma.Sql; // , g."sortOrder" yoki bo'sh
+  order: Prisma.Sql;
+  where: Prisma.Sql;
+  srcCond: Prisma.Sql;
+}) {
+  const { table, joinOn, sortExpr, groupExtra, order, where, srcCond } = opts;
+  return prisma.$queryRaw<TotalsRow[]>(Prisma.sql`
+    SELECT g.id, g.name, ${sortExpr} AS "sortOrder",
+           COUNT(p.id)                                          AS total,
+           COUNT(p.id) FILTER (WHERE p."isInefficient")         AS inefficient,
+           COUNT(p.id) FILTER (WHERE p."rentContractCount" > 0) AS rented,
+           COALESCE(SUM(p."rentContractCount"), 0)              AS contracts,
+           COALESCE(SUM(p."rentTotalArea"), 0)                  AS area,
+           COALESCE(SUM(p."rentTotalSum"), 0)                   AS sum
+    FROM ${table} g
+    LEFT JOIN "Property" p ON ${joinOn} AND ${srcCond}
+    WHERE ${where}
+    GROUP BY g.id, g.name${groupExtra}
+    ORDER BY ${order}
+  `);
+}
+
+function toRegionStat(r: TotalsRow): RegionStat {
+  const t = Number(r.total);
+  const rented = Number(r.rented);
+  return {
+    regionId: r.id,
+    name: r.name,
+    sortOrder: Number(r.sortOrder),
+    total: t,
+    inefficient: Number(r.inefficient),
+    rentedObjects: rented,
+    rentedPct: t > 0 ? Math.round((rented / t) * 1000) / 10 : 0,
+    contractCount: Number(r.contracts),
+    rentArea: Number(r.area ?? 0),
+    rentSum: Number(r.sum ?? 0),
+  };
+}
+
+/**
+ * Bitta hududning TUMANLARI bo'yicha ijara jamlanmasi — "Hududlar kesimi — ijara
+ * shartnomalari" jadvalida hudud qatori ochilganda. Hudud qatori bilan bir xil
+ * `RegionStat` shakli, shuning uchun ustunlar ham bir xil.
+ */
+export async function computeDistrictRentStats(
+  regionId: string,
+  sourceName?: string,
+): Promise<RegionStat[]> {
+  const srcCond = sourceName
+    ? Prisma.sql`p."sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${sourceName})`
+    : Prisma.sql`TRUE`;
+  const rows = await groupTotalsRows({
+    table: Prisma.sql`"District"`,
+    joinOn: Prisma.sql`p."districtId" = g.id`,
+    sortExpr: Prisma.sql`0`,
+    groupExtra: Prisma.empty,
+    order: Prisma.sql`g.name`,
+    where: Prisma.sql`g."regionId" = ${regionId}`,
+    srcCond,
+  });
+  return rows.map(toRegionStat);
+}
+
+/**
+ * TUMANLAR kesimi. `regionId` berilsa — faqat o'sha hudud (dashboard'da qator ochilganda),
+ * berilmasa — barcha tumanlar (Excel eksporti uchun, bitta juft so'rovda).
+ * Ustunlar hudud qatoridagi bilan bir xil (`buildDashboardColumns()`), chunki qaytariladigan
+ * tuzilma ham bir xil (`RegionCategoryRow`). Obyekti yo'q tumanlar ham ro'yxatda qoladi (0 bilan).
+ */
+async function districtRows(regionId: string | undefined, sourceName: string | undefined) {
+  const srcPart = sourceName
+    ? Prisma.sql`AND p."sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${sourceName})`
+    : Prisma.empty;
+  const regionPart = regionId ? Prisma.sql`AND p."regionId" = ${regionId}` : Prisma.empty;
+  const cond = Prisma.sql`p."districtId" IS NOT NULL ${regionPart} ${srcPart}`;
+  const groupCol = Prisma.sql`p."districtId"`;
+
+  const [districts, catRows, rentRows] = await Promise.all([
+    prisma.district.findMany({
+      where: regionId ? { regionId } : {},
+      orderBy: [{ region: { sortOrder: "asc" } }, { name: "asc" }],
+      select: { id: true, name: true, regionId: true, region: { select: { name: true } } },
+    }),
+    categoryCountRows(groupCol, cond),
+    rentBreakdownRows(groupCol, cond),
+  ]);
+
+  const counts = countsByGid(catRows);
+  const rentMap = new Map(rentRows.filter((r) => r.gid != null).map((r) => [r.gid as string, r]));
+
+  return districts.map((d) => ({
+    regionId: d.regionId,
+    regionName: d.region.name,
+    row: buildRow(d.id, d.name, counts.get(d.id) ?? {}, rentMap.get(d.id)),
+  }));
+}
+
+/** Bitta hududning tumanlari — dashboard jadvalida hudud qatori ochilganda. */
+export async function computeDistrictStats(
+  regionId: string,
+  sourceName?: string,
+): Promise<RegionCategoryRow[]> {
+  return (await districtRows(regionId, sourceName)).map((d) => d.row);
+}
+
+/**
+ * Barcha tumanlar, hudud bo'yicha guruhlangan — Excel eksporti uchun.
+ * Hududlar `Region.sortOrder`, tumanlar nom bo'yicha tartiblanadi.
+ */
+export async function computeDistrictStatsByRegion(
+  sourceName?: string,
+): Promise<{ regionId: string; regionName: string; districts: RegionCategoryRow[] }[]> {
+  const rows = await districtRows(undefined, sourceName);
+  const grouped: { regionId: string; regionName: string; districts: RegionCategoryRow[] }[] = [];
+  for (const d of rows) {
+    let g = grouped.find((x) => x.regionId === d.regionId);
+    if (!g) {
+      g = { regionId: d.regionId, regionName: d.regionName, districts: [] };
+      grouped.push(g);
+    }
+    g.districts.push(d.row);
+  }
+  return grouped;
+}
+
+// Eksport qilingan — keshdan tashqari chaqirish (skript/sinov) uchun ham kerak.
+export async function computeDashboardStats(sourceName?: string): Promise<DashboardStats> {
+  // Prisma tomon (count) uchun filtr.
+  const srcWhere: Prisma.PropertyWhereInput = sourceName ? { source: { name: sourceName } } : {};
+
+  // Raw SQL uchun filtr — PARAMETRLANGAN (Prisma.sql), satr sifatida yopishtirilmaydi:
+  // sourceName foydalanuvchi kiritgan query paramdan keladi.
+  const srcCond = sourceName
+    ? Prisma.sql`p."sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${sourceName})`
+    : Prisma.sql`TRUE`;
+  // Alias'siz variant (CTE va oddiy FROM "Property" uchun).
+  const srcCondNoAlias = sourceName
+    ? Prisma.sql`"sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${sourceName})`
+    : Prisma.sql`TRUE`;
+
+  const [total, synced, pending, failed, regionRows, byCategoryRaw] = await Promise.all([
+    prisma.property.count({ where: srcWhere }),
+    prisma.property.count({ where: { syncStatus: "SYNCED", ...srcWhere } }),
+    prisma.property.count({ where: { syncStatus: "PENDING", ...srcWhere } }),
+    prisma.property.count({ where: { syncStatus: "FAILED", ...srcWhere } }),
+    // Hudud kesimi — umumiy yordamchi orqali (tuman kesimi ham shuni ishlatadi).
+    groupTotalsRows({
+      table: Prisma.sql`"Region"`,
+      joinOn: Prisma.sql`p."regionId" = g.id`,
+      sortExpr: Prisma.sql`g."sortOrder"`,
+      groupExtra: Prisma.sql`, g."sortOrder"`,
+      order: Prisma.sql`g."sortOrder", g.name`,
+      where: Prisma.sql`TRUE`,
+      srcCond: srcCond,
+    }),
+    prisma.$queryRaw<{ code: number | null; count: number }[]>(Prisma.sql`
+      SELECT COALESCE("integrationCategoryCode", "manualCategoryCode", 11) AS code,
+             COUNT(*)::int AS count
+      FROM "Property"
+      WHERE ${srcCondNoAlias}
+      GROUP BY 1
+      ORDER BY 1
+    `),
+  ]);
+
+  // ⚠️ "Bo'sh turgan" (samarasiz) soni `Property.isInefficient` ustunidan ALOHIDA
+  // so'rov bilan EMAS, shu yerdagi `byCategoryRaw`dan (code=11) olinadi. Ilgari
+  // alohida `prisma.property.count({isInefficient:true})` so'rovi bo'lgan — u
+  // `byCategoryRaw` bilan bir xil `Promise.all` ichida, lekin alohida ulanishda
+  // bajarilgani uchun fon worker'i aynan shu ikki so'rov orasida bitta obyektni
+  // yangilab qo'ysa, tepadagi karta va pastdagi jadval bir necha obyektga farq
+  // qilib qolardi (poyga holati — worker faol sinxronlanayotganda ko'rinadi,
+  // isInefficient ustuni o'zi buzilmagan bo'lsa ham). Effektiv kategoriya=11
+  // bo'lish sharti `computeIsInefficient()` bilan matematik teng (manualCategoryCode
+  // faqat 9/10/null bo'ladi, integrationCategoryCode 1–7/null — demak effektiv
+  // faqat ikkalasi ham null bo'lganda 11ga tushadi), shuning uchun bitta manbadan
+  // olish xavfsiz va HAR DOIM jadval bilan mos keladi.
+  const inefficient = byCategoryRaw.find((c) => c.code === 11)?.count ?? 0;
+
+  // Hudud × kategoriya (effektiv kategoriya bo'yicha).
+  const regionCategoryRaw = await categoryCountRows(Prisma.sql`p."regionId"`, srcCond);
+
+  // Ijara xususiyati bo'yicha kesim — kategoriyaga BOG'LIQ EMAS.
+  // "Bo'sh maydon" = foydali maydon (buildingArea) − ijaraga berilgan (rentTotalArea).
+  // Ijara xususiyati bo'yicha kesim — hudud bo'yicha (tuman kesimi ham shu funksiyani ishlatadi).
+  const rentRaw = await rentBreakdownRows(Prisma.sql`p."regionId"`, srcCond);
+
+  const byRegion: RegionStat[] = regionRows.map(toRegionStat);
 
   // Hudud × kategoriya jadvalini yig'amiz (hududlar tartibi saqlanadi).
-  const countsByRegion = new Map<string, Record<string, number>>();
-  for (const row of regionCategoryRaw) {
-    const key = row.code == null ? "none" : String(row.code);
-    const rec = countsByRegion.get(row.regionId) ?? {};
-    rec[key] = (rec[key] ?? 0) + Number(row.count);
-    countsByRegion.set(row.regionId, rec);
-  }
-  const rentByRegion = new Map(rentRaw.map((r) => [r.regionId, r]));
-  const n = (v: string | null | undefined) => Number(v ?? 0);
+  // Qator tuzilishi tuman kesimi bilan BIR XIL — `buildRow` ikkalasiga xizmat qiladi.
+  const countsByRegion = countsByGid(regionCategoryRaw);
+  const rentByRegion = new Map(rentRaw.filter((r) => r.gid != null).map((r) => [r.gid as string, r]));
 
-  const byRegionCategory: RegionCategoryRow[] = byRegion.map((r) => {
-    const rr = rentByRegion.get(r.regionId);
-    const mk = (
-      count: bigint | undefined,
-      useful: string | null | undefined,
-      rented: string | null | undefined,
-      vacant: string | null | undefined,
-    ): RentAreaStat => ({
-      count: Number(count ?? 0),
-      usefulArea: n(useful),
-      rentedArea: n(rented),
-      // Obyekt darajasida hisoblangan bo'sh maydonlar yig'indisi (manfiy emas).
-      vacantArea: n(vacant),
-    });
-    const counts = countsByRegion.get(r.regionId) ?? {};
-    return {
-      regionId: r.regionId,
-      name: r.name,
-      total: r.total,
-      counts,
-      rentBreakdown: {
-        free: mk(rr?.freeCount, rr?.freeUseful, rr?.freeRented, rr?.freeVacant),
-        paid: mk(rr?.paidCount, rr?.paidUseful, rr?.paidRented, rr?.paidVacant),
-        hasVacant: { count: Number(rr?.hasVacantCount ?? 0), area: n(rr?.hasVacantArea) },
-        onlyFreeOrPaidCategory: { count: (counts["5"] ?? 0) + (counts["6"] ?? 0) },
-        vacant: { count: Number(rr?.vacantCount ?? 0), usefulArea: n(rr?.vacantUseful) },
-        fullyRented: { count: Number(rr?.fullyRentedCount ?? 0) },
-        privatizationLot: {
-          count: Number(rr?.privLotCount ?? 0),
-          rentContracts: n(rr?.privLotContracts),
-          rentedObjects: Number(rr?.privLotRentedObjects ?? 0),
-        },
-        rentLot: {
-          count: Number(rr?.rentLotCount ?? 0),
-          area: n(rr?.rentLotArea),
-          rentContracts: n(rr?.rentLotOnlyContracts),
-          rentedObjects: Number(rr?.rentLotOnlyRentedObjects ?? 0),
-        },
-        installmentSoldRented: { count: Number(rr?.cat1RentedObjects ?? 0) },
-        onAuctionProcessRented: { count: Number(rr?.cat7RentedObjects ?? 0) },
-        onAnyAuction: { count: Number(rr?.onAnyAuctionCount ?? 0) },
-      },
-    };
-  });
+  const byRegionCategory: RegionCategoryRow[] = byRegion.map((r) =>
+    buildRow(r.regionId, r.name, countsByRegion.get(r.regionId) ?? {}, rentByRegion.get(r.regionId)),
+  );
 
   // JAMI — hududlar yig'indisi (foiz alohida hisoblanadi, o'rtacha emas).
   const sum = (f: (s: RegionStat) => number) => byRegion.reduce((a, s) => a + f(s), 0);

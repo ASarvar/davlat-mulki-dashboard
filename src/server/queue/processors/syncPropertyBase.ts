@@ -6,6 +6,7 @@ import { isAuctionConfigured } from "@/server/integrations/auction";
 import { isRentApiConfigured } from "@/server/integrations/rentApi";
 import { isRentAuctionConfigured } from "@/server/integrations/rentAuction";
 import { computeIsInefficient } from "@/server/services/classification";
+import { resolveDistrictId } from "@/server/services/districts";
 import { enqueueStatusCheck } from "../dispatch";
 import type { JobOutcome, PropertyBaseJob } from "../jobs";
 
@@ -35,6 +36,7 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
   }
 
   const base = result.data;
+  const districtId = await resolveDistrictId(base.districtCode, base.district, regionId);
 
   const property = await prisma.property.upsert({
     where: { cadNumber },
@@ -42,6 +44,7 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
       cadNumber,
       cadNumberOld: base.cadNumberOld,
       regionId,
+      districtId,
       sourceId,
       name: base.name,
       address: base.address,
@@ -52,6 +55,7 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
     },
     update: {
       cadNumberOld: base.cadNumberOld,
+      districtId,
       name: base.name,
       address: base.address,
       area: base.area != null ? new Prisma.Decimal(base.area) : null,
