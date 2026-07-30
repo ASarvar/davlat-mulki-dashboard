@@ -27,6 +27,8 @@ services:
     image: postgres:15-alpine
     restart: unless-stopped
     env_file: .env.production
+    ports:
+      - "127.0.0.1:5435:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
