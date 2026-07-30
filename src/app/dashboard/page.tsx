@@ -19,7 +19,7 @@ import {
   ChevronDown,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { requireUser, isAdmin } from "@/lib/authz";
+import { requireUser, isAdmin, userSourceScope } from "@/lib/authz";
 import {
   getDashboardStats,
   computeDistrictStats,
@@ -28,6 +28,7 @@ import {
   type DashboardColumnSub,
   type RegionCategoryRow,
   type RegionStat,
+  type StatsScope,
 } from "@/server/services/stats";
 import { listSourceNames } from "@/server/services/sources";
 import { SyncRunStatusBadge } from "@/components/badges";
@@ -232,9 +233,25 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const user = await requireUser();
   const sp = await searchParams;
 
+  // ── Rol doirasi (majburiy) ──
+  // IJROCHI/MODERATOR faqat o'z tashkilot(lar)ining statistikasini ko'radi.
+  // `null` = cheklovsiz (admin/rahbariyat/kuzatuvchi).
+  const scopeIds = await userSourceScope(user);
+  const scopedSources =
+    scopeIds === null
+      ? null
+      : await prisma.organizationSource.findMany({
+          where: { id: { in: scopeIds } },
+          select: { name: true, regionId: true },
+        });
+
   // Manba (soha) kesimi. Obyektlar ro'yxatidagi filtr bilan bir xil `soha` nomi —
   // shunda jadvaldagi raqamni bosganda filtr saqlanib qoladi.
-  const sohaList = await listSourceNames();
+  // ⚠️ Cheklangan foydalanuvchiga faqat O'Z tashkilotlari sohalari ko'rsatiladi —
+  // aks holda tugmalarning bir qismi doim bo'sh natija berardi.
+  const sohaList = scopedSources
+    ? [...new Set(scopedSources.map((s) => s.name))].sort()
+    : await listSourceNames();
   const sohaRaw = str(sp.soha) || undefined;
   // ⚠️ Standart holat "Hammasi" emas — "Ijara markazi" (agar mavjud bo'lsa).
   // "Hammasi"ni ko'rish uchun ANIQ `?soha=__all__` kerak (SourceFilter shu havolani beradi);
@@ -250,16 +267,29 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   // Qaysi hudud tumanlarga ochilgan (`?tuman=<regionId>`). Bir vaqtda bittasi —
   // jadval juda keng, hammasini ochish o'qishni qiyinlashtirardi.
-  const tuman = str(sp.tuman) || undefined;
+  //
+  // ⚠️ Hududiy boshqarmaga biriktirilgan foydalanuvchi (masalan "Ijara markazi — Andijon")
+  // uchun hudud jadvali bitta qatordan iborat bo'lardi, shuning uchun uning hududi
+  // TUMANLAR kesimida avtomatik ochiladi. Respublika darajasidagi tashkilot (regionId
+  // null) yoki bir nechta hudud bo'lsa — avtomatik ochilmaydi, foydalanuvchi o'zi tanlaydi.
+  const scopedRegionIds = scopedSources ? [...new Set(scopedSources.map((s) => s.regionId))] : [];
+  const autoTuman =
+    scopedRegionIds.length === 1 && scopedRegionIds[0] != null ? scopedRegionIds[0] : undefined;
+  // `?tuman=none` — avtomatik ochilishni bekor qilish uchun (hudud qatorini yopish).
+  const tumanRaw = str(sp.tuman) || undefined;
+  const tuman = tumanRaw === "none" ? undefined : (tumanRaw ?? autoTuman);
 
-  // Aggregatlar keshlangan (tag: dashboard, TTL 60s; kesh kaliti manbaga bog'liq).
+  // Soha filtri + rol doirasi BIRGA (AND) — kesh kaliti ikkalasini ham o'z ichiga oladi.
+  const scope: StatsScope = { sourceName: soha, sourceIds: scopeIds };
+
+  // Aggregatlar keshlangan (tag: dashboard, TTL 60s; kesh kaliti doiraga bog'liq).
   // Oxirgi run — jonli. Tuman kesimi faqat ochilgan hudud uchun so'raladi (keshlanmaydi:
   // arzon va kamdan-kam chaqiriladi).
   const [s, latestRun, districts, districtRent] = await Promise.all([
-    getDashboardStats(soha),
+    getDashboardStats(scope),
     prisma.syncRun.findFirst({ orderBy: { createdAt: "desc" } }),
-    tuman ? computeDistrictStats(tuman, soha) : Promise.resolve([] as RegionCategoryRow[]),
-    tuman ? computeDistrictRentStats(tuman, soha) : Promise.resolve([] as RegionStat[]),
+    tuman ? computeDistrictStats(tuman, scope) : Promise.resolve([] as RegionCategoryRow[]),
+    tuman ? computeDistrictRentStats(tuman, scope) : Promise.resolve([] as RegionStat[]),
   ]);
 
   // Drill-down havolalari manba filtrini olib yuradi.
@@ -292,10 +322,18 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // mantiqni ishlatadi, aks holda ikkisi orasida tafovut paydo bo'lishi mumkin.
   const COLUMNS = buildDashboardColumns();
 
+  // ⚠️ Cheklangan foydalanuvchi (bitta tashkilot) uchun 13 ta hudud qatori nol bo'lardi —
+  // shuning uchun bo'sh hududlar yashiriladi. Cheklovsiz foydalanuvchida har bir hududda
+  // obyekt bor, ya'ni rasmiy hisobot shakli (14 hudud) o'zgarmaydi.
+  const catRows = scopeIds === null ? s.byRegionCategory : s.byRegionCategory.filter((r) => r.total > 0);
+  const rentRows = scopeIds === null ? s.byRegion : s.byRegion.filter((r) => r.total > 0);
+  // Bitta hudud qolganda JAMI qatori shu qatorning aynan nusxasi bo'lardi — ko'rsatmaymiz.
+  const showCatTotals = catRows.length > 1;
+  const showRentTotals = rentRows.length > 1;
+
   // JAMI qatori — hududlar yig'indisi (har bir kichik ustun uchun alohida).
-  const totalObjects = s.byRegionCategory.reduce((a, r) => a + r.total, 0);
-  const sumSub = (sub: DashboardColumnSub) =>
-    s.byRegionCategory.reduce((a, r) => a + sub.get(r), 0);
+  const totalObjects = catRows.reduce((a, r) => a + r.total, 0);
+  const sumSub = (sub: DashboardColumnSub) => catRows.reduce((a, r) => a + sub.get(r), 0);
   // "Bo'sh turgan maydoni" kartasi — kat 11 (Bo'sh turgan, ijarasi umuman yo'q)
   // obyektlarining FOYDALI MAYDONI. `hasVacant.area` (kat 12 — "Bo'sh maydoni bor")
   // BILAN ARALASHTIRMANG: u ijara shartnomasi bor, lekin qisman bo'sh qolgan
@@ -470,7 +508,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </tr>
             </thead>
             <tbody>
-              {/* JAMI — birinchi qator */}
+              {/* JAMI — birinchi qator. Bitta hudud qolganda ko'rsatilmaydi (nusxa bo'lardi). */}
+              {showCatTotals ? (
               <tr
                 className="border-b-2 font-bold"
                 style={{
@@ -514,7 +553,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                         style={{ color: "var(--navy)" }}
                       >
                         {nf(
-                          s.byRegionCategory.reduce(
+                          catRows.reduce(
                             (a, r) => a + r.rentBreakdown.onAnyAuction.count,
                             0,
                           ),
@@ -527,7 +566,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                         style={{ color: "var(--navy)" }}
                       >
                         {nf(
-                          s.byRegionCategory.reduce(
+                          catRows.reduce(
                             (a, r) =>
                               a + r.rentBreakdown.onlyFreeOrPaidCategory.count,
                             0,
@@ -542,15 +581,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   style={{ color: "var(--navy)" }}
                 >
                   {nf(
-                    s.byRegionCategory.reduce(
+                    catRows.reduce(
                       (a, r) => a + r.rentBreakdown.fullyRented.count,
                       0,
                     ),
                   )}
                 </td>
               </tr>
+              ) : null}
 
-              {s.byRegionCategory.map((r, i) => {
+              {catRows.map((r, i) => {
                 // Zebra: juft qatorlar oq, toq qatorlar och-oltin (light-golden).
                 const zebra =
                   i % 2 === 1 ? "bg-[var(--gold-lighter)]" : "bg-white";
@@ -618,6 +658,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   </Fragment>
                 );
               })}
+              {catRows.length === 0 ? (
+                <tr>
+                  <td colSpan={99} className="py-10 text-center text-sm text-muted-foreground">
+                    Sizning tashkilotingiz bo'yicha obyekt topilmadi.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>
@@ -676,7 +723,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </tr>
             </thead>
             <tbody>
-              {/* JAMI — birinchi qator */}
+              {/* JAMI — birinchi qator. Bitta hudud qolganda ko'rsatilmaydi (nusxa bo'lardi). */}
+              {showRentTotals ? (
               <tr
                 className="border-b-2 font-bold"
                 style={{
@@ -720,8 +768,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   {nf(s.totals.rentSum / 1_000_000, 1)}
                 </td>
               </tr>
+              ) : null}
 
-              {s.byRegion.map((r, i) => {
+              {rentRows.map((r, i) => {
                 // Zebra: juft qatorlar oq, toq qatorlar och-oltin (light-golden).
                 const zebra =
                   i % 2 === 1 ? "bg-[var(--gold-lighter)]" : "bg-white";
@@ -782,6 +831,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   </Fragment>
                 );
               })}
+              {rentRows.length === 0 ? (
+                <tr>
+                  <td colSpan={99} className="py-10 text-center text-sm text-muted-foreground">
+                    Sizning tashkilotingiz bo'yicha obyekt topilmadi.
+                  </td>
+                </tr>
+              ) : null}
             </tbody>
           </table>
         </div>

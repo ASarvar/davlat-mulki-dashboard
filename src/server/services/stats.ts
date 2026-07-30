@@ -103,11 +103,6 @@ export interface DashboardStats {
 }
 
 // DIQQAT: unstable_cache natijani serializatsiya qiladi — faqat oddiy tiplar.
-//
-// `sourceName` — manba (soha) nomi bo'yicha kesim: "Ijara markazi", "Davlat aktivlari"...
-// Berilmasa — umumiy statistika (barcha manbalar). Obyektlar ro'yxatidagi `soha` filtri
-// bilan AYNAN bir xil mezon (`OrganizationSource.name`) — shunda jadvaldagi raqamni
-// bosganda ro'yxat mos keladi.
 // ── Guruhlangan agregatlar (hudud yoki tuman kesimi uchun BIR XIL mantiq) ──
 // `gid` — guruh kaliti: hudud kesimida "regionId", tuman kesimida "districtId".
 // ⚠️ Ikkala kesim ham SHU ikki funksiyani chaqiradi — SQL takrorlanmaydi, aks holda
@@ -128,6 +123,45 @@ type RentRow = {
 };
 
 // Effektiv kategoriya bo'yicha sanoq.
+/**
+ * Statistika doirasi — IKKI mustaqil cheklov, AND bilan birikadi:
+ *  - `sourceName` — foydalanuvchi TANLAYDIGAN soha filtri (dashboard'dagi manba tugmalari)
+ *  - `sourceIds`  — ROL doirasi (`userSourceScope()`), foydalanuvchi o'zgartira olmaydi.
+ *                   `null`/`undefined` = cheklovsiz, `[]` = hech narsa ko'rinmaydi.
+ * ⚠️ Ikkalasini aralashtirmang: sohani foydalanuvchi almashtiradi, `sourceIds` esa
+ * xavfsizlik chegarasi — u har doim qo'llanishi shart.
+ */
+export interface StatsScope {
+  sourceName?: string;
+  sourceIds?: string[] | null;
+}
+
+/**
+ * Doirani SQL shartiga aylantiradi. `col` — `sourceId` ustuni ifodasi
+ * (`p."sourceId"` yoki alias'siz `"sourceId"`). Qiymatlar PARAMETRLANADI.
+ */
+function sourceCond(scope: StatsScope, col: Prisma.Sql): Prisma.Sql {
+  const parts: Prisma.Sql[] = [];
+  if (scope.sourceName) {
+    parts.push(Prisma.sql`${col} IN (SELECT id FROM "OrganizationSource" WHERE name = ${scope.sourceName})`);
+  }
+  if (scope.sourceIds != null) {
+    // Bo'sh doira = biriktirilmagan foydalanuvchi: hech narsa ko'rmasligi kerak.
+    if (scope.sourceIds.length === 0) return Prisma.sql`FALSE`;
+    parts.push(Prisma.sql`${col} IN (${Prisma.join(scope.sourceIds)})`);
+  }
+  if (parts.length === 0) return Prisma.sql`TRUE`;
+  return parts.reduce((a, b) => Prisma.sql`${a} AND ${b}`);
+}
+
+/** O'sha doiraning Prisma `where` ko'rinishi (count'lar uchun). */
+function sourceWhere(scope: StatsScope): Prisma.PropertyWhereInput {
+  const and: Prisma.PropertyWhereInput[] = [];
+  if (scope.sourceName) and.push({ source: { name: scope.sourceName } });
+  if (scope.sourceIds != null) and.push({ sourceId: { in: scope.sourceIds } });
+  return and.length ? { AND: and } : {};
+}
+
 function categoryCountRows(groupCol: Prisma.Sql, cond: Prisma.Sql) {
   return prisma.$queryRaw<CatRow[]>(Prisma.sql`
     SELECT ${groupCol} AS gid,
@@ -321,11 +355,9 @@ function toRegionStat(r: TotalsRow): RegionStat {
  */
 export async function computeDistrictRentStats(
   regionId: string,
-  sourceName?: string,
+  scope: StatsScope = {},
 ): Promise<RegionStat[]> {
-  const srcCond = sourceName
-    ? Prisma.sql`p."sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${sourceName})`
-    : Prisma.sql`TRUE`;
+  const srcCond = sourceCond(scope, Prisma.sql`p."sourceId"`);
   const rows = await groupTotalsRows({
     table: Prisma.sql`"District"`,
     joinOn: Prisma.sql`p."districtId" = g.id`,
@@ -344,10 +376,8 @@ export async function computeDistrictRentStats(
  * Ustunlar hudud qatoridagi bilan bir xil (`buildDashboardColumns()`), chunki qaytariladigan
  * tuzilma ham bir xil (`RegionCategoryRow`). Obyekti yo'q tumanlar ham ro'yxatda qoladi (0 bilan).
  */
-async function districtRows(regionId: string | undefined, sourceName: string | undefined) {
-  const srcPart = sourceName
-    ? Prisma.sql`AND p."sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${sourceName})`
-    : Prisma.empty;
+async function districtRows(regionId: string | undefined, scope: StatsScope) {
+  const srcPart = Prisma.sql`AND ${sourceCond(scope, Prisma.sql`p."sourceId"`)}`;
   const regionPart = regionId ? Prisma.sql`AND p."regionId" = ${regionId}` : Prisma.empty;
   const cond = Prisma.sql`p."districtId" IS NOT NULL ${regionPart} ${srcPart}`;
   const groupCol = Prisma.sql`p."districtId"`;
@@ -375,9 +405,9 @@ async function districtRows(regionId: string | undefined, sourceName: string | u
 /** Bitta hududning tumanlari — dashboard jadvalida hudud qatori ochilganda. */
 export async function computeDistrictStats(
   regionId: string,
-  sourceName?: string,
+  scope: StatsScope = {},
 ): Promise<RegionCategoryRow[]> {
-  return (await districtRows(regionId, sourceName)).map((d) => d.row);
+  return (await districtRows(regionId, scope)).map((d) => d.row);
 }
 
 /**
@@ -385,9 +415,9 @@ export async function computeDistrictStats(
  * Hududlar `Region.sortOrder`, tumanlar nom bo'yicha tartiblanadi.
  */
 export async function computeDistrictStatsByRegion(
-  sourceName?: string,
+  scope: StatsScope = {},
 ): Promise<{ regionId: string; regionName: string; districts: RegionCategoryRow[] }[]> {
-  const rows = await districtRows(undefined, sourceName);
+  const rows = await districtRows(undefined, scope);
   const grouped: { regionId: string; regionName: string; districts: RegionCategoryRow[] }[] = [];
   for (const d of rows) {
     let g = grouped.find((x) => x.regionId === d.regionId);
@@ -397,23 +427,22 @@ export async function computeDistrictStatsByRegion(
     }
     g.districts.push(d.row);
   }
-  return grouped;
+  // ⚠️ Butunlay bo'sh hudud guruhlari tashlanadi. `districtRows()` BARCHA tumanlarni
+  // qaytaradi (jadvalda 0 li qatorlar ham ko'rinishi kerak), lekin bir tashkilotga
+  // cheklangan foydalanuvchi uchun bu 14 hudud × 205 tuman nol qator degani edi.
+  // Cheklovsiz foydalanuvchida har bir hududda obyekt bor — natija o'zgarmaydi.
+  return grouped.filter((g) => g.districts.some((d) => d.total > 0));
 }
 
 // Eksport qilingan — keshdan tashqari chaqirish (skript/sinov) uchun ham kerak.
-export async function computeDashboardStats(sourceName?: string): Promise<DashboardStats> {
+export async function computeDashboardStats(scope: StatsScope = {}): Promise<DashboardStats> {
   // Prisma tomon (count) uchun filtr.
-  const srcWhere: Prisma.PropertyWhereInput = sourceName ? { source: { name: sourceName } } : {};
+  const srcWhere = sourceWhere(scope);
 
-  // Raw SQL uchun filtr — PARAMETRLANGAN (Prisma.sql), satr sifatida yopishtirilmaydi:
-  // sourceName foydalanuvchi kiritgan query paramdan keladi.
-  const srcCond = sourceName
-    ? Prisma.sql`p."sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${sourceName})`
-    : Prisma.sql`TRUE`;
+  // Raw SQL uchun filtr — PARAMETRLANGAN (Prisma.sql), satr sifatida yopishtirilmaydi.
+  const srcCond = sourceCond(scope, Prisma.sql`p."sourceId"`);
   // Alias'siz variant (CTE va oddiy FROM "Property" uchun).
-  const srcCondNoAlias = sourceName
-    ? Prisma.sql`"sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${sourceName})`
-    : Prisma.sql`TRUE`;
+  const srcCondNoAlias = sourceCond(scope, Prisma.sql`"sourceId"`);
 
   const [total, synced, pending, failed, regionRows, byCategoryRaw] = await Promise.all([
     prisma.property.count({ where: srcWhere }),
@@ -500,8 +529,9 @@ export async function computeDashboardStats(sourceName?: string): Promise<Dashbo
 }
 
 // Keshlash: "dashboard" tegi + 60s TTL (worker alohida process — revalidateTag chaqira olmaydi).
-// `sourceName` argumenti kesh kalitiga avtomatik kiradi — ya'ni har bir manba
-// (va "hammasi") o'z keshiga ega bo'ladi.
+// `scope` argumenti kesh kalitiga avtomatik kiradi — ya'ni har bir soha VA har bir
+// rol doirasi (sourceIds) o'z keshiga ega bo'ladi. ⚠️ Shuning uchun doirani argument
+// sifatida uzatish shart: keshdan boshqa foydalanuvchining natijasi qaytmasligi kerak.
 export const getDashboardStats = unstable_cache(computeDashboardStats, ["dashboard-stats-v8"], {
   tags: ["dashboard"],
   revalidate: 60,

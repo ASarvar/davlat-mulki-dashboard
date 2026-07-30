@@ -1,14 +1,15 @@
 import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getCurrentUser, userSourceScope } from "@/lib/authz";
 import { getDashboardStats } from "@/server/services/stats";
 
 // "Hududlar kesimi — ijara shartnomalari" jadvalini .xlsx qilib beradi.
 export async function GET() {
-  const session = await auth();
-  if (!session?.user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
+  const user = await getCurrentUser();
+  if (!user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
 
-  const stats = await getDashboardStats();
+  // Rol doirasi qo'llanadi — cheklangan foydalanuvchi faqat o'z tashkilot(lar)ini yuklaydi.
+  const stats = await getDashboardStats({ sourceIds: await userSourceScope(user) });
 
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Ijara shartnomalari");

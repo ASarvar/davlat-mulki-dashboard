@@ -349,6 +349,38 @@ qo'shadi, shuning uchun yangi havola qo'shsangiz **`objHref()` ishlating**, qo'l
 holda o'sha manbada obyekti yo'q hudud jadvaldan butunlay tushib qolardi (0 o'rniga yo'qoladi).
 Kesh kaliti `dashboard-stats-v8` + argument, ya'ni har bir soha o'z keshiga ega.
 
+### Dashboard doirasi — `StatsScope` (2026-07-30)
+Statistika funksiyalari (`computeDashboardStats`, `computeDistrictStats`,
+`computeDistrictRentStats`, `computeDistrictStatsByRegion`) endi **bitta `StatsScope` obyekti**
+qabul qiladi — ilgari `sourceName?: string` edi:
+```ts
+{ sourceName?: string;      // foydalanuvchi TANLAYDIGAN soha filtri (manba tugmalari)
+  sourceIds?: string[]|null } // ROL doirasi (userSourceScope), foydalanuvchi o'zgartira olmaydi
+```
+Ikkalasi **AND** bilan birikadi. `sourceIds: []` (biriktirilmagan foydalanuvchi) ⇒ SQL sharti
+`FALSE`, ya'ni hamma joyda 0. Qiymatlar `Prisma.join` bilan parametrlanadi.
+
+⚠️ **Doirani uzatishni unutmang** — `getDashboardStats(scope)` kesh kaliti argumentdan
+quriladi, ya'ni uzatilmasa cheklangan foydalanuvchiga boshqa birovning keshlangan natijasi
+qaytishi mumkin. Ikkala Excel eksporti ham (`dashboard-categories`, `dashboard-rent`) doirani
+qo'llaydi — aks holda moderator ekranda o'z tashkilotini ko'rib turib, eksport orqali butun
+bazani yuklab olardi.
+
+**Hududiy boshqarmaga biriktirilgan foydalanuvchi** (masalan "Ijara markazi — Andijon") uchun
+hudud jadvali bitta qatordan iborat bo'lardi, shuning uchun uning hududi **tumanlar kesimida
+avtomatik ochiladi** (`dashboard/page.tsx` → `autoTuman`). Yopish uchun `?tuman=none`.
+Respublika darajasidagi tashkilot yoki bir nechta hudud bo'lsa — avtomatik ochilmaydi.
+Manba tugmalari ham cheklanadi: faqat o'z tashkilotlarining sohalari ko'rsatiladi.
+⚠️ `computeDistrictStatsByRegion()` butunlay bo'sh hudud guruhlarini tashlaydi — aks holda
+bitta tashkilotga cheklangan foydalanuvchining Excel eksportida 14 hudud × 205 tuman nol
+qator chiqardi (cheklovsiz foydalanuvchida har bir hududda obyekt bor, natija o'zgarmaydi).
+
+**Ekranda ham shu printsip** (`dashboard/page.tsx` → `catRows`/`rentRows`): doira cheklangan
+bo'lsa (`scopeIds !== null`) obyekti yo'q hudud qatorlari yashiriladi, va **bitta hudud qolganda
+"J A M I" qatori ham ko'rsatilmaydi** (u o'sha yagona qatorning aynan nusxasi bo'lardi —
+`showCatTotals`/`showRentTotals`). Cheklovsiz foydalanuvchida rasmiy hisobot shakli (14 hudud +
+JAMI) o'zgarmaydi. Tashkilotda obyekt bo'lmasa jadval bo'sh qolmaydi — tushuntirish qatori chiqadi.
+
 ⚠️ **`computeDashboardStats()`dagi `inefficient` (Bo'sh turgan) soni `byCategoryRaw`dan (code=11)
 olinadi, `Property.isInefficient` ustunidan ALOHIDA so'rov bilan EMAS.** Ilgari alohida
 `prisma.property.count({isInefficient:true})` so'rovi bor edi — bir xil `Promise.all` ichida bo'lsa

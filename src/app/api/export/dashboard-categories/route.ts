@@ -1,21 +1,25 @@
 import { NextResponse } from "next/server";
-import { auth } from "@/auth";
+import { getCurrentUser, userSourceScope } from "@/lib/authz";
 import { buildDashboardWorkbook } from "@/server/services/dashboardExport";
-import { getDashboardStats, computeDistrictStatsByRegion } from "@/server/services/stats";
+import { getDashboardStats, computeDistrictStatsByRegion, type StatsScope } from "@/server/services/stats";
 import { listSourceNames } from "@/server/services/sources";
 
 export async function GET(req: Request) {
-  const session = await auth();
-  if (!session?.user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
+  const user = await getCurrentUser();
+  if (!user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
 
   // Dashboard'dagi manba (soha) kesimi eksportga ham o'tadi — aks holda ekranda
   // bir manba ko'rinib turib, yuklangan faylda hamma manba chiqib ketardi.
   const sohaRaw = new URL(req.url).searchParams.get("soha")?.trim() || undefined;
   const soha = sohaRaw && (await listSourceNames()).includes(sohaRaw) ? sohaRaw : undefined;
 
+  // ⚠️ Rol doirasi ham qo'llanadi — aks holda cheklangan foydalanuvchi ekranda o'z
+  // tashkilotini ko'rib turib, eksport orqali BUTUN bazani yuklab olardi.
+  const scope: StatsScope = { sourceName: soha, sourceIds: await userSourceScope(user) };
+
   const [stats, byRegionDistricts] = await Promise.all([
-    getDashboardStats(soha),
-    computeDistrictStatsByRegion(soha),
+    getDashboardStats(scope),
+    computeDistrictStatsByRegion(scope),
   ]);
   const workbook = buildDashboardWorkbook(stats, byRegionDistricts);
   const buffer = await workbook.xlsx.writeBuffer();
