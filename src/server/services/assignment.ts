@@ -1,7 +1,7 @@
 import { unlink } from "node:fs/promises";
 import type { Prisma, ChangeRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { assertRegionWriteAccess, userRegionScope, isAdmin, type SessionUser } from "@/lib/authz";
+import { assertSourceWriteAccess, userSourceScope, isAdmin, type SessionUser } from "@/lib/authz";
 import { computeIsInefficient, CAT_VACANT } from "./classification";
 import { ASSIGNABLE_CATEGORY_CODES } from "@/lib/categories";
 import { objectHref } from "@/lib/cadastre";
@@ -31,7 +31,7 @@ export async function assignManualCategory(user: SessionUser, input: AssignInput
 
   const property = await prisma.property.findUnique({
     where: { cadNumber: input.cadNumber },
-    select: { id: true, regionId: true, integrationCategoryCode: true, manualCategoryCode: true },
+    select: { id: true, regionId: true, sourceId: true, integrationCategoryCode: true, manualCategoryCode: true },
   });
   if (!property) throw new Error(`Obyekt topilmadi: ${input.cadNumber}`);
 
@@ -54,8 +54,8 @@ export async function assignManualCategory(user: SessionUser, input: AssignInput
     throw new Error(`Ko'pi bilan ${MAX_IMAGE_ATTACHMENTS} ta rasm yuklash mumkin`);
   }
 
-  // Ruxsat: ijrochi o'z hududi; admin — hamma. (VIEWER umuman kirmaydi.)
-  await assertRegionWriteAccess(user, property.regionId);
+  // Ruxsat: ijrochi o'z tashkiloti; admin — hamma. (VIEWER umuman kirmaydi.)
+  await assertSourceWriteAccess(user, property.sourceId);
 
   // Fayllarni oldin saqlaymiz (tranzaksiyadan tashqarida). Tx yiqilsa — hammasini o'chiramiz.
   const saved: SavedDocument[] = [];
@@ -185,7 +185,7 @@ export async function removeManualCategory(user: SessionUser, cadNumber: string,
 
   const property = await prisma.property.findUnique({
     where: { cadNumber },
-    select: { id: true, regionId: true, integrationCategoryCode: true, manualCategoryCode: true },
+    select: { id: true, regionId: true, sourceId: true, integrationCategoryCode: true, manualCategoryCode: true },
   });
   if (!property) throw new Error(`Obyekt topilmadi: ${cadNumber}`);
 
@@ -196,7 +196,7 @@ export async function removeManualCategory(user: SessionUser, cadNumber: string,
     throw new Error("Obyekt Yaroqsiz/Chekka kategoriyasida emas");
   }
 
-  await assertRegionWriteAccess(user, property.regionId);
+  await assertSourceWriteAccess(user, property.sourceId);
 
   // Bu obyektning 9/10-kategoriya biriktirishlariga asoslovchi PDF'lari — kategoriya
   // olib tashlanganda ular ham o'chiriladi (tarix yozuvi qoladi, faqat hujjat havolasi
@@ -310,10 +310,10 @@ export async function listPendingRequests(user: SessionUser, filters: RequestFil
   if (stages.length === 0) return [];
 
   // Hudud doirasi faqat moderator bosqichida ma'noga ega — rahbariyat hamma hududni ko'radi.
-  const scope = await userRegionScope(user); // null = cheklovsiz
+  const scope = await userSourceScope(user); // null = cheklovsiz
 
   const and: Prisma.CategoryChangeRequestWhereInput[] = [{ status: { in: stages } }];
-  if (scope !== null) and.push({ property: { regionId: { in: scope } } });
+  if (scope !== null) and.push({ property: { sourceId: { in: scope } } });
   if (filters.regionId) and.push({ property: { regionId: filters.regionId } });
   if (filters.categoryCode) and.push({ toCategory: filters.categoryCode });
   const reqCond = requestedByCondition(filters.q);
@@ -356,8 +356,8 @@ export async function listRequestHistory(
   if (user.role === "IJROCHI") {
     and.push({ requestedById: user.id });
   } else if (user.role === "MODERATOR") {
-    const scope = await userRegionScope(user);
-    if (scope !== null) and.push({ property: { regionId: { in: scope } } });
+    const scope = await userSourceScope(user);
+    if (scope !== null) and.push({ property: { sourceId: { in: scope } } });
   }
 
   if (filters.regionId) and.push({ property: { regionId: filters.regionId } });
@@ -407,7 +407,7 @@ export async function reviewRequest(
   const req = await prisma.categoryChangeRequest.findUnique({
     where: { id: requestId },
     include: {
-      property: { select: { id: true, cadNumber: true, regionId: true, integrationCategoryCode: true } },
+      property: { select: { id: true, cadNumber: true, sourceId: true, integrationCategoryCode: true } },
     },
   });
   if (!req) throw new Error("So'rov topilmadi");
@@ -423,8 +423,8 @@ export async function reviewRequest(
     );
   }
 
-  // Moderator bosqichida hudud cheklovi tekshiriladi (rahbariyat/admin — cheklovsiz).
-  await assertRegionWriteAccess(user, req.property.regionId);
+  // Moderator bosqichida tashkilot cheklovi tekshiriladi (rahbariyat/admin — cheklovsiz).
+  await assertSourceWriteAccess(user, req.property.sourceId);
 
   const isModeratorStage = req.status === "PENDING_MODERATOR";
   const now = new Date();

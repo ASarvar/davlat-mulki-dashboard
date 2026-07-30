@@ -53,14 +53,16 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   // "Bo'sh maydoni bor" (kat 12) filtri tanlansa, maydon ustunida bo'sh maydon ko'rsatiladi.
   const showVacant = filters.categoryCode === CAT_HAS_VACANT_AREA;
 
-  const canFilterRegion = user.role !== "IJROCHI";
-  // MODERATOR hamma hududni ko'radi — dropdown'da ham hamma hudud ko'rsatiladi. Qo'shimcha
-  // Hudud select'ining birinchi varianti "Faqat mening hududlarim" (ObjectFilters) bilan
-  // o'ziga biriktirilganlar bo'yicha saralay oladi (myRegionsOnly, buildWhere()da qo'llanadi).
+  // Hudud endi DOIRA emas, oddiy filtr — shuning uchun hammaga ko'rsatiladi. IJROCHI
+  // uchun ham foydali: respublika darajasidagi tashkilotga (Direksiya, Agentlik markaziy)
+  // biriktirilgan bo'lsa obyektlari barcha hududlarga tarqalgan bo'ladi.
+  const canFilterRegion = true;
+  // MODERATOR "Faqat mening tashkilotlarim" bilan o'ziga biriktirilganlar bo'yicha
+  // saralay oladi (myRegionsOnly, buildWhere()da qo'llanadi).
   const showMyRegionsToggle = user.role === "MODERATOR";
   // Tuman tanlagichi tanlangan HUDUDGA bog'liq: hudud tanlanmasa 205 ta tuman
-  // bitta ro'yxatda chiqib, foydasiz bo'lardi. IJROCHI uchun esa o'z hududi olinadi.
-  const districtRegionId = canFilterRegion ? region : (user.regionId ?? undefined);
+  // bitta ro'yxatda chiqib, foydasiz bo'lardi.
+  const districtRegionId = region;
   const [regions, districts, sohaList, result] = await Promise.all([
     canFilterRegion
       ? prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } })

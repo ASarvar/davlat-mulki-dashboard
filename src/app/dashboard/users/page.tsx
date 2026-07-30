@@ -17,7 +17,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const actor = await requireRole("SUPER_ADMIN", "ADMIN");
   const sp = await searchParams;
 
-  const regionId = str(sp.region) || undefined;
+  const sourceId = str(sp.source) || undefined;
   const roleRaw = str(sp.role);
   const role = roleRaw && roleRaw in Role ? (roleRaw as Role) : undefined;
 
@@ -26,11 +26,21 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   // Filtr uchun rollar (Admin uchun SUPER_ADMIN yashiriladi).
   const roleFilterOptions = (Object.keys(ROLE_LABEL) as Role[]).filter((r) => !(hideSuperAdmin && r === "SUPER_ADMIN"));
 
-  const [users, regions, activeAdmins] = await Promise.all([
-    listUsers({ regionId, role, hideSuperAdmin }),
-    prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
+  const [users, sourceRows, activeAdmins] = await Promise.all([
+    listUsers({ sourceId, role, hideSuperAdmin }),
+    // Tashkilotlar — soha bo'yicha, keyin hudud tartibida (respublika darajasidagilar oxirida).
+    prisma.organizationSource.findMany({
+      orderBy: [{ name: "asc" }, { region: { sortOrder: "asc" } }],
+      select: { id: true, name: true, orgName: true, region: { select: { name: true } } },
+    }),
     prisma.user.count({ where: { role: "SUPER_ADMIN", isActive: true } }),
   ]);
+  const sources = sourceRows.map((s) => ({
+    id: s.id,
+    name: s.name,
+    orgName: s.orgName,
+    regionName: s.region?.name ?? null,
+  }));
 
   return (
     <div>
@@ -47,7 +57,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           <UserPlus className="h-4 w-4" style={{ color: "var(--gold)" }} />
           Yangi foydalanuvchi
         </h2>
-        <CreateUserForm regions={regions} isSuperAdmin={actor.role === "SUPER_ADMIN"} />
+        <CreateUserForm sources={sources} isSuperAdmin={actor.role === "SUPER_ADMIN"} />
       </div>
 
       {/* Filtr */}
@@ -57,12 +67,12 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
       >
         <div className="flex flex-col">
-          <label className="mb-1 text-xs font-medium text-muted-foreground">Hudud</label>
-          <select name="region" defaultValue={regionId ?? ""} className={`${selectCls} w-52`}>
+          <label className="mb-1 text-xs font-medium text-muted-foreground">Tashkilot</label>
+          <select name="source" defaultValue={sourceId ?? ""} className={`${selectCls} w-64`}>
             <option value="">Barchasi</option>
-            {regions.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
+            {sources.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name} — {s.regionName ?? "Respublika"}
               </option>
             ))}
           </select>
@@ -118,7 +128,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               users.map((u) => (
                 <UserRow
                   key={u.id}
-                  regions={regions}
+                  sources={sources}
                   currentUserId={actor.id}
                   canManageAdmins={actor.role === "SUPER_ADMIN"}
                   isLastSuperAdmin={u.role === "SUPER_ADMIN" && u.isActive && activeAdmins <= 1}
@@ -128,10 +138,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                     fullName: u.fullName,
                     role: u.role,
                     isActive: u.isActive,
-                    regionId: u.region?.id ?? null,
-                    regionName: u.region?.name ?? null,
-                    allRegions: u.allRegions,
-                    moderatorRegionIds: u.moderatorRegions.map((m) => m.regionId),
+                    sourceId: u.source?.id ?? null,
+                    sourceLabel: u.source ? `${u.source.name} — ${u.source.region?.name ?? "Respublika"}` : null,
+                    allSources: u.allSources,
+                    moderatorSourceIds: u.moderatorSources.map((m) => m.sourceId),
                     activityCount: u._count.documents + u._count.assignments + u._count.requestedChanges,
                   }}
                 />

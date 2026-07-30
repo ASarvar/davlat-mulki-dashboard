@@ -27,6 +27,9 @@ yarn-error.log*
 .env.production
 !.env.production.example
 
+# vaqtinchalik diagnostika/sinov skriptlari (_diag.ts, _scope.ts ...) — repo'ga tushmasin
+/_*.ts
+
 # prisma
 /prisma/*.db
 

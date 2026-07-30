@@ -7,43 +7,45 @@ export interface CreateUserInput {
   fullName: string;
   password: string;
   role: Role;
-  regionId?: string | null; // IJROCHI uchun
-  allRegions?: boolean; // MODERATOR uchun (hamma hudud)
-  moderatorRegionIds?: string[]; // MODERATOR uchun (aniq hududlar)
+  sourceId?: string | null; // IJROCHI uchun (aynan bitta tashkilot)
+  allSources?: boolean; // MODERATOR uchun (hamma tashkilot)
+  moderatorSourceIds?: string[]; // MODERATOR uchun (aniq tashkilotlar)
 }
 
 export interface UpdateUserInput {
   userId: string;
   role: Role;
-  regionId?: string | null;
-  allRegions?: boolean;
-  moderatorRegionIds?: string[];
+  sourceId?: string | null;
+  allSources?: boolean;
+  moderatorSourceIds?: string[];
   isActive: boolean;
 }
 
-// Rol bo'yicha hudud ma'lumotini normallashtiradi va validatsiya qiladi.
-function resolveRegions(input: {
+// Rol bo'yicha TASHKILOT ma'lumotini normallashtiradi va validatsiya qiladi.
+// ⚠️ Doira hudud emas, tashkilot bo'yicha (2026-07-30) — `OrganizationSource.id`.
+function resolveSources(input: {
   role: Role;
-  regionId?: string | null;
-  allRegions?: boolean;
-  moderatorRegionIds?: string[];
-}): { regionId: string | null; allRegions: boolean; moderatorRegionIds: string[] } {
+  sourceId?: string | null;
+  allSources?: boolean;
+  moderatorSourceIds?: string[];
+}): { sourceId: string | null; allSources: boolean; moderatorSourceIds: string[] } {
   if (input.role === "IJROCHI") {
-    if (!input.regionId) throw new Error("Nazoratchi uchun hudud tanlanishi shart");
-    return { regionId: input.regionId, allRegions: false, moderatorRegionIds: [] };
+    if (!input.sourceId) throw new Error("Ijrochi uchun tashkilot tanlanishi shart");
+    return { sourceId: input.sourceId, allSources: false, moderatorSourceIds: [] };
   }
   if (input.role === "MODERATOR") {
-    const all = Boolean(input.allRegions);
-    const ids = all ? [] : (input.moderatorRegionIds ?? []).filter(Boolean);
-    if (!all && ids.length === 0) throw new Error("Moderator uchun kamida bitta hudud yoki 'hammasi' tanlang");
-    return { regionId: null, allRegions: all, moderatorRegionIds: ids };
+    const all = Boolean(input.allSources);
+    const ids = all ? [] : (input.moderatorSourceIds ?? []).filter(Boolean);
+    if (!all && ids.length === 0)
+      throw new Error("Moderator uchun kamida bitta tashkilot yoki 'hammasi' tanlang");
+    return { sourceId: null, allSources: all, moderatorSourceIds: ids };
   }
-  // SUPER_ADMIN / ADMIN / VIEWER — hudud saqlanmaydi.
-  return { regionId: null, allRegions: false, moderatorRegionIds: [] };
+  // SUPER_ADMIN / ADMIN / RAHBARIYAT / VIEWER — tashkilot saqlanmaydi (cheklovsiz).
+  return { sourceId: null, allSources: false, moderatorSourceIds: [] };
 }
 
 export interface UserFilters {
-  regionId?: string;
+  sourceId?: string;
   role?: Role;
   /** ADMIN uchun: SUPER_ADMIN foydalanuvchilarni ko'rsatmaymiz. */
   hideSuperAdmin?: boolean;
@@ -52,8 +54,8 @@ export interface UserFilters {
 export async function listUsers(f: UserFilters = {}) {
   return prisma.user.findMany({
     where: {
-      ...(f.regionId
-        ? { OR: [{ regionId: f.regionId }, { moderatorRegions: { some: { regionId: f.regionId } } }] }
+      ...(f.sourceId
+        ? { OR: [{ sourceId: f.sourceId }, { moderatorSources: { some: { sourceId: f.sourceId } } }] }
         : {}),
       ...(f.role ? { role: f.role } : {}),
       ...(f.hideSuperAdmin ? { role: { not: "SUPER_ADMIN" } } : {}),
@@ -65,10 +67,10 @@ export async function listUsers(f: UserFilters = {}) {
       fullName: true,
       role: true,
       isActive: true,
-      allRegions: true,
+      allSources: true,
       createdAt: true,
-      region: { select: { id: true, name: true } },
-      moderatorRegions: { select: { regionId: true } },
+      source: { select: { id: true, name: true, orgName: true, region: { select: { name: true } } } },
+      moderatorSources: { select: { sourceId: true } },
       _count: { select: { documents: true, assignments: true, requestedChanges: true } },
     },
   });
@@ -115,7 +117,7 @@ export async function deleteUser(actorId: string, userId: string) {
 }
 
 export async function createUser(actorId: string, input: CreateUserInput) {
-  const { regionId, allRegions, moderatorRegionIds } = resolveRegions(input);
+  const { sourceId, allSources, moderatorSourceIds } = resolveSources(input);
   const passwordHash = await bcrypt.hash(input.password, 10);
   const username = input.username.toLowerCase().trim();
 
@@ -127,10 +129,10 @@ export async function createUser(actorId: string, input: CreateUserInput) {
           fullName: input.fullName.trim(),
           passwordHash,
           role: input.role,
-          regionId,
-          allRegions,
-          moderatorRegions: moderatorRegionIds.length
-            ? { create: moderatorRegionIds.map((rid) => ({ regionId: rid })) }
+          sourceId,
+          allSources,
+          moderatorSources: moderatorSourceIds.length
+            ? { create: moderatorSourceIds.map((sid) => ({ sourceId: sid })) }
             : undefined,
         },
       });
@@ -154,7 +156,7 @@ export async function createUser(actorId: string, input: CreateUserInput) {
 }
 
 export async function updateUser(actorId: string, input: UpdateUserInput) {
-  const { regionId, allRegions, moderatorRegionIds } = resolveRegions(input);
+  const { sourceId, allSources, moderatorSourceIds } = resolveSources(input);
 
   // O'zini bloklab qo'yishning oldini olamiz (lockout himoyasi).
   if (actorId === input.userId) {
@@ -173,16 +175,16 @@ export async function updateUser(actorId: string, input: UpdateUserInput) {
   }
 
   await prisma.$transaction(async (tx) => {
-    await tx.userRegion.deleteMany({ where: { userId: input.userId } });
+    await tx.userSource.deleteMany({ where: { userId: input.userId } });
     await tx.user.update({
       where: { id: input.userId },
       data: {
         role: input.role,
-        regionId,
-        allRegions,
+        sourceId,
+        allSources,
         isActive: input.isActive,
-        moderatorRegions: moderatorRegionIds.length
-          ? { create: moderatorRegionIds.map((rid) => ({ regionId: rid })) }
+        moderatorSources: moderatorSourceIds.length
+          ? { create: moderatorSourceIds.map((sid) => ({ sourceId: sid })) }
           : undefined,
       },
     });
@@ -192,7 +194,7 @@ export async function updateUser(actorId: string, input: UpdateUserInput) {
         action: "UPDATE_USER",
         entityType: "User",
         entityId: input.userId,
-        metadata: { role: input.role, isActive: input.isActive, regionId, allRegions },
+        metadata: { role: input.role, isActive: input.isActive, sourceId, allSources },
       },
     });
   });

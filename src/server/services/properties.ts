@@ -8,7 +8,7 @@ import {
   CAT_ON_AUCTION_RENT,
   CAT_VACANT,
 } from "./classification";
-import { userRegionScope, type SessionUser } from "@/lib/authz";
+import { userSourceScope, type SessionUser } from "@/lib/authz";
 
 export interface PropertyFilters {
   q?: string; // kadastr (yangi/eski) bo'yicha qidiruv
@@ -38,17 +38,20 @@ export const PROPERTY_PAGE_SIZE = PAGE_SIZE;
 export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise<Prisma.PropertyWhereInput> {
   const and: Prisma.PropertyWhereInput[] = [];
 
-  // Hudud doirasi: IJROCHI faqat o'z hududini ko'radi. Boshqa rollar (admin/moderator/
-  // kuzatuvchi) hamma obyektni ko'radi, lekin filtr param'ni hurmat qiladi. MODERATOR
-  // qo'shimcha ravishda "faqat mening hududlarim" bilan o'ziga biriktirilgan hudud(lar)
-  // bo'yicha saralashi mumkin (myRegionsOnly) — bu ko'rish cheklovi emas, ixtiyoriy filtr.
-  if (user.role === "IJROCHI" && user.regionId) {
-    and.push({ regionId: user.regionId });
+  // TASHKILOT doirasi: IJROCHI faqat o'z tashkilotining obyektlarini ko'radi
+  // (biriktirilmagan bo'lsa — hech narsa). Boshqa rollar (admin/moderator/kuzatuvchi)
+  // hamma obyektni ko'radi, lekin filtr param'ni hurmat qiladi. MODERATOR qo'shimcha
+  // ravishda "faqat mening tashkilotlarim" bilan saralashi mumkin (myRegionsOnly) —
+  // bu ko'rish cheklovi emas, ixtiyoriy filtr.
+  // ⚠️ Hudud endi FAQAT foydalanuvchi tanlaydigan filtr — doira emas.
+  if (user.role === "IJROCHI") {
+    and.push(user.sourceId ? { sourceId: user.sourceId } : { id: "__no_source__" });
+    if (f.regionId) and.push({ regionId: f.regionId });
   } else {
     if (f.regionId) and.push({ regionId: f.regionId });
     if (f.myRegionsOnly && user.role === "MODERATOR") {
-      const scope = await userRegionScope(user);
-      if (scope !== null) and.push({ regionId: { in: scope } });
+      const scope = await userSourceScope(user);
+      if (scope !== null) and.push({ sourceId: { in: scope } });
     }
   }
 
@@ -342,6 +345,7 @@ export async function getPropertyDetail(user: SessionUser, cadNumber: string) {
     },
   });
   if (!property) return null;
-  if (user.role === "IJROCHI" && property.regionId !== user.regionId) return null;
+  // Obyekt sahifasi: ijrochi faqat o'z tashkilotining obyektini ocha oladi.
+  if (user.role === "IJROCHI" && property.sourceId !== user.sourceId) return null;
   return property;
 }

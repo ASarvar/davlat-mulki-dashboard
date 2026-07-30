@@ -3,15 +3,15 @@
 import { useActionState, useState } from "react";
 import { UserPlus } from "lucide-react";
 import type { Role } from "@prisma/client";
-import { ASSIGNABLE_ROLES, regionMode } from "@/lib/roles";
+import { ASSIGNABLE_ROLES, sourceMode } from "@/lib/roles";
 import { createUserAction, type UserFormState } from "./actions";
-import { RegionPicker } from "./RegionPicker";
+import { SourcePicker, type SourceOption } from "./SourcePicker";
 
 export function CreateUserForm({
-  regions,
+  sources,
   isSuperAdmin,
 }: {
-  regions: { id: string; name: string }[];
+  sources: SourceOption[];
   isSuperAdmin: boolean;
 }) {
   const [state, formAction, pending] = useActionState<UserFormState, FormData>(createUserAction, {});
@@ -56,7 +56,7 @@ export function CreateUserForm({
         </select>
       </div>
 
-      <RegionPicker mode={regionMode(role)} regions={regions} />
+      <SourcePicker mode={sourceMode(role)} sources={sources} />
 
       <div className="md:col-span-2">
         {state.error ? <p className="mb-2 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">{state.error}</p> : null}

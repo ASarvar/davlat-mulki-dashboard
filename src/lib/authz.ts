@@ -6,7 +6,8 @@ import type { Role } from "@prisma/client";
 export type SessionUser = {
   id: string;
   role: Role;
-  regionId: string | null;
+  /** IJROCHI biriktirilgan tashkilot (`OrganizationSource.id`). Boshqa rollarda null. */
+  sourceId: string | null;
   username?: string;
   name?: string | null;
 };
@@ -26,7 +27,7 @@ export function isAdmin(role: Role): boolean {
 const loadUser = cache(async (id: string) =>
   prisma.user.findUnique({
     where: { id },
-    select: { id: true, role: true, regionId: true, username: true, fullName: true, isActive: true },
+    select: { id: true, role: true, sourceId: true, username: true, fullName: true, isActive: true },
   }),
 );
 
@@ -39,7 +40,7 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const db = await loadUser(sessionUser.id);
   if (!db || !db.isActive) return null;
 
-  return { id: db.id, role: db.role, regionId: db.regionId, username: db.username, name: db.fullName };
+  return { id: db.id, role: db.role, sourceId: db.sourceId, username: db.username, name: db.fullName };
 }
 
 // Tizimga kirgan foydalanuvchini talab qiladi.
@@ -57,35 +58,40 @@ export async function requireRole(...roles: Role[]): Promise<SessionUser> {
 }
 
 /**
- * Foydalanuvchi qaysi hududlarga tegishli:
- *  - SUPER_ADMIN / ADMIN / RAHBARIYAT / VIEWER → null (hamma hudud, cheklovsiz)
- *  - MODERATOR → allRegions bo'lsa null, aks holda biriktirilgan hududlar ro'yxati
- *  - IJROCHI → [o'z hududi]
- * `null` = cheklov yo'q. Bo'sh massiv = hech qanday hudud (ehtiyot uchun).
+ * Foydalanuvchi qaysi TASHKILOTLARGA tegishli (`OrganizationSource.id` ro'yxati):
+ *  - SUPER_ADMIN / ADMIN / RAHBARIYAT / VIEWER → null (hamma tashkilot, cheklovsiz)
+ *  - MODERATOR → allSources bo'lsa null, aks holda biriktirilgan tashkilotlar
+ *  - IJROCHI → [o'z tashkiloti] (aynan bitta)
+ * `null` = cheklov yo'q. Bo'sh massiv = hech qanday tashkilot (ehtiyot uchun —
+ * biriktirilmagan ijrochi/moderator hech narsa ko'rmaydi).
+ *
+ * ⚠️ Hudud emas, tashkilot: hududiy tashkilotga bog'langan odam amalda faqat o'z
+ * hududini ko'radi, respublika darajasidagi tashkilot (Direksiya, Agentlik markaziy)
+ * esa kadastr prefiksi orqali barcha hududlarga tarqaladi — bu kutilgan xulq.
  */
-export async function userRegionScope(user: SessionUser): Promise<string[] | null> {
+export async function userSourceScope(user: SessionUser): Promise<string[] | null> {
   if (isAdmin(user.role) || user.role === "RAHBARIYAT" || user.role === "VIEWER") return null;
-  if (user.role === "IJROCHI") return user.regionId ? [user.regionId] : [];
+  if (user.role === "IJROCHI") return user.sourceId ? [user.sourceId] : [];
   if (user.role === "MODERATOR") {
     const u = await prisma.user.findUnique({
       where: { id: user.id },
-      select: { allRegions: true, moderatorRegions: { select: { regionId: true } } },
+      select: { allSources: true, moderatorSources: { select: { sourceId: true } } },
     });
     if (!u) return [];
-    if (u.allRegions) return null;
-    return u.moderatorRegions.map((r) => r.regionId);
+    if (u.allSources) return null;
+    return u.moderatorSources.map((r) => r.sourceId);
   }
   return [];
 }
 
-// Hududga yozish/tasdiqlash ruxsati.
-//  - ADMIN/SUPER_ADMIN/RAHBARIYAT — hamma hudud
-//  - MODERATOR — o'z hududlari (yoki hammasi)
-//  - IJROCHI — o'z hududi (lekin u to'g'ridan-to'g'ri emas, so'rov orqali)
-export async function assertRegionWriteAccess(user: SessionUser, regionId: string): Promise<void> {
+// Tashkilotga yozish/tasdiqlash ruxsati.
+//  - ADMIN/SUPER_ADMIN/RAHBARIYAT — hamma tashkilot
+//  - MODERATOR — o'z tashkilotlari (yoki hammasi)
+//  - IJROCHI — o'z tashkiloti (lekin u to'g'ridan-to'g'ri emas, so'rov orqali)
+export async function assertSourceWriteAccess(user: SessionUser, sourceId: string): Promise<void> {
   if (isAdmin(user.role)) return;
-  const scope = await userRegionScope(user);
+  const scope = await userSourceScope(user);
   if (scope === null) return; // cheklov yo'q (moderator=hammasi)
-  if (scope.includes(regionId)) return;
-  throw new Error("Bu hududga o'zgartirish kiritish ruxsati yo'q");
+  if (scope.includes(sourceId)) return;
+  throw new Error("Bu tashkilotga o'zgartirish kiritish ruxsati yo'q");
 }

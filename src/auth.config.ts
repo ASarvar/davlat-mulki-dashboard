@@ -18,11 +18,11 @@ export const authConfig: NextAuthConfig = {
       if (isOnLogin) return true; // login sahifasi ochiq
       return isLoggedIn; // qolgan hamma narsa himoyalangan
     },
-    // Rol va regionId'ni token/sessiyaga olib o'tamiz (DB'siz).
+    // Rol va sourceId'ni token/sessiyaga olib o'tamiz (DB'siz).
     jwt({ token, user }) {
       if (user) {
         token.role = (user as { role: Role }).role;
-        token.regionId = (user as { regionId: string | null }).regionId;
+        token.sourceId = (user as { sourceId: string | null }).sourceId;
         token.username = (user as { username: string }).username;
       }
       return token;
@@ -31,7 +31,7 @@ export const authConfig: NextAuthConfig = {
       if (session.user) {
         session.user.id = token.sub as string;
         session.user.role = token.role as Role;
-        session.user.regionId = (token.regionId as string | null) ?? null;
+        session.user.sourceId = (token.sourceId as string | null) ?? null;
         session.user.username = (token.username as string) ?? "";
       }
       return session;

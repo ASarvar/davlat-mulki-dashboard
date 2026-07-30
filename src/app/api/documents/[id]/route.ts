@@ -15,12 +15,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   const doc = await prisma.document.findUnique({
     where: { id },
-    include: { property: { select: { regionId: true } } },
+    include: { property: { select: { sourceId: true } } },
   });
   if (!doc) return new NextResponse("Hujjat topilmadi", { status: 404 });
 
-  // IJROCHI faqat o'z hududi hujjatlarini ko'ra oladi.
-  if (user.role === "IJROCHI" && doc.property.regionId !== user.regionId) {
+  // IJROCHI faqat o'z TASHKILOTI hujjatlarini ko'ra oladi.
+  if (user.role === "IJROCHI" && doc.property.sourceId !== user.sourceId) {
     return new NextResponse("Ruxsat yo'q", { status: 403 });
   }
 

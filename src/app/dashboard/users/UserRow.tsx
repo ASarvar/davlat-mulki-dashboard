@@ -3,9 +3,9 @@
 import { useActionState, useState } from "react";
 import { Save, KeyRound, Trash2 } from "lucide-react";
 import type { Role } from "@prisma/client";
-import { ASSIGNABLE_ROLES, ROLE_LABEL, regionMode } from "@/lib/roles";
+import { ASSIGNABLE_ROLES, ROLE_LABEL, sourceMode } from "@/lib/roles";
 import { updateUserAction, resetPasswordAction, deleteUserAction, type UserFormState } from "./actions";
-import { RegionPicker } from "./RegionPicker";
+import { SourcePicker, type SourceOption } from "./SourcePicker";
 
 export interface UserRowData {
   id: string;
@@ -13,23 +13,24 @@ export interface UserRowData {
   fullName: string;
   role: Role;
   isActive: boolean;
-  regionId: string | null;
-  regionName: string | null;
-  allRegions: boolean;
-  moderatorRegionIds: string[];
+  sourceId: string | null;
+  /** Ko'rsatish uchun: "Ijara markazi — Andijon" ko'rinishida. */
+  sourceLabel: string | null;
+  allSources: boolean;
+  moderatorSourceIds: string[];
   /** Hujjat/biriktirish/so'rov soni — 0 bo'lmasa o'chirib bo'lmaydi (audit izi). */
   activityCount: number;
 }
 
 export function UserRow({
   user,
-  regions,
+  sources,
   currentUserId,
   canManageAdmins,
   isLastSuperAdmin,
 }: {
   user: UserRowData;
-  regions: { id: string; name: string }[];
+  sources: SourceOption[];
   currentUserId: string;
   /** SUPER_ADMIN bo'lsa true — Admin rolini bera oladi va super adminlarni boshqaradi. */
   canManageAdmins: boolean;
@@ -67,6 +68,19 @@ export function UserRow({
         <p className="text-xs text-muted-foreground">
           {user.username} · {ROLE_LABEL[user.role]}
         </p>
+        {/* Doira — tashkilot bo'yicha. Biriktirilmagan ijrochi/moderator hech narsa
+            ko'rmaydi, shuning uchun buni aniq ogohlantirish bilan ko'rsatamiz. */}
+        {user.allSources ? (
+          <p className="mt-0.5 text-xs text-muted-foreground">Barcha tashkilotlar</p>
+        ) : user.sourceLabel ? (
+          <p className="mt-0.5 text-xs text-muted-foreground">{user.sourceLabel}</p>
+        ) : user.moderatorSourceIds.length > 0 ? (
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            {user.moderatorSourceIds.length} ta tashkilot
+          </p>
+        ) : user.role === "IJROCHI" || user.role === "MODERATOR" ? (
+          <p className="mt-0.5 text-xs font-medium text-amber-700">⚠ Tashkilot biriktirilmagan</p>
+        ) : null}
       </td>
 
       <td className="px-4 py-3" colSpan={2}>
@@ -91,12 +105,12 @@ export function UserRow({
             </select>
 
             <div className="min-w-[200px]">
-              <RegionPicker
-                mode={regionMode(role)}
-                regions={regions}
-                initialRegionId={user.regionId}
-                initialAllRegions={user.allRegions}
-                initialModeratorRegionIds={user.moderatorRegionIds}
+              <SourcePicker
+                mode={sourceMode(role)}
+                sources={sources}
+                initialSourceId={user.sourceId}
+                initialAllSources={user.allSources}
+                initialModeratorSourceIds={user.moderatorSourceIds}
               />
             </div>
 

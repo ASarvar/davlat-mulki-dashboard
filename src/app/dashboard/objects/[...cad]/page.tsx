@@ -58,10 +58,11 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
   // Ikkalasi ham null bo'lsa ham "Bo'sh turgan" (DB'da 11 alohida saqlanmaydi).
   const effectiveCode = p.integrationCategoryCode ?? p.manualCategoryCode ?? 11;
   const isVacant = effectiveCode === 11;
-  const inRegion = user.regionId === p.regionId;
+  // Ijrochi faqat o'z tashkilotining obyektiga so'rov yubora oladi.
+  const inSource = user.sourceId != null && user.sourceId === p.sourceId;
   // IJROCHI → so'rov; ADMIN/SUPER_ADMIN → darhol. MODERATOR'da to'g'ridan-to'g'ri
   // biriktirish huquqi yo'q — u faqat /dashboard/requests'da so'rovlarni ko'rib chiqadi.
-  const canAssign = isVacant && (isAdmin(user.role) || (user.role === "IJROCHI" && inRegion));
+  const canAssign = isVacant && (isAdmin(user.role) || (user.role === "IJROCHI" && inSource));
   const isRequest = user.role === "IJROCHI";
   const pendingRequest = p.changeRequests.find(
     (r) => r.status === "PENDING_MODERATOR" || r.status === "PENDING_RAHBARIYAT",

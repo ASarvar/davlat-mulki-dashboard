@@ -1,20 +1,20 @@
 import type { Role } from "@prisma/client";
 import type { DefaultSession } from "next-auth";
 
-// Session/JWT'ga rol va regionId qo'shamiz (rol-asosidagi ruxsatlar uchun).
+// Session/JWT'ga rol va sourceId qo'shamiz (rol-asosidagi ruxsatlar uchun).
 declare module "next-auth" {
   interface Session {
     user: {
       id: string;
       role: Role;
-      regionId: string | null;
+      sourceId: string | null;
       username: string;
     } & DefaultSession["user"];
   }
 
   interface User {
     role: Role;
-    regionId: string | null;
+    sourceId: string | null;
     username: string;
   }
 }
@@ -22,7 +22,7 @@ declare module "next-auth" {
 declare module "next-auth/jwt" {
   interface JWT {
     role: Role;
-    regionId: string | null;
+    sourceId: string | null;
     username: string;
   }
 }

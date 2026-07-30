@@ -2,7 +2,7 @@
 
 import { revalidatePath, revalidateTag } from "next/cache";
 import { prisma } from "@/lib/prisma";
-import { requireUser, assertRegionWriteAccess } from "@/lib/authz";
+import { requireUser, assertSourceWriteAccess } from "@/lib/authz";
 import { objectHref } from "@/lib/cadastre";
 import { assignManualCategory, removeManualCategory } from "@/server/services/assignment";
 import { triggerSingleSync } from "@/server/queue/enqueue";
@@ -62,15 +62,15 @@ export async function removeCategoryAction(_prev: AssignState, formData: FormDat
   }
 }
 
-// Bitta kadastrni API orqali yangilash (SUPER_ADMIN yoki o'z hududidagi REGION_USER).
+// Bitta kadastrni API orqali yangilash (admin yoki o'z tashkilotidagi foydalanuvchi).
 export async function syncSingleAction(formData: FormData): Promise<void> {
   const user = await requireUser();
   const cadNumber = String(formData.get("cadNumber") ?? "");
   if (!cadNumber) return;
 
-  const property = await prisma.property.findUnique({ where: { cadNumber }, select: { regionId: true } });
+  const property = await prisma.property.findUnique({ where: { cadNumber }, select: { sourceId: true } });
   if (!property) return;
-  await assertRegionWriteAccess(user, property.regionId); // VIEWER/boshqa hudud => xato
+  await assertSourceWriteAccess(user, property.sourceId); // VIEWER/boshqa tashkilot => xato
 
   await triggerSingleSync(cadNumber, user.id);
   revalidatePath(objectHref(cadNumber));

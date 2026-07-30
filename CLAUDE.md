@@ -100,21 +100,40 @@ Faol run bor bo'lsa `assertNoActiveRun()` xato tashlaydi — kunlik ishga tushir
 ### Rollar (6 ta)
 - `SUPER_ADMIN` — hammasi.
 - `ADMIN` — super admin bilan bir xil, lekin super adminni ko'rmaydi/boshqarmaydi.
-- `RAHBARIYAT` — **hamma hudud** (hudud biriktirilmaydi); so'rovni **yakuniy tasdiqlaydi** (2-bosqich);
+- `RAHBARIYAT` — **cheklovsiz**; so'rovni **yakuniy tasdiqlaydi** (2-bosqich);
   9/10 kategoriyani "Bo'sh turgan"ga qaytara oladi (`removeManualCategory`).
-- `MODERATOR` — hamma obyektni ko'radi; biriktirilgan hudud(lar) (`UserRegion` yoki `allRegions`)
-  so'rovlarini **qabul qiladi** (1-bosqich) yoki rad etadi. To'g'ridan-to'g'ri biriktira **olmaydi**.
-- `IJROCHI` (Hudud ijrochisi) — bitta hudud (`regionId`); "Bo'sh turgan" obyektni Yaroqsiz/Chekka'ga
+- `MODERATOR` — hamma obyektni ko'radi; biriktirilgan **tashkilot(lar)** (`UserSource` yoki
+  `allSources`) so'rovlarini **qabul qiladi** (1-bosqich) yoki rad etadi. To'g'ridan-to'g'ri
+  biriktira **olmaydi**.
+- `IJROCHI` — aynan bitta **tashkilot** (`User.sourceId`); "Bo'sh turgan" obyektni Yaroqsiz/Chekka'ga
   biriktirish **so'rovini** yuboradi (darhol emas).
 - `VIEWER` — faqat ko'rish.
 
 ⚠️ Enum `NAZORATCHI` → `IJROCHI` deb qayta nomlangan (migratsiya `20260725120000_rahbariyat_two_stage`).
 Yorliqlar `src/lib/roles.ts` → `ROLE_LABEL` da; kodda rol satrini qo'lda yozmang.
 
+### ⚠️ Foydalanuvchi doirasi — HUDUD emas, TASHKILOT (2026-07-30)
+Migratsiya `20260730120000_user_source_scope`: `User.regionId`→`sourceId`,
+`allRegions`→`allSources`, `UserRegion`→`UserSource`. `authz.ts` → **`userSourceScope()`** va
+**`assertSourceWriteAccess(user, sourceId)`** (`Property.sourceId` majburiy bo'lgani uchun cheklash
+bo'shliqsiz). Rol yorlig'i ham "Hudud ijrochisi"dan **"Ijrochi"**ga o'zgardi.
+
+⚠️ **Hudud va tashkilot — bir-biriga bo'ysunmaydigan ikki o'lchov.** Respublika darajasidagi
+tashkilot (`OrganizationSource.regionId = null` — Direksiya, Agentlik markaziy) obyektlari kadastr
+prefiksi orqali BARCHA hududlarga tarqaladi. Ya'ni bunday tashkilotga biriktirilgan ijrochi bir
+nechta hududdagi obyektni ko'radi — bu kutilgan xulq, xato emas. Shu sabab:
+- rol nomida "hudud" yo'q;
+- `buildWhere()`da hudud endi FAQAT foydalanuvchi tanlaydigan filtr (`f.regionId`), doira emas;
+- obyektlar sahifasida hudud tanlagichi **hamma rolga** ko'rinadi (ilgari IJROCHI'dan yashirilgan edi).
+
+⚠️ Migratsiya mavjud bog'lanishlarni **ko'chirmaydi** (foydalanuvchi qarori) — "hududdagi barcha
+tashkilotlar" deb ko'chirish respublika tashkilotlari obyektlarini yo'qotardi, ularni qo'shish esa
+doirani 14 hududga kengaytirardi. Ijrochi/moderator tashkilotsiz qoladi va **hech narsa ko'rmaydi** —
+`/dashboard/users`da qo'lda biriktiriladi (UserRow'da "⚠ Tashkilot biriktirilmagan" belgisi chiqadi).
+
 **Email YO'Q — `username` (login) + parol.** Ochiq ro'yxatdan o'tish yo'q; userlarni faqat
 SUPER_ADMIN/ADMIN qo'shadi (ADMIN, ADMIN/SUPER_ADMIN yarata olmaydi). Sync/Manbalar/Userlar —
-faqat SUPER_ADMIN+ADMIN. Rol doirasi bir joyda: `authz.ts` → `userRegionScope()`,
-`assertRegionWriteAccess()` (endi **async**). RAHBARIYAT `userRegionScope()`da `null` (cheklovsiz).
+faqat SUPER_ADMIN+ADMIN. RAHBARIYAT `userSourceScope()`da `null` (cheklovsiz).
 
 ### Tasdiqlash workflow — IKKI BOSQICH (`assignment.ts` + `CategoryChangeRequest`)
 ```

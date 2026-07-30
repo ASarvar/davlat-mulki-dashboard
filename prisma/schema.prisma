@@ -38,13 +38,18 @@ model User {
   role         Role    @default(VIEWER)
   isActive     Boolean @default(true)
 
-  // IJROCHI uchun bitta hudud (majburiy, app-level).
-  regionId String?
-  region   Region? @relation(fields: [regionId], references: [id])
+  // ⚠️ Foydalanuvchi doirasi HUDUD emas, TASHKILOT bo'yicha (2026-07-30).
+  // Har bir obyektda `sourceId` majburiy, shuning uchun cheklash aniq va bo'shliqsiz.
+  // Hududiy tashkilotga bog'langan odam amalda faqat o'z hududini ko'radi; respublika
+  // darajasidagi tashkilot (Direksiya, Agentlik markaziy) esa barcha hududlarga tarqaladi.
 
-  // MODERATOR uchun: allRegions=true bo'lsa hamma hudud, aks holda moderatorRegions.
-  allRegions       Boolean      @default(false)
-  moderatorRegions UserRegion[]
+  // IJROCHI uchun aynan bitta tashkilot (majburiy, app-level).
+  sourceId String?
+  source   OrganizationSource? @relation("UserSource1", fields: [sourceId], references: [id])
+
+  // MODERATOR uchun: allSources=true bo'lsa hamma tashkilot, aks holda moderatorSources.
+  allSources       Boolean      @default(false)
+  moderatorSources UserSource[]
 
   documents        Document[]                   @relation("UploadedBy")
   assignments      PropertyCategoryAssignment[] @relation("AssignedBy")
@@ -58,19 +63,19 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([regionId])
+  @@index([sourceId])
   @@index([role])
 }
 
-// MODERATOR ↔ hudud (ko'p-ko'p). allRegions=true bo'lsa bu jadval e'tiborga olinmaydi.
-model UserRegion {
+// MODERATOR ↔ tashkilot (ko'p-ko'p). allSources=true bo'lsa bu jadval e'tiborga olinmaydi.
+model UserSource {
   userId   String
-  regionId String
-  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
-  region   Region @relation(fields: [regionId], references: [id], onDelete: Cascade)
+  sourceId String
+  user     User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  source   OrganizationSource @relation("UserSourceMany", fields: [sourceId], references: [id], onDelete: Cascade)
 
-  @@id([userId, regionId])
-  @@index([regionId])
+  @@id([userId, sourceId])
+  @@index([sourceId])
 }
 
 // ─────────────────────── Hudud & Manba (source) ──────────────────────
@@ -85,9 +90,7 @@ model Region {
   // aynan bitta prefiks, hech qanday chalkashish yo'q.
   cadastrePrefix String?           @unique
   properties      Property[]
-  users           User[]
   sources         OrganizationSource[]
-  moderatorLinks  UserRegion[]
   districts       District[]
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
@@ -131,6 +134,9 @@ model OrganizationSource {
   region     Region?    @relation(fields: [regionId], references: [id])
   isActive   Boolean    @default(true)
   properties Property[]
+  // Foydalanuvchi doirasi shu tashkilotga bog'lanadi (IJROCHI — bitta, MODERATOR — ko'p).
+  ijrochilar User[]       @relation("UserSource1")
+  moderatorLinks UserSource[] @relation("UserSourceMany")
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 

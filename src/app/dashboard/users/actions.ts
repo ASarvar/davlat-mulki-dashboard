@@ -22,11 +22,11 @@ const createSchema = z.object({
 });
 
 // Rolga qarab hudud maydonlarini FormData'dan o'qiydi.
-function readRegions(formData: FormData, role: Role) {
+function readSources(formData: FormData, role: Role) {
   return {
-    regionId: String(formData.get("regionId") ?? "") || null,
-    allRegions: formData.get("allRegions") === "on",
-    moderatorRegionIds: formData.getAll("moderatorRegionIds").map(String).filter(Boolean),
+    sourceId: String(formData.get("sourceId") ?? "") || null,
+    allSources: formData.get("allSources") === "on",
+    moderatorSourceIds: formData.getAll("moderatorSourceIds").map(String).filter(Boolean),
   };
 }
 
@@ -44,7 +44,7 @@ export async function createUserAction(_prev: UserFormState, formData: FormData)
     if (actor.role === "ADMIN" && (parsed.data.role === "ADMIN" || parsed.data.role === "SUPER_ADMIN"))
       return { error: "Admin bu rolni yarata olmaydi" };
 
-    await createUser(actor.id, { ...parsed.data, ...readRegions(formData, parsed.data.role) });
+    await createUser(actor.id, { ...parsed.data, ...readSources(formData, parsed.data.role) });
     revalidatePath("/dashboard/users");
     return { ok: true };
   } catch (err) {
@@ -61,7 +61,7 @@ export async function updateUserAction(_prev: UserFormState, formData: FormData)
 
     if (!userId || !(role in Role)) return { error: "Ma'lumot noto'g'ri" };
 
-    await updateUser(actor.id, { userId, role, isActive, ...readRegions(formData, role) });
+    await updateUser(actor.id, { userId, role, isActive, ...readSources(formData, role) });
     revalidatePath("/dashboard/users");
     return { ok: true };
   } catch (err) {
