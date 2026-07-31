@@ -299,6 +299,33 @@ o'zgartirasiz; SQL'ni takrorlab yozmang.
 sahifasida "Tuman" maydoni, Excel eksportida ustun. Tuman tanlagichi faqat **hudud tanlanganda**
 ko'rinadi — aks holda 205 ta variant bitta ro'yxatga tushib ketardi.
 
+### Obyektlar filtri (`ObjectFilters.tsx`) — uchta qoida
+
+Oddiy GET forma (client JS faqat qulaylik uchun). Tuzilishi: asosiy qator (Kadastr, Soha,
+Tashkilot, Hudud) + "Qo'shimcha" ochiladigan bo'lim (Tuman, Kategoriya, Samaradorlik).
+Barcha `select`lar o'zgarishi bilan darhol yuboriladi; matn maydoni Enter/tugma kutadi.
+
+⚠️ **1. Kaskad filtrlarda ota o'zgarsa, BOLA tozalanishi shart** (`submitResetting`).
+Soha → tashkilot va hudud → tuman juftliklari `buildWhere()`da **AND** bilan birikadi, ya'ni
+eski bola qiymati yangi ota bilan qolib ketsa natija jimgina **bo'sh** chiqadi va sababi
+ekranda ko'rinmaydi.
+
+⚠️ **2. "Qo'shimcha" bo'limi `hidden` bilan yashiriladi, shartli render EMAS.** Yopiq holatda
+ham uning maydonlari DOM'da qolishi kerak — aks holda forma yuborilganda ulardagi qiymatlar
+tushib qolardi.
+
+⚠️ **3. Dashboard'dan kelgan filtrlar** (`onAnyAuction`, `hasRentContract`, `fullyRented`,
+`status`) formada tanlagich sifatida YO'Q — ular **yorliq (chip)** bo'lib chiqadi va
+**yashirin maydon** orqali saqlanadi. GET forma faqat o'z maydonlarini yuboradi, shuning
+uchun yashirin maydonsiz boshqa filtrni o'zgartirgan zahoti bular yo'qolib ketardi.
+
+⚠️ Yangi filtr qo'shsangiz `page.tsx` → `baseParams` ga ham qo'shing — u eksport va
+sahifalash havolalarini quradi (`status` bir marta shu sabab eksportga yetib bormagan edi).
+
+**Tashkilotning qisqa yorlig'i** (`Andijon` / `Respublika` / `Markaziy apparat`) —
+`lib/sourceLabel.ts` → `sourceScopeLabel()`. Ilgari bu qoida 5 joyda takrorlangan edi;
+yangi joyda kerak bo'lsa shu funksiyani chaqiring.
+
 **Dashboard Excel eksporti** — ikki varaq: "Hududlar" va "Tumanlar". Ikkalasini ham
 `services/dashboardExport.ts` → `writeSheet()` quradi (ustunlar bitta `exportCols` massividan),
 shuning uchun yangi ustun ikkala varaqda avtomatik paydo bo'ladi.

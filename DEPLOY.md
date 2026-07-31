@@ -90,6 +90,29 @@ Shu ikki buyruq yetarli:
 
 Downtime ~5–15 soniya.
 
+### ⚠️ "Migrate avtomatik" — faqat SXEMA uchun, MA'LUMOT uchun emas
+
+`docker compose up -d --build` faqat `prisma/migrations/`ni qo'llaydi (jadval/ustun
+o'zgarishlari). Quyidagilar **avtomatik EMAS** — pull qilingan commit'da shulardan biri
+bo'lsa, alohida eslab qo'lda ishga tushiring:
+
+- **`prisma/seed.ts`ga yangi manba/hudud/kategoriya qo'shilgan bo'lsa** — production'da
+  ular hosil bo'lmaydi, chunki `seed` xizmati `--profile setup` ortida (atayin, tasodifiy
+  qayta seed'lashdan himoya uchun). Qo'lda ishga tushiring:
+  ```bash
+  docker compose --profile setup run --rm seed
+  ```
+  Xavfsiz — STIR/kod bo'yicha upsert, mavjud yozuvni qayta yozmaydi, faqat yangisini qo'shadi.
+- **Bir martalik tuzatish skripti** (`prisma/fix-*.ts` kabi) — bunday fayllar reponing
+  o'zida qoladi, lekin hech qachon avtomatik ishga tushmaydi. `migrate` xizmatining
+  image'idan foydalanib qo'lda chaqiring:
+  ```bash
+  docker compose run --rm migrate npx tsx prisma/<fayl-nomi>.ts
+  ```
+- **Umumiy qoida:** migratsiya papkasidan tashqarida `.ts` fayl orqali ma'lumot
+  o'zgartirilsa (seed yoki bir martalik skript), uni push qilgan sessiyada shu haqda
+  ANIQ eslatib o'tish kerak — "faqat kodni pull qiling" degan xulosa yetarli emas.
+
 ### ⚠️ Hech qachon
 
 ```bash

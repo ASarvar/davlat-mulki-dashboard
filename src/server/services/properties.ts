@@ -20,6 +20,8 @@ export interface PropertyFilters {
   syncStatus?: SyncStatus;
   /** Soha = manba nomi ("Ijara markazi", "Sog'liqni saqlash", ...) */
   soha?: string;
+  /** Aniq TASHKILOT (OrganizationSource.id) — soha ichidagi torroq kesim (masalan bitta hudud yoki "Markaziy apparat"). */
+  sourceId?: string;
   /** Ijara shartnomasi bor VA foydali maydon to'liq band (vacantArea = 0). Kategoriyaga bog'liq emas. */
   fullyRented?: boolean;
   /** Ijara shartnomasi bor — tekin foydalanish yoki pullik, ikkisidan biri. Kategoriyaga bog'liq emas. */
@@ -106,6 +108,8 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
 
   // Soha bo'yicha: obyekt qaysi tashkilot manbasiga tegishli.
   if (f.soha) and.push({ source: { name: f.soha } });
+  // Aniq tashkilot (soha ichidagi bitta hudud yoki "Markaziy apparat") — soha filtri bilan AND birikadi.
+  if (f.sourceId) and.push({ sourceId: f.sourceId });
 
   // To'liq ijaraga berilgan — dashboard'dagi mos ustun bilan bir xil mantiq (stats.ts → rentRaw).
   if (f.fullyRented) and.push({ rentContractCount: { gt: 0 }, vacantArea: 0 });

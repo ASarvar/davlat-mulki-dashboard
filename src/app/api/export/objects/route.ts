@@ -36,6 +36,7 @@ export async function GET(req: Request) {
     regionId: myRegionsOnly ? undefined : regionRaw,
     districtId: sp.get("district") || undefined,
     soha: sp.get("soha") || undefined,
+    sourceId: sp.get("tashkilot") || undefined,
     categoryCode: category ? Number(category) : undefined,
     inefficient: inefficient === "1" ? true : inefficient === "0" ? false : undefined,
     syncStatus: statusRaw && statusRaw in SyncStatus ? (statusRaw as SyncStatus) : undefined,

@@ -1,6 +1,7 @@
 import { Users, UserPlus, Search, RotateCcw } from "lucide-react";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { sourceScopeLabel } from "@/lib/sourceLabel";
 import { requireRole, isAdmin } from "@/lib/authz";
 import { listUsers } from "@/server/services/users";
 import { ROLE_LABEL } from "@/lib/roles";
@@ -72,7 +73,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             <option value="">Barchasi</option>
             {sources.map((s) => (
               <option key={s.id} value={s.id}>
-                {s.name} — {s.regionName ?? "Respublika"}
+                {s.name} — {sourceScopeLabel(s.name, s.regionName)}
               </option>
             ))}
           </select>
@@ -139,7 +140,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                     role: u.role,
                     isActive: u.isActive,
                     sourceId: u.source?.id ?? null,
-                    sourceLabel: u.source ? `${u.source.name} — ${u.source.region?.name ?? "Respublika"}` : null,
+                    sourceLabel: u.source
+                      ? `${u.source.name} — ${sourceScopeLabel(u.source.name, u.source.region?.name)}`
+                      : null,
                     allSources: u.allSources,
                     moderatorSourceIds: u.moderatorSources.map((m) => m.sourceId),
                     activityCount: u._count.documents + u._count.assignments + u._count.requestedChanges,

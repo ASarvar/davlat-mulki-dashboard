@@ -2,6 +2,7 @@
 
 import { useActionState } from "react";
 import { Plus, Save, Trash2 } from "lucide-react";
+import { sourceScopeLabel } from "@/lib/sourceLabel";
 import { createSourceAction, updateSourceAction, deleteSourceAction, type SourceState } from "./actions";
 
 export function CreateSourceForm({
@@ -20,7 +21,7 @@ export function CreateSourceForm({
         {/* Bo'sh = respublika darajasi (Agentlik, Direksiya) — obyektlari kadastr
             raqamidan tegishli hududga taqsimlanadi. */}
         <select name="regionId" defaultValue="" className="w-48 rounded-md border border-slate-300 px-2 py-1.5 text-sm">
-          <option value="">Respublika (hududsiz)</option>
+          <option value="">Respublika</option>
           {regions.map((r) => (
             <option key={r.id} value={r.id}>
               {r.name}
@@ -93,7 +94,11 @@ export function SourceRow({ source }: { source: SourceRowData }) {
   return (
     <tr className="border-b border-border last:border-0">
       <td className="px-4 py-3 align-top">
-        {source.regionName ?? <span className="text-muted-foreground">Respublika</span>}
+        {source.regionName ?? (
+          <span className="text-muted-foreground">
+            {sourceScopeLabel(source.name, null)}
+          </span>
+        )}
       </td>
       <td className="px-4 py-3" colSpan={3}>
         {/* Ikkala forma bitta flex qatorda — o'chirish tugmasi saqlashdan darhol keyin turadi. */}

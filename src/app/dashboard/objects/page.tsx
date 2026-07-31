@@ -5,13 +5,14 @@ import { SyncStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authz";
 import { listProperties, PROPERTY_PAGE_SIZE, type PropertyFilters } from "@/server/services/properties";
-import { listSourceNames } from "@/server/services/sources";
+import { listSourceNames, listSources } from "@/server/services/sources";
 import { listDistricts } from "@/server/services/districts";
 import { CAT_HAS_VACANT_AREA } from "@/server/services/classification";
 import { objectHref } from "@/lib/cadastre";
+import { sourceScopeLabel } from "@/lib/sourceLabel";
 import { CategoryBadge, InefficientBadge, SyncStatusBadge } from "@/components/badges";
 import { Pagination } from "@/components/Pagination";
-import { ObjectFilters } from "./ObjectFilters";
+import { ObjectFilters, type FilterChip } from "./ObjectFilters";
 
 type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -27,6 +28,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   const region = myRegionsOnly ? undefined : regionRaw;
   const district = str(sp.district) || undefined;
   const soha = str(sp.soha) || undefined;
+  const tashkilot = str(sp.tashkilot) || undefined;
   const categoryStr = str(sp.category);
   const inefficientStr = str(sp.inefficient);
   const fullyRentedStr = str(sp.fullyRented);
@@ -41,6 +43,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     regionId: region,
     districtId: district,
     soha,
+    sourceId: tashkilot,
     categoryCode: categoryStr ? Number(categoryStr) : undefined,
     inefficient: inefficientStr === "1" ? true : inefficientStr === "0" ? false : undefined,
     syncStatus,
@@ -53,38 +56,64 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   // "Bo'sh maydoni bor" (kat 12) filtri tanlansa, maydon ustunida bo'sh maydon ko'rsatiladi.
   const showVacant = filters.categoryCode === CAT_HAS_VACANT_AREA;
 
-  // Hudud endi DOIRA emas, oddiy filtr — shuning uchun hammaga ko'rsatiladi. IJROCHI
-  // uchun ham foydali: respublika darajasidagi tashkilotga (Direksiya, Agentlik markaziy)
-  // biriktirilgan bo'lsa obyektlari barcha hududlarga tarqalgan bo'ladi.
-  const canFilterRegion = true;
   // MODERATOR "Faqat mening tashkilotlarim" bilan o'ziga biriktirilganlar bo'yicha
   // saralay oladi (myRegionsOnly, buildWhere()da qo'llanadi).
   const showMyRegionsToggle = user.role === "MODERATOR";
   // Tuman tanlagichi tanlangan HUDUDGA bog'liq: hudud tanlanmasa 205 ta tuman
   // bitta ro'yxatda chiqib, foydasiz bo'lardi.
-  const districtRegionId = region;
-  const [regions, districts, sohaList, result] = await Promise.all([
-    canFilterRegion
-      ? prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } })
-      : Promise.resolve([]),
-    districtRegionId ? listDistricts(districtRegionId) : Promise.resolve([]),
+  const [regions, districts, sohaList, sohaSources, result] = await Promise.all([
+    // Hudud endi DOIRA emas, oddiy filtr — hammaga ko'rsatiladi. IJROCHI uchun ham
+    // foydali: respublika darajasidagi tashkilotga biriktirilgan bo'lsa obyektlari
+    // barcha hududlarga tarqalgan bo'ladi.
+    prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
+    region ? listDistricts(region) : Promise.resolve([]),
     listSourceNames(),
+    // Tashkilot tanlagichi tanlangan SOHAGA bog'liq — soha bo'lmasa hamma manba bitta
+    // ro'yxatda chiqib, foydasiz bo'lardi (xuddi tuman/hudud kabi).
+    soha ? listSources({ name: soha }) : Promise.resolve([]),
     listProperties(user, filters, requestedPage),
   ]);
 
+  const orgs = sohaSources.map((s) => ({
+    id: s.id,
+    label: sourceScopeLabel(s.name, s.region?.name),
+  }));
+
   // Joriy filtrlar (eksport va sahifalash uchun umumiy).
+  // ⚠️ Bu yerga QO'SHILMAGAN param eksport va sahifalashda yo'qoladi — yangi filtr
+  // qo'shsangiz shu ro'yxatni ham yangilang (`status` bir marta shu sabab tushib qolgan edi).
   const baseParams = new URLSearchParams();
   if (q) baseParams.set("q", q);
   if (regionRaw) baseParams.set("region", regionRaw);
   if (district) baseParams.set("district", district);
   if (soha) baseParams.set("soha", soha);
+  if (tashkilot) baseParams.set("tashkilot", tashkilot);
   if (categoryStr) baseParams.set("category", categoryStr);
   if (inefficientStr) baseParams.set("inefficient", inefficientStr);
   if (fullyRentedStr) baseParams.set("fullyRented", fullyRentedStr);
   if (hasRentContractStr) baseParams.set("hasRentContract", hasRentContractStr);
   if (onAnyAuctionStr) baseParams.set("onAnyAuction", onAnyAuctionStr);
+  if (syncStatus) baseParams.set("status", syncStatus);
 
   const exportHref = `/api/export/objects?${baseParams.toString()}`;
+
+  // Dashboard'dan kelgan maxsus filtrlar — formada tanlagich sifatida yo'q, yorliq
+  // (chip) ko'rinishida chiqadi. `removeHref` — faqat shu filtrni olib tashlaydigan URL.
+  const hrefWithout = (key: string) => {
+    const params = new URLSearchParams(baseParams);
+    params.delete(key);
+    const qs = params.toString();
+    return qs ? `/dashboard/objects?${qs}` : "/dashboard/objects";
+  };
+  const chips: FilterChip[] = [];
+  if (onAnyAuctionStr === "1")
+    chips.push({ key: "onAnyAuction", value: "1", label: "Auksion savdolarida", removeHref: hrefWithout("onAnyAuction") });
+  if (hasRentContractStr === "1")
+    chips.push({ key: "hasRentContract", value: "1", label: "Ijaraga berilgan", removeHref: hrefWithout("hasRentContract") });
+  if (fullyRentedStr === "1")
+    chips.push({ key: "fullyRented", value: "1", label: "To'liq ijara berilgan", removeHref: hrefWithout("fullyRented") });
+  if (syncStatus)
+    chips.push({ key: "status", value: syncStatus, label: `Sinxronizatsiya: ${syncStatus}`, removeHref: hrefWithout("status") });
 
   // Sahifa havolasi — filtrlarni saqlab, faqat `page` ni almashtiradi.
   const hrefFor = (p: number) => {
@@ -118,9 +147,12 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
         regions={regions}
         districts={districts}
         sohaList={sohaList}
-        canFilterRegion={canFilterRegion}
+        orgs={orgs}
         showMyRegionsToggle={showMyRegionsToggle}
-        current={{ q, region: regionRaw, district, soha, category: categoryStr, inefficient: inefficientStr }}
+        chips={chips}
+        total={result.total}
+        clearHref="/dashboard/objects"
+        current={{ q, region: regionRaw, district, soha, tashkilot, category: categoryStr, inefficient: inefficientStr }}
       />
 
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">

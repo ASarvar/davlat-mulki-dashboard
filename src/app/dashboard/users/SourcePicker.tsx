@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { sourceScopeLabel } from "@/lib/sourceLabel";
 
 type Mode = "single" | "multi" | "none";
 
@@ -14,10 +15,9 @@ export interface SourceOption {
   regionName: string | null;
 }
 
-// Ro'yxatda ko'rinadigan nom: hududiy tashkilot uchun hudud yetarli va qisqa,
-// respublika darajasidagilar aniq belgilanadi.
+// Yorliq qoidasi markazlashtirilgan (lib/sourceLabel.ts) — bu yerda takrorlanmaydi.
 function optionLabel(s: SourceOption): string {
-  return s.regionName ?? "Respublika";
+  return sourceScopeLabel(s.name, s.regionName);
 }
 
 function groupBySoha(sources: SourceOption[]): [string, SourceOption[]][] {

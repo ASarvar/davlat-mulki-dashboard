@@ -412,7 +412,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-sm">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <SectionTitle icon={Tags}>
-            Davlat obyektlaridan foydalanish markazi balansidagi obyektlar
+            {soha ? `${soha} balansidagi obyektlar` : "Davlat mulki balansidagi obyektlar"}
           </SectionTitle>
           <a
             href={`/api/export/dashboard-categories${sohaParam ? `?${sohaParam}` : ""}`}
