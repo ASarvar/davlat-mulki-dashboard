@@ -102,9 +102,15 @@ Faol run bor bo'lsa `assertNoActiveRun()` xato tashlaydi — kunlik ishga tushir
 - `ADMIN` — super admin bilan bir xil, lekin super adminni ko'rmaydi/boshqarmaydi.
 - `RAHBARIYAT` — **cheklovsiz**; so'rovni **yakuniy tasdiqlaydi** (2-bosqich);
   9/10 kategoriyani "Bo'sh turgan"ga qaytara oladi (`removeManualCategory`).
-- `MODERATOR` — hamma obyektni ko'radi; biriktirilgan **tashkilot(lar)** (`UserSource` yoki
-  `allSources`) so'rovlarini **qabul qiladi** (1-bosqich) yoki rad etadi. To'g'ridan-to'g'ri
-  biriktira **olmaydi**.
+- `MODERATOR` — **KO'RISHDA cheklanmaydi** (kuzatuvchi kabi hamma obyekt, so'rovlar tarixi va
+  dashboard); biriktirilgan **tashkilot(lar)** (`UserSource` yoki `allSources`) so'rovlarini
+  **qabul qiladi** (1-bosqich) yoki rad etadi. To'g'ridan-to'g'ri biriktira **olmaydi**.
+  ⚠️ **Ko'rish va tasdiqlash doiralari AJRALGAN** (2026-07-31): tashkilot doirasi faqat
+  `listPendingRequests()` + `assertSourceWriteAccess()` da qo'llanadi. Dashboardda esa u
+  **standart tanlov** — sahifa parametrsiz ochilganda o'z tashkiloti ko'rinadi (tumanlar
+  kesimida), "Manba" tugmalaridan boshqasini tanlasa cheklov bekor bo'ladi. Qaytish uchun
+  moderatorga **"Mening tashkilotim"** tugmasi ko'rsatiladi (`SourceFilter` → `showOwn`).
+  `IJROCHI` uchun esa doira **qat'iy** — u boshqa tashkilotni umuman ko'ra olmaydi.
 - `IJROCHI` — aynan bitta **tashkilot** (`User.sourceId`); "Bo'sh turgan" obyektni Yaroqsiz/Chekka'ga
   biriktirish **so'rovini** yuboradi (darhol emas).
 - `VIEWER` — faqat ko'rish.
@@ -196,16 +202,30 @@ sozlanadi (`API3_PARAM`, `API4_PARAM`, `API5_PARAM`). API 1 da javobda `inn`, so
   Shuning uchun "savdoda" kategoriyasi haqiqiy `lotNumber` talab qiladi.
 - **API 4:** parametr o'qilmasa `result` o'ramisiz `{result_msg:"Xatolik", result_code:0}` qaytadi —
   ya'ni `result_code === 0` muvaffaqiyat kafolati emas, `result.order` borligini ham tekshirish shart.
-- **API 2 maydonlari:** `area` ← `object_area_p` (**binoning umumiy maydoni**),
-  `buildingArea` ← `object_area_u` (**foydali maydon**).
+- **API 2 maydonlari:** `area` ← **binoning umumiy maydoni**, `buildingArea` ← `object_area_u`
+  (**foydali maydon**). Ikkalasi ham `src/lib/area.ts` orqali o'qiladi — **yagona joy**:
+  `totalBuildingArea()` / `usefulArea()`.
+  ⚠️ **Umumiy maydon zanjiri:** `object_area_p` → `object_area` → `land_area` → `land_area_i`
+  (foydalanuvchi qoidasi, 2026-07-31). **`0` ham "qiymat yo'q"** deb qaraladi — jonli API
+  bo'sh maydonni `null` emas, `0` qilib qaytaradi, shuning uchun oddiy `??` YETARLI EMAS.
+  Jonli o'lchov (5500 obyekt): 3026 `object_area_p`, 68 `object_area`, **2333 `land_area`**,
+  70 `land_area_i`, faqat 3 tasida hammasi 0. Ya'ni obyektlarning ~44% shu zanjirga tayanadi.
+  ⚠️ **Yorliq manbaga bog'liq:** qiymat `land_area`/`land_area_i` dan olinsa obyekt aslida
+  bino emas, shuning uchun obyekt sahifasida **"Umumiy maydoni"** deb yoziladi (aks holda
+  "Binoning umumiy maydoni"). Qoida `totalAreaLabel()` da; `totalBuildingAreaWithSource()`
+  qiymat bilan birga manbani ham qaytaradi.
+  ⚠️ **Foydali maydonga (`object_area_u`) zanjir QO'LLANMAYDI** — atayin: `vacantArea`
+  (= foydali − ijarada) shunga tayanadi, unga `land_area` qo'shilsa dashboarddagi
+  "Bo'sh maydon" ustunlari ham o'zgarib ketadi. 2528 obyektda `object_area_u = 0`.
   ⚠️ Shartnoma maydoni foydali maydondan katta bo'lsa (obyekt aslida yer uchastkasi) — ikkala ustun
   ham `land_area` dan olinadi. Real ma'lumotda 84 holatdan 81 tasi shu bilan tuzaldi, 13 tasida
   `land_area` ham yetarli emas. `Property.vacantArea` = `GREATEST(foydali − ijarada, 0)` ustun sifatida
   saqlanadi (Prisma ikki ustunni solishtira olmaydi, filtr uchun kerak).
   ⚠️ Obyekt sahifasida (`/dashboard/objects/[...cad]`) "Binoning umumiy maydoni"/"Foydali maydon"
-  `Property.area`/`buildingArea` emas, `rawApi2.object_area_p`/`object_area_u`dan **to'g'ridan-to'g'ri**
-  o'qiladi — chunki DB ustunlari yuqoridagi `land_area` tuzatishi bilan almashtirilgan bo'lishi mumkin,
-  bu yerda esa API 2 ning xom qiymati ko'rsatilishi kerak. Karta ostidagi "Barcha kadastr ma'lumotlari"
+  `Property.area`/`buildingArea` emas, `rawApi2`dan — lekin **AYNAN o'sha `lib/area.ts`
+  funksiyalari** bilan (DB ustuni faqat zaxira). Ilgari sahifa o'z mantiqini yozgan va `??`
+  ishlatgani uchun `0` ni "bor" deb qabul qilardi — ro'yxatda 294 m², sahifada 0 m² chiqishi
+  mumkin edi. Endi ikkalasi bitta manbadan. Karta ostidagi "Barcha kadastr ma'lumotlari"
   kengaytmasi (`CadastreRawData.tsx`) barcha `land_area*`/`object_area*` maydonlarini xom holda
   ko'rsatadi — suffikslar (`_i`, `_b`, `_f`, `_z`, `_d`, `_bd`, `_nz`, `_legal`) ma'nosi jonli javobda
   hujjatlashtirilmagan, shuning uchun taxmin qilib nomlanmagan.
@@ -334,6 +354,12 @@ obyektlar (API 2 da `district_id` yo'q, hozir 2 ta) u yerga kirmaydi.
 ⚠️ `buildDashboardWorkbook()` ma'lumotni o'zi olmaydi — chaqiruvchi beradi. Sabab: route keshlangan
 `getDashboardStats()` ni ishlatadi, lekin `unstable_cache` Next so'rov konteksti tashqarisida
 yiqiladi, ya'ni skript/sinovdan chaqirib bo'lmasdi.
+
+### Kadastrni tekshirish (`/dashboard/cadastre-check`) — faqat admin
+Kadastr raqami bo'yicha **API 2 ga jonli so'rov** yuborib, xom javobni JSON ko'rinishida
+ko'rsatadi (jonli javobda ~66 maydon). Diagnostika vositasi — **bazaga hech narsa yozmaydi**;
+obyektni yangilash uchun obyekt sahifasidagi "API orqali yangilash" yoki Sinxronizatsiya
+ishlatiladi. `API2_BASE_URL` sozlanmagan bo'lsa ogohlantirish chiqadi.
 
 ### Manba (soha) kesimi — `?soha=`
 ⚠️ `OrganizationSource`da **ikkita nom** bor, aralashtirmang:

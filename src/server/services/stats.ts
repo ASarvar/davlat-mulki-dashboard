@@ -2,6 +2,7 @@ import { unstable_cache } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { CATEGORIES } from "@/lib/categories";
+import { sourceScopeLabel } from "@/lib/sourceLabel";
 
 export interface RegionStat {
   regionId: string;
@@ -100,6 +101,13 @@ export interface DashboardStats {
   byCategory: CategoryStat[];
   /** Hudud × kategoriya jadvali (JAMI qatori UI'da hisoblanadi). */
   byRegionCategory: RegionCategoryRow[];
+  /**
+   * Respublika darajasidagi (regionId=null) tashkilotlarning `byRegion`/`byRegionCategory`
+   * OXIRIGA qo'shilgan qatorlari — `regionId` maydonida haqiqiy hudud EMAS, balki
+   * `OrganizationSource.id` turadi. UI shu ro'yxat orqali ularni haqiqiy hududlardan
+   * ajratadi (tuman ochish o'chiriladi, drill-down "region=" o'rniga "tashkilot=" ishlatadi).
+   */
+  nationalOrgIds: string[];
 }
 
 // DIQQAT: unstable_cache natijani serializatsiya qiladi — faqat oddiy tiplar.
@@ -160,6 +168,23 @@ function sourceWhere(scope: StatsScope): Prisma.PropertyWhereInput {
   if (scope.sourceName) and.push({ source: { name: scope.sourceName } });
   if (scope.sourceIds != null) and.push({ sourceId: { in: scope.sourceIds } });
   return and.length ? { AND: and } : {};
+}
+
+/**
+ * Doira ichidagi RESPUBLIKA darajasidagi (regionId=null) tashkilotlar — masalan
+ * "Davlat aktivlari agentligi"ning markaziy tashkiloti yoki "Direksiya". Ularning
+ * obyektlari kadastr prefiksi orqali istalgan hududga tarqalgan bo'lishi mumkin —
+ * shuning uchun hudud jadvalida ALOHIDA qator sifatida ko'rsatiladi (hech qanday
+ * hudud qatoriga QO'SHILMAYDI, aks holda qaysi hisob qayerdan kelgani ko'rinmay qolardi).
+ */
+async function nationalOrgRows(scope: StatsScope): Promise<{ id: string; name: string }[]> {
+  const where: Prisma.OrganizationSourceWhereInput = { regionId: null };
+  if (scope.sourceName) where.name = scope.sourceName;
+  if (scope.sourceIds != null) {
+    if (scope.sourceIds.length === 0) return [];
+    where.id = { in: scope.sourceIds };
+  }
+  return prisma.organizationSource.findMany({ where, select: { id: true, name: true } });
 }
 
 function categoryCountRows(groupCol: Prisma.Sql, cond: Prisma.Sql) {
@@ -357,7 +382,13 @@ export async function computeDistrictRentStats(
   regionId: string,
   scope: StatsScope = {},
 ): Promise<RegionStat[]> {
-  const srcCond = sourceCond(scope, Prisma.sql`p."sourceId"`);
+  const baseCond = sourceCond(scope, Prisma.sql`p."sourceId"`);
+  // Respublika darajasidagi tashkilotlar bu yerda ham chiqarib tashlanadi —
+  // districtRows() bilan bir xil printsip (computeDashboardStats izohiga qarang).
+  const natIds = (await nationalOrgRows(scope)).map((o) => o.id);
+  const srcCond = natIds.length
+    ? Prisma.sql`${baseCond} AND p."sourceId" NOT IN (${Prisma.join(natIds)})`
+    : baseCond;
   const rows = await groupTotalsRows({
     table: Prisma.sql`"District"`,
     joinOn: Prisma.sql`p."districtId" = g.id`,
@@ -377,7 +408,15 @@ export async function computeDistrictRentStats(
  * tuzilma ham bir xil (`RegionCategoryRow`). Obyekti yo'q tumanlar ham ro'yxatda qoladi (0 bilan).
  */
 async function districtRows(regionId: string | undefined, scope: StatsScope) {
-  const srcPart = Prisma.sql`AND ${sourceCond(scope, Prisma.sql`p."sourceId"`)}`;
+  // Respublika darajasidagi tashkilotlar (agar bor bo'lsa) hudud/tuman kesimidan
+  // butunlay chiqarilgan (computeDashboardStats bilan bir xil printsip) — ularning
+  // sonlari dashboard'da alohida "Markaziy apparat"/"Respublika" qatorida ko'rinadi.
+  const natIds = (await nationalOrgRows(scope)).map((o) => o.id);
+  const baseCond = sourceCond(scope, Prisma.sql`p."sourceId"`);
+  const condExNat = natIds.length
+    ? Prisma.sql`${baseCond} AND p."sourceId" NOT IN (${Prisma.join(natIds)})`
+    : baseCond;
+  const srcPart = Prisma.sql`AND ${condExNat}`;
   const regionPart = regionId ? Prisma.sql`AND p."regionId" = ${regionId}` : Prisma.empty;
   const cond = Prisma.sql`p."districtId" IS NOT NULL ${regionPart} ${srcPart}`;
   const groupCol = Prisma.sql`p."districtId"`;
@@ -444,6 +483,15 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
   // Alias'siz variant (CTE va oddiy FROM "Property" uchun).
   const srcCondNoAlias = sourceCond(scope, Prisma.sql`"sourceId"`);
 
+  // Respublika darajasidagi tashkilotlar (masalan "Davlat aktivlari agentligi"ning
+  // markaziy tashkiloti) — ularning obyektlari HECH QANDAY hudud qatoriga
+  // qo'shilmaydi, o'z alohida qatorida ko'rsatiladi (pastda).
+  const natOrgs = await nationalOrgRows(scope);
+  const natIds = natOrgs.map((o) => o.id);
+  const regionSrcCond = natIds.length
+    ? Prisma.sql`${srcCond} AND p."sourceId" NOT IN (${Prisma.join(natIds)})`
+    : srcCond;
+
   const [total, synced, pending, failed, regionRows, byCategoryRaw] = await Promise.all([
     prisma.property.count({ where: srcWhere }),
     prisma.property.count({ where: { syncStatus: "SYNCED", ...srcWhere } }),
@@ -457,7 +505,7 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
       groupExtra: Prisma.sql`, g."sortOrder"`,
       order: Prisma.sql`g."sortOrder", g.name`,
       where: Prisma.sql`TRUE`,
-      srcCond: srcCond,
+      srcCond: regionSrcCond,
     }),
     prisma.$queryRaw<{ code: number | null; count: number }[]>(Prisma.sql`
       SELECT COALESCE("integrationCategoryCode", "manualCategoryCode", 11) AS code,
@@ -483,26 +531,64 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
   // olish xavfsiz va HAR DOIM jadval bilan mos keladi.
   const inefficient = byCategoryRaw.find((c) => c.code === 11)?.count ?? 0;
 
-  // Hudud × kategoriya (effektiv kategoriya bo'yicha).
-  const regionCategoryRaw = await categoryCountRows(Prisma.sql`p."regionId"`, srcCond);
+  // Hudud × kategoriya (effektiv kategoriya bo'yicha) — respublika darajasidagilarsiz.
+  const regionCategoryRaw = await categoryCountRows(Prisma.sql`p."regionId"`, regionSrcCond);
 
   // Ijara xususiyati bo'yicha kesim — kategoriyaga BOG'LIQ EMAS.
   // "Bo'sh maydon" = foydali maydon (buildingArea) − ijaraga berilgan (rentTotalArea).
   // Ijara xususiyati bo'yicha kesim — hudud bo'yicha (tuman kesimi ham shu funksiyani ishlatadi).
-  const rentRaw = await rentBreakdownRows(Prisma.sql`p."regionId"`, srcCond);
+  const rentRaw = await rentBreakdownRows(Prisma.sql`p."regionId"`, regionSrcCond);
 
-  const byRegion: RegionStat[] = regionRows.map(toRegionStat);
+  // Respublika darajasidagi tashkilotlar — bir XIL mantiq, lekin guruh ustuni
+  // `p."sourceId"` (`OrganizationSource.id`), hudud emas.
+  let nationalRegionStats: RegionStat[] = [];
+  let nationalCategoryRows: RegionCategoryRow[] = [];
+  if (natIds.length > 0) {
+    const natCond = Prisma.sql`${srcCond} AND p."sourceId" IN (${Prisma.join(natIds)})`;
+    const [natTotalsRaw, natCatRaw, natRentRaw] = await Promise.all([
+      groupTotalsRows({
+        table: Prisma.sql`"OrganizationSource"`,
+        joinOn: Prisma.sql`p."sourceId" = g.id`,
+        sortExpr: Prisma.sql`0`,
+        groupExtra: Prisma.empty,
+        order: Prisma.sql`g.name`,
+        where: Prisma.sql`g.id IN (${Prisma.join(natIds)})`,
+        srcCond: srcCond,
+      }),
+      categoryCountRows(Prisma.sql`p."sourceId"`, natCond),
+      rentBreakdownRows(Prisma.sql`p."sourceId"`, natCond),
+    ]);
+    const natCounts = countsByGid(natCatRaw);
+    const natRentByGid = new Map(natRentRaw.filter((r) => r.gid != null).map((r) => [r.gid as string, r]));
+    const labelById = new Map(natOrgs.map((o) => [o.id, sourceScopeLabel(o.name, null)]));
 
-  // Hudud × kategoriya jadvalini yig'amiz (hududlar tartibi saqlanadi).
+    nationalRegionStats = natTotalsRaw.map((r) => ({
+      ...toRegionStat(r),
+      name: labelById.get(r.id) ?? r.name,
+    }));
+    nationalCategoryRows = natTotalsRaw.map((r) =>
+      buildRow(r.id, labelById.get(r.id) ?? r.name, natCounts.get(r.id) ?? {}, natRentByGid.get(r.id)),
+    );
+  }
+
+  const byRegion: RegionStat[] = [...regionRows.map(toRegionStat), ...nationalRegionStats];
+
+  // Hudud × kategoriya jadvalini yig'amiz (hududlar tartibi saqlanadi, so'ng
+  // respublika darajasidagi qatorlar OXIRIGA qo'shiladi).
   // Qator tuzilishi tuman kesimi bilan BIR XIL — `buildRow` ikkalasiga xizmat qiladi.
   const countsByRegion = countsByGid(regionCategoryRaw);
   const rentByRegion = new Map(rentRaw.filter((r) => r.gid != null).map((r) => [r.gid as string, r]));
 
-  const byRegionCategory: RegionCategoryRow[] = byRegion.map((r) =>
-    buildRow(r.regionId, r.name, countsByRegion.get(r.regionId) ?? {}, rentByRegion.get(r.regionId)),
-  );
+  const byRegionCategory: RegionCategoryRow[] = [
+    ...regionRows.map((r) =>
+      buildRow(r.id, r.name, countsByRegion.get(r.id) ?? {}, rentByRegion.get(r.id)),
+    ),
+    ...nationalCategoryRows,
+  ];
 
-  // JAMI — hududlar yig'indisi (foiz alohida hisoblanadi, o'rtacha emas).
+  // JAMI — hududlar + respublika darajasidagi qatorlar yig'indisi (foiz alohida
+  // hisoblanadi, o'rtacha emas). Umumiy son o'zgarmaydi — faqat qayerda hisoblanishi
+  // (hudud qatorimi, "Markaziy apparat" qatorimi) aniqroq bo'ladi.
   const sum = (f: (s: RegionStat) => number) => byRegion.reduce((a, s) => a + f(s), 0);
   const totalObjects = sum((s) => s.total);
   const totalRented = sum((s) => s.rentedObjects);
@@ -525,6 +611,7 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
     byRegion,
     byCategory: byCategoryRaw.map((c) => ({ code: c.code, count: Number(c.count) })),
     byRegionCategory,
+    nationalOrgIds: natIds,
   };
 }
 
@@ -532,7 +619,7 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
 // `scope` argumenti kesh kalitiga avtomatik kiradi — ya'ni har bir soha VA har bir
 // rol doirasi (sourceIds) o'z keshiga ega bo'ladi. ⚠️ Shuning uchun doirani argument
 // sifatida uzatish shart: keshdan boshqa foydalanuvchining natijasi qaytmasligi kerak.
-export const getDashboardStats = unstable_cache(computeDashboardStats, ["dashboard-stats-v8"], {
+export const getDashboardStats = unstable_cache(computeDashboardStats, ["dashboard-stats-v9"], {
   tags: ["dashboard"],
   revalidate: 60,
 });

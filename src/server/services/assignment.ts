@@ -342,7 +342,8 @@ export async function listPendingRequests(user: SessionUser, filters: RequestFil
 /**
  * So'rovlar TARIXI — har bir rol uchun, o'z doirasida:
  *  - IJROCHI   → faqat o'zi yuborgan so'rovlar
- *  - MODERATOR → biriktirilgan hudud(lar)idagi so'rovlar
+ *  - MODERATOR → CHEKLANMAYDI (kuzatuvchi kabi hammasini ko'radi; tashkilot doirasi
+ *    faqat tasdiqlashda qo'llanadi)
  *  - RAHBARIYAT / ADMIN / SUPER_ADMIN / VIEWER → hammasi
  * Kutilayotganlar ham kiradi (ijrochi o'z so'rovi qayerda turganini ko'rishi kerak).
  */
@@ -353,11 +354,11 @@ export async function listRequestHistory(
 ) {
   const and: Prisma.CategoryChangeRequestWhereInput[] = [];
 
+  // ⚠️ MODERATOR tarixda CHEKLANMAYDI (foydalanuvchi qarori, 2026-07-31) — u kuzatuvchi
+  // kabi barcha so'rovlarni ko'radi. Uning tashkilot doirasi faqat TASDIQLASHGA taalluqli
+  // (`listPendingRequests` + `assertSourceWriteAccess`), ko'rishga emas.
   if (user.role === "IJROCHI") {
     and.push({ requestedById: user.id });
-  } else if (user.role === "MODERATOR") {
-    const scope = await userSourceScope(user);
-    if (scope !== null) and.push({ property: { sourceId: { in: scope } } });
   }
 
   if (filters.regionId) and.push({ property: { regionId: filters.regionId } });

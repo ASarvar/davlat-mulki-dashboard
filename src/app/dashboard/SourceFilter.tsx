@@ -6,11 +6,31 @@ import { Layers3 } from "lucide-react";
 // unga qaytishning umuman yo'li bo'lmasdi.
 export const ALL_SOHA = "__all__";
 
-// Manba (soha) kesimi tanlagichi. Oddiy havolalar — client JS kerak emas.
-// "Hammasi" = umumiy statistika, qolganlari = alohida manba bo'yicha.
-export function SourceFilter({ names, current }: { names: string[]; current?: string }) {
+/** MODERATOR'ning standart doirasi (o'z tashkiloti) — parametrsiz `/dashboard`. */
+export const OWN_SOHA = "__own__";
+
+/**
+ * Manba (soha) kesimi tanlagichi. Oddiy havolalar — client JS kerak emas.
+ *
+ * ⚠️ Qaysi tugma faol ekani SERVERDA hisoblanadi (`activeKey`) — bu yerda emas.
+ * Sabab: "Mening tashkilotim" ham, "Hammasi" ham natijada `soha = undefined` beradi,
+ * ya'ni faqat `soha` qiymatidan ularni ajratib bo'lmaydi. Qoidani ikki joyda
+ * takrorlamaslik uchun tayyor kalit uzatiladi.
+ *
+ * `showOwn` — MODERATOR uchun: uning standart doirasi parametrsiz URL'da yashaydi,
+ * shuning uchun boshqa sohaga o'tgandan keyin qaytish uchun alohida tugma kerak.
+ */
+export function SourceFilter({
+  names,
+  activeKey,
+  showOwn = false,
+}: {
+  names: string[];
+  activeKey: string;
+  showOwn?: boolean;
+}) {
   // Bitta manba bo'lsa tanlashning ma'nosi yo'q — ko'rsatmaymiz.
-  if (names.length < 2) return null;
+  if (names.length < 2 && !showOwn) return null;
 
   // Tartib: "Ijara markazi" har doim birinchi (asosiy manba), qolganlari o'z tartibida,
   // "Hammasi" esa oxirida.
@@ -19,9 +39,11 @@ export function SourceFilter({ names, current }: { names: string[]; current?: st
     if (b === "Ijara markazi") return 1;
     return 0;
   });
-  const items: { label: string; value?: string }[] = [
-    ...ordered.map((n) => ({ label: n, value: n })),
-    { label: "Hammasi" },
+
+  const items: { key: string; label: string; href: string }[] = [
+    ...(showOwn ? [{ key: OWN_SOHA, label: "Mening tashkilotim", href: "/dashboard" }] : []),
+    ...ordered.map((n) => ({ key: n, label: n, href: `/dashboard?soha=${encodeURIComponent(n)}` })),
+    { key: ALL_SOHA, label: "Hammasi", href: `/dashboard?soha=${ALL_SOHA}` },
   ];
 
   return (
@@ -32,11 +54,11 @@ export function SourceFilter({ names, current }: { names: string[]; current?: st
       </span>
       <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-card p-1 shadow-sm">
         {items.map((it) => {
-          const active = current === it.value || (!current && !it.value);
+          const active = it.key === activeKey;
           return (
             <Link
-              key={it.label}
-              href={`/dashboard?soha=${encodeURIComponent(it.value ?? ALL_SOHA)}`}
+              key={it.key}
+              href={it.href}
               className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
                 active ? "text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
               }`}

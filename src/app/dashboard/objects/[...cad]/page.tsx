@@ -17,6 +17,7 @@ import { lotUrl } from "@/server/integrations/auction";
 import { requireUser, isAdmin } from "@/lib/authz";
 import { getPropertyDetail } from "@/server/services/properties";
 import { pathToCad } from "@/lib/cadastre";
+import { totalBuildingAreaWithSource, totalAreaLabel, usefulArea } from "@/lib/area";
 import { CATEGORY_BY_CODE } from "@/lib/categories";
 import { CategoryBadge, InefficientBadge, SyncStatusBadge } from "@/components/badges";
 import { AssignCategoryForm } from "./AssignCategoryForm";
@@ -75,17 +76,19 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
   const canRemoveCategory =
     (effectiveCode === 9 || effectiveCode === 10) && (isAdmin(user.role) || user.role === "RAHBARIYAT");
 
-  // "Binoning umumiy maydoni" / "Foydali maydon" — API 2 xom javobidan to'g'ridan-to'g'ri
-  // (object_area_p / object_area_u), Property.area/buildingArea emas: bu ustunlar
-  // ba'zan land_area bilan qayta hisoblanadi (CLAUDE.md — "Maydon tuzatish").
+  // "Binoning umumiy maydoni" / "Foydali maydon" — API 2 xom javobidan, `lib/area.ts`
+  // dagi AYNAN o'sha mantiq bilan (parser ham shuni ishlatadi, ya'ni ro'yxat va bu
+  // sahifa hech qachon farqli son ko'rsatmaydi).
+  // DB ustuni (Property.area/buildingArea) faqat zaxira: u `land_area` tuzatishi bilan
+  // almashtirilgan bo'lishi mumkin (CLAUDE.md — "Maydon tuzatish"), shuning uchun avval
+  // xom javob o'qiladi.
   const rawApi2 = (p.rawApi2 as Record<string, unknown> | null) ?? null;
-  const numOrNull = (v: unknown): number | null => {
-    if (v === null || v === undefined || v === "") return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
-  };
-  const objectAreaP = numOrNull(rawApi2?.object_area_p) ?? (p.area ? Number(p.area) : null);
-  const objectAreaU = numOrNull(rawApi2?.object_area_u) ?? (p.buildingArea ? Number(p.buildingArea) : null);
+  const totalArea = totalBuildingAreaWithSource(rawApi2);
+  const objectAreaP = totalArea?.value ?? (p.area ? Number(p.area) : null);
+  const objectAreaU = usefulArea(rawApi2) ?? (p.buildingArea ? Number(p.buildingArea) : null);
+  // Qiymat yer uchastkasi maydonidan (land_area/land_area_i) olingan bo'lsa obyekt aslida
+  // bino emas — yorliq "Binoning umumiy maydoni" emas, "Umumiy maydoni" bo'ladi.
+  const totalAreaFieldLabel = totalAreaLabel(totalArea?.source);
 
   return (
     <div>
@@ -135,7 +138,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
               <Field label="Manba" value={p.source.name} />
               <Field label="Nomi" value={p.name} />
               <Field label="Manzil" value={p.address} />
-              <Field label="Binoning umumiy maydoni" value={objectAreaP != null ? `${objectAreaP.toLocaleString("uz")} m²` : null} />
+              <Field label={totalAreaFieldLabel} value={objectAreaP != null ? `${objectAreaP.toLocaleString("uz")} m²` : null} />
               <Field label="Foydali maydon" value={objectAreaU != null ? `${objectAreaU.toLocaleString("uz")} m²` : null} />
               <Field label="Kategoriya" value={<CategoryBadge integrationCode={p.integrationCategoryCode} manualCode={p.manualCategoryCode} />} />
             </dl>

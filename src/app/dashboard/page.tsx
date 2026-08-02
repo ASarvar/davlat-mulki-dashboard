@@ -32,7 +32,7 @@ import {
 } from "@/server/services/stats";
 import { listSourceNames } from "@/server/services/sources";
 import { SyncRunStatusBadge } from "@/components/badges";
-import { SourceFilter, ALL_SOHA } from "./SourceFilter";
+import { SourceFilter, ALL_SOHA, OWN_SOHA } from "./SourceFilter";
 
 type Tone = "navy" | "gold" | "green" | "amber" | "red" | "cobalt";
 
@@ -233,35 +233,51 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const user = await requireUser();
   const sp = await searchParams;
 
-  // ── Rol doirasi (majburiy) ──
-  // IJROCHI/MODERATOR faqat o'z tashkilot(lar)ining statistikasini ko'radi.
-  // `null` = cheklovsiz (admin/rahbariyat/kuzatuvchi).
-  const scopeIds = await userSourceScope(user);
-  const scopedSources =
-    scopeIds === null
+  // ── Rol doirasi ──
+  // ⚠️ IJROCHI va MODERATOR uchun doira TURLICHA ishlaydi:
+  //  - IJROCHI  → QAT'IY cheklov: boshqa tashkilotni umuman ko'ra olmaydi.
+  //  - MODERATOR → faqat STANDART tanlov: sahifa ochilganda o'z tashkiloti ko'rinadi,
+  //    lekin "Manba" tugmalaridan boshqasini (yoki "Hammasi"ni) tanlab, kuzatuvchi kabi
+  //    hamma narsani ko'ra oladi (foydalanuvchi qarori, 2026-07-31). Tasdiqlash huquqi
+  //    baribir o'z tashkilotlari bilan chegaralangan — u `assertSourceWriteAccess`da.
+  const roleScope = await userSourceScope(user);
+  const hardScope = user.role === "IJROCHI" ? roleScope : null;
+  const defaultScope = user.role === "MODERATOR" ? roleScope : null;
+
+  const ownSources =
+    roleScope === null
       ? null
       : await prisma.organizationSource.findMany({
-          where: { id: { in: scopeIds } },
+          where: { id: { in: roleScope } },
           select: { name: true, regionId: true },
         });
 
   // Manba (soha) kesimi. Obyektlar ro'yxatidagi filtr bilan bir xil `soha` nomi —
   // shunda jadvaldagi raqamni bosganda filtr saqlanib qoladi.
-  // ⚠️ Cheklangan foydalanuvchiga faqat O'Z tashkilotlari sohalari ko'rsatiladi —
-  // aks holda tugmalarning bir qismi doim bo'sh natija berardi.
-  const sohaList = scopedSources
-    ? [...new Set(scopedSources.map((s) => s.name))].sort()
+  // ⚠️ Faqat QAT'IY cheklangan (IJROCHI) uchun ro'yxat qisqartiriladi — moderator
+  // barcha sohalarni ko'radi, aks holda boshqasiga o'ta olmasdi.
+  const sohaList = hardScope && ownSources
+    ? [...new Set(ownSources.map((s) => s.name))].sort()
     : await listSourceNames();
   const sohaRaw = str(sp.soha) || undefined;
+
+  // ⚠️ MODERATOR "Manba" tugmalaridan biror narsa TANLAGAN bo'lsa (jumladan "Hammasi"),
+  // uning standart doirasi bekor qilinadi — shunda u boshqa hududlarni ham ko'ra oladi.
+  // Hech narsa tanlanmagan bo'lsa (sahifa endi ochilgan) standart doira qo'llanadi.
+  const usingDefaultScope = defaultScope !== null && sohaRaw === undefined;
+  const effectiveSourceIds = hardScope ?? (usingDefaultScope ? defaultScope : null);
+
   // ⚠️ Standart holat "Hammasi" emas — "Ijara markazi" (agar mavjud bo'lsa).
-  // "Hammasi"ni ko'rish uchun ANIQ `?soha=__all__` kerak (SourceFilter shu havolani beradi);
-  // aks holda sahifa birinchi ochilganda "Ijara markazi" tanlangan bo'lib turadi.
+  // "Hammasi"ni ko'rish uchun ANIQ `?soha=__all__` kerak (SourceFilter shu havolani beradi).
+  // ⚠️ Moderatorning standart doirasi ishlayotganda soha standarti QO'LLANMAYDI: uning
+  // tashkiloti boshqa sohada bo'lsa (masalan "Davlat aktivlari agentligi"), ikkalasi AND
+  // bo'lib natija bo'sh chiqardi. U holatda doira o'zi yetarli filtr.
   const soha =
     sohaRaw === ALL_SOHA
       ? undefined
       : sohaRaw && sohaList.includes(sohaRaw)
         ? sohaRaw
-        : !sohaRaw && sohaList.includes("Ijara markazi")
+        : !sohaRaw && !usingDefaultScope && sohaList.includes("Ijara markazi")
           ? "Ijara markazi"
           : undefined;
 
@@ -272,15 +288,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // uchun hudud jadvali bitta qatordan iborat bo'lardi, shuning uchun uning hududi
   // TUMANLAR kesimida avtomatik ochiladi. Respublika darajasidagi tashkilot (regionId
   // null) yoki bir nechta hudud bo'lsa — avtomatik ochilmaydi, foydalanuvchi o'zi tanlaydi.
-  const scopedRegionIds = scopedSources ? [...new Set(scopedSources.map((s) => s.regionId))] : [];
+  const scopedRegionIds =
+    hardScope || usingDefaultScope ? [...new Set((ownSources ?? []).map((s) => s.regionId))] : [];
   const autoTuman =
     scopedRegionIds.length === 1 && scopedRegionIds[0] != null ? scopedRegionIds[0] : undefined;
   // `?tuman=none` — avtomatik ochilishni bekor qilish uchun (hudud qatorini yopish).
   const tumanRaw = str(sp.tuman) || undefined;
   const tuman = tumanRaw === "none" ? undefined : (tumanRaw ?? autoTuman);
 
+  // Qaysi "Manba" tugmasi yonib turadi. Serverda hisoblanadi, chunki "Mening tashkilotim"
+  // ham, "Hammasi" ham `soha = undefined` beradi — faqat `soha`dan ajratib bo'lmaydi.
+  const activeSourceKey = usingDefaultScope ? OWN_SOHA : (soha ?? ALL_SOHA);
+
   // Soha filtri + rol doirasi BIRGA (AND) — kesh kaliti ikkalasini ham o'z ichiga oladi.
-  const scope: StatsScope = { sourceName: soha, sourceIds: scopeIds };
+  const scope: StatsScope = { sourceName: soha, sourceIds: effectiveSourceIds };
 
   // Aggregatlar keshlangan (tag: dashboard, TTL 60s; kesh kaliti doiraga bog'liq).
   // Oxirgi run — jonli. Tuman kesimi faqat ochilgan hudud uchun so'raladi (keshlanmaydi:
@@ -325,11 +346,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // ⚠️ Cheklangan foydalanuvchi (bitta tashkilot) uchun 13 ta hudud qatori nol bo'lardi —
   // shuning uchun bo'sh hududlar yashiriladi. Cheklovsiz foydalanuvchida har bir hududda
   // obyekt bor, ya'ni rasmiy hisobot shakli (14 hudud) o'zgarmaydi.
-  const catRows = scopeIds === null ? s.byRegionCategory : s.byRegionCategory.filter((r) => r.total > 0);
-  const rentRows = scopeIds === null ? s.byRegion : s.byRegion.filter((r) => r.total > 0);
+  const catRows = effectiveSourceIds === null ? s.byRegionCategory : s.byRegionCategory.filter((r) => r.total > 0);
+  const rentRows = effectiveSourceIds === null ? s.byRegion : s.byRegion.filter((r) => r.total > 0);
   // Bitta hudud qolganda JAMI qatori shu qatorning aynan nusxasi bo'lardi — ko'rsatmaymiz.
   const showCatTotals = catRows.length > 1;
   const showRentTotals = rentRows.length > 1;
+
+  // Respublika darajasidagi qatorlar (masalan "Markaziy apparat") — `regionId` maydonida
+  // haqiqiy hudud EMAS, `OrganizationSource.id` turadi: tuman ochish o'chiriladi va
+  // drill-down "region=" o'rniga "tashkilot=" ishlatadi (properties.ts → buildWhere()).
+  const isNational = (id: string) => s.nationalOrgIds.includes(id);
 
   // JAMI qatori — hududlar yig'indisi (har bir kichik ustun uchun alohida).
   const totalObjects = catRows.reduce((a, r) => a + r.total, 0);
@@ -363,7 +389,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             aks holda soha o'zgarganda sarlavha ostidagi matn uzunligi o'zgarib,
             `justify-between` bu ikkisini gorizontal siljitib qo'yardi. */}
         <div className="ml-auto flex items-center gap-3">
-          <SourceFilter names={sohaList} current={soha} />
+          <SourceFilter names={sohaList} activeKey={activeSourceKey} showOwn={defaultScope !== null} />
           {isAdmin(user.role) ? (
             <Link
               href="/dashboard/sync"
@@ -594,7 +620,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 // Zebra: juft qatorlar oq, toq qatorlar och-oltin (light-golden).
                 const zebra =
                   i % 2 === 1 ? "bg-[var(--gold-lighter)]" : "bg-white";
-                const expanded = tuman === r.regionId;
+                const national = isNational(r.regionId);
+                const expanded = !national && tuman === r.regionId;
+                // Respublika darajasidagi qator (masalan "Markaziy apparat") haqiqiy
+                // hudud EMAS — tumanlarga ochilmaydi, drill-down "tashkilot=" bilan.
+                const rowScope = national ? `tashkilot=${r.regionId}` : `region=${r.regionId}`;
                 return (
                   <Fragment key={r.regionId}>
                     <CategoryTableRow
@@ -602,12 +632,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                       columns={COLUMNS}
                       zebra={zebra}
                       objHref={objHref}
-                      scope={`region=${r.regionId}`}
+                      scope={rowScope}
                       nf={nf}
                       km={km}
                       label={
                         <Link
-                          href={objHref(`region=${r.regionId}`)}
+                          href={objHref(rowScope)}
                           className="font-medium hover:underline"
                           style={{ color: "var(--cobalt)" }}
                         >
@@ -615,20 +645,24 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                         </Link>
                       }
                       lead={
-                        // Tumanlarni ochish/yopish — server tomonda, `?tuman=` orqali.
-                        <Link
-                          href={expanded ? dashHref() : dashHref(r.regionId)}
-                          scroll={false}
-                          title={expanded ? "Tumanlarni yopish" : "Tumanlar bo'yicha"}
-                          className="inline-flex items-center gap-1 tabular-nums text-muted-foreground hover:text-slate-700"
-                        >
-                          {expanded ? (
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          ) : (
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          )}
-                          {i + 1}
-                        </Link>
+                        national ? (
+                          <span className="tabular-nums">{i + 1}</span>
+                        ) : (
+                          // Tumanlarni ochish/yopish — server tomonda, `?tuman=` orqali.
+                          <Link
+                            href={expanded ? dashHref() : dashHref(r.regionId)}
+                            scroll={false}
+                            title={expanded ? "Tumanlarni yopish" : "Tumanlar bo'yicha"}
+                            className="inline-flex items-center gap-1 tabular-nums text-muted-foreground hover:text-slate-700"
+                          >
+                            {expanded ? (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            )}
+                            {i + 1}
+                          </Link>
+                        )
                       }
                     />
                     {expanded
@@ -774,7 +808,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 // Zebra: juft qatorlar oq, toq qatorlar och-oltin (light-golden).
                 const zebra =
                   i % 2 === 1 ? "bg-[var(--gold-lighter)]" : "bg-white";
-                const expanded = tuman === r.regionId;
+                const national = isNational(r.regionId);
+                const expanded = !national && tuman === r.regionId;
+                const rowScope = national ? `tashkilot=${r.regionId}` : `region=${r.regionId}`;
                 return (
                   <Fragment key={r.regionId}>
                     <RentTableRow
@@ -783,7 +819,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                       nf={nf}
                       label={
                         <Link
-                          href={objHref(`region=${r.regionId}`)}
+                          href={objHref(rowScope)}
                           className="font-medium hover:underline"
                           style={{ color: "var(--cobalt)" }}
                         >
@@ -791,21 +827,25 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                         </Link>
                       }
                       lead={
-                        // Birinchi jadval bilan BIR XIL `?tuman=` parametri — bittasini
-                        // ochsangiz ikkalasi ham o'sha hududning tumanlarini ko'rsatadi.
-                        <Link
-                          href={expanded ? dashHref() : dashHref(r.regionId)}
-                          scroll={false}
-                          title={expanded ? "Tumanlarni yopish" : "Tumanlar bo'yicha"}
-                          className="inline-flex items-center gap-1 tabular-nums text-muted-foreground hover:text-slate-700"
-                        >
-                          {expanded ? (
-                            <ChevronDown className="h-3.5 w-3.5" />
-                          ) : (
-                            <ChevronRight className="h-3.5 w-3.5" />
-                          )}
-                          {i + 1}
-                        </Link>
+                        national ? (
+                          <span className="tabular-nums">{i + 1}</span>
+                        ) : (
+                          // Birinchi jadval bilan BIR XIL `?tuman=` parametri — bittasini
+                          // ochsangiz ikkalasi ham o'sha hududning tumanlarini ko'rsatadi.
+                          <Link
+                            href={expanded ? dashHref() : dashHref(r.regionId)}
+                            scroll={false}
+                            title={expanded ? "Tumanlarni yopish" : "Tumanlar bo'yicha"}
+                            className="inline-flex items-center gap-1 tabular-nums text-muted-foreground hover:text-slate-700"
+                          >
+                            {expanded ? (
+                              <ChevronDown className="h-3.5 w-3.5" />
+                            ) : (
+                              <ChevronRight className="h-3.5 w-3.5" />
+                            )}
+                            {i + 1}
+                          </Link>
+                        )
                       }
                     />
                     {expanded
