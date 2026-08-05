@@ -3,6 +3,7 @@ import { getCurrentUser, userSourceScope } from "@/lib/authz";
 import { buildDashboardWorkbook } from "@/server/services/dashboardExport";
 import { getDashboardStats, computeDistrictStatsByRegion, type StatsScope } from "@/server/services/stats";
 import { listSourceNames } from "@/server/services/sources";
+import { isLandSplitSoha } from "@/lib/sourceLabel";
 
 export async function GET(req: Request) {
   const user = await getCurrentUser();
@@ -21,7 +22,7 @@ export async function GET(req: Request) {
     getDashboardStats(scope),
     computeDistrictStatsByRegion(scope),
   ]);
-  const workbook = buildDashboardWorkbook(stats, byRegionDistricts);
+  const workbook = buildDashboardWorkbook(stats, byRegionDistricts, isLandSplitSoha(soha) ? "landSplit" : "default");
   const buffer = await workbook.xlsx.writeBuffer();
   const fileName = `kategoriyalar-${new Date().toISOString().slice(0, 10)}.xlsx`;
   return new NextResponse(buffer as unknown as BodyInit, {

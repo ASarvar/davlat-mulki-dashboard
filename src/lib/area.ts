@@ -71,3 +71,27 @@ export function usefulArea(raw: Record<string, unknown> | null | undefined): num
   if (!raw) return null;
   return positive(raw.object_area_u);
 }
+
+/**
+ * Yer uchastkasimi yoki bino — quyidagi 11 ta maydonning HAMMASI 0/bo'sh bo'lsa
+ * YER (rost), aks holda BINO (yolg'on). Foydalanuvchi qoidasi, 2026-08-05.
+ * `positive()` bilan bir xil "0 ham bo'sh" mezoni ishlatiladi.
+ */
+const LAND_CHECK_FIELDS = [
+  "object_area",
+  "object_area_l",
+  "object_area_u",
+  "object_area_legal",
+  "object_area_bd",
+  "object_area_nz",
+  "object_area_p",
+  "object_area_p_bd",
+  "object_area_p_legal",
+  "object_area_p_nz",
+  "object_rooms",
+] as const;
+
+export function isLandOnly(raw: Record<string, unknown> | null | undefined): boolean {
+  if (!raw) return false;
+  return LAND_CHECK_FIELDS.every((f) => positive(raw[f]) == null);
+}

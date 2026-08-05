@@ -10,6 +10,8 @@ import { httpJson, NotFoundError } from "./http";
 export interface Api3Response {
   success: boolean;
   data?: {
+    /** e-auksion tizimidagi obyekt IDsi — obyekt sahifasida "DM ID" deb ko'rsatiladi. */
+    id?: number | string | null;
     lot_number?: number | string | null;
     status_id?: number | null;
     status_name?: string | null;
@@ -177,9 +179,20 @@ function detailValue(order: Api4Order, key: string): string | null {
   return str(d?.value);
 }
 
+/** API 3 dan xom obyekt + shu javobning `success` bayrog'i (klassifikatsiya uchun). */
+export interface Api3AssetResult {
+  data: NonNullable<Api3Response["data"]>;
+  success: boolean;
+}
+
 // ─── API 3: kadastr -> lot/order ───
 // Jonli tasdiqlangan: POST + JSON body { cad_number: "..." } + Basic auth.
-export async function fetchAuctionAssetByCadastre(cadNumber: string): Promise<Api3Response["data"] | null> {
+// ⚠️ `success` ham qaytariladi, lekin `data` bo'lsa — `success=false` bo'lsa ham —
+// null QAYTARILMAYDI: obyekt "DM ID" (asset.id) ko'rsatishi uchun xom javob har doim
+// kerak, `success`dan qat'i nazar. `null` FAQAT haqiqatan hech narsa qaytmaganda
+// (404/tarmoq xatosi) qaytadi. Klassifikatsiya (found/assetStatus/...) esa
+// `checkAuction()`da FAQAT `success=true` bo'lganda davom etadi — xulq o'zgarmaydi.
+export async function fetchAuctionAssetByCadastre(cadNumber: string): Promise<Api3AssetResult | null> {
   if (!env.API3_BASE_URL) throw new Error("API3_BASE_URL sozlanmagan");
 
   try {
@@ -190,8 +203,8 @@ export async function fetchAuctionAssetByCadastre(cadNumber: string): Promise<Ap
       basicAuth: basic(),
       rateKey: "API3",
     });
-    if (!res.success || !res.data) return null;
-    return res.data;
+    if (!res.data) return null;
+    return { data: res.data, success: res.success };
   } catch (err) {
     if (err instanceof NotFoundError) return null;
     throw err;
@@ -228,8 +241,17 @@ export async function fetchAuctionOrder(
 
 // ─── Zanjir: kadastr -> API 3 -> order_id -> API 4 ───
 export async function checkAuction(cadNumber: string): Promise<AuctionInfo> {
-  const asset = await fetchAuctionAssetByCadastre(cadNumber);
-  if (!asset) return EMPTY_AUCTION;
+  const result = await fetchAuctionAssetByCadastre(cadNumber);
+  if (!result) return EMPTY_AUCTION;
+  const { data: asset, success } = result;
+
+  // API3 `success=false` qaytarsa — obyekt auksion zanjiri uchun "topilmadi" (xulq
+  // ILGARIGIDEK, found=false, klassifikatsiyaga ta'sir qilmaydi). Lekin xom javob
+  // (jumladan "DM ID" — asset.id) baribir SAQLANADI, aks holda ko'pchilik obyektda
+  // DM ID hech qachon chiqmasdi (foydalanuvchi topgan muammo, 2026-08-06).
+  if (!success) {
+    return { ...EMPTY_AUCTION, raw: { api3: asset } };
+  }
 
   const orderId = int(asset.order_id);
   // API 3 topildi, lekin order_id yo'q — faqat lot ma'lumotini qaytaramiz.

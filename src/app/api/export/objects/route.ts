@@ -27,6 +27,7 @@ export async function GET(req: Request) {
   const fullyRented = sp.get("fullyRented");
   const hasRentContract = sp.get("hasRentContract");
   const onAnyAuction = sp.get("onAnyAuction");
+  const isLand = sp.get("isLand");
   // "mine" — Hudud select'idagi maxsus variant (faqat MODERATOR), haqiqiy hudud ID emas.
   const regionRaw = sp.get("region") || undefined;
   const myRegionsOnly = regionRaw === "mine";
@@ -43,6 +44,7 @@ export async function GET(req: Request) {
     fullyRented: fullyRented === "1" ? true : undefined,
     hasRentContract: hasRentContract === "1" ? true : undefined,
     onAnyAuction: onAnyAuction === "1" ? true : undefined,
+    isLand: isLand === "1" ? true : isLand === "0" ? false : undefined,
     myRegionsOnly: myRegionsOnly || undefined,
   };
 

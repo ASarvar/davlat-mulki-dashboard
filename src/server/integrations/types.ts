@@ -17,6 +17,8 @@ export interface PropertyBaseData {
   districtCode?: number | null;
   holderName?: string | null; // balansdagi tashkilot (subjects[0].name)
   holderInn?: string | null; // uning STIR'i (subjects[0].inn)
+  /** Yer uchastkasimi (rost) yoki bino (yolg'on) — src/lib/area.ts -> isLandOnly() */
+  isLand: boolean;
   raw: unknown;
 }
 

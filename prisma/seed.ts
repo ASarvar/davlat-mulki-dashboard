@@ -1,5 +1,6 @@
 import { PrismaClient, CategorySource, Role } from "@prisma/client";
 import bcrypt from "bcryptjs";
+import { SOHA_AKTIVLAR, SOHA_DIREKSIYA } from "../src/lib/sourceLabel";
 
 const prisma = new PrismaClient();
 
@@ -33,8 +34,8 @@ const CATEGORIES: {
 // filtrlari aynan shu bo'yicha guruhlaydi, shuning uchun bitta sohaning barcha
 // yozuvlarida harfma-harf bir xil bo'lishi shart.
 const SOHA_IJARA = "Ijara markazi";
-const SOHA_AKTIVLAR = "Davlat aktivlari agentligi";
-const SOHA_DIREKSIYA = "Direksiya";
+// SOHA_AKTIVLAR / SOHA_DIREKSIYA — src/lib/sourceLabel.ts'dan (bitta joyda, boshqa
+// joyda ham ishlatiladi — masalan dashboard'dagi Yer/Bino ajratish varianti).
 
 // ─── 14 hudud ───
 // Tartib rasmiy hisobot shaklidagidek (foydalanuvchi belgilagan) — sortOrder shuni saqlaydi.

@@ -34,6 +34,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   const fullyRentedStr = str(sp.fullyRented);
   const hasRentContractStr = str(sp.hasRentContract);
   const onAnyAuctionStr = str(sp.onAnyAuction);
+  const isLandStr = str(sp.isLand);
   const requestedPage = Number(str(sp.page) ?? 1);
   const statusRaw = str(sp.status);
   const syncStatus = statusRaw && statusRaw in SyncStatus ? (statusRaw as SyncStatus) : undefined;
@@ -50,6 +51,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     fullyRented: fullyRentedStr === "1" ? true : undefined,
     hasRentContract: hasRentContractStr === "1" ? true : undefined,
     onAnyAuction: onAnyAuctionStr === "1" ? true : undefined,
+    isLand: isLandStr === "1" ? true : isLandStr === "0" ? false : undefined,
     myRegionsOnly: myRegionsOnly || undefined,
   };
 
@@ -93,6 +95,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   if (fullyRentedStr) baseParams.set("fullyRented", fullyRentedStr);
   if (hasRentContractStr) baseParams.set("hasRentContract", hasRentContractStr);
   if (onAnyAuctionStr) baseParams.set("onAnyAuction", onAnyAuctionStr);
+  if (isLandStr) baseParams.set("isLand", isLandStr);
   if (syncStatus) baseParams.set("status", syncStatus);
 
   const exportHref = `/api/export/objects?${baseParams.toString()}`;
@@ -112,6 +115,8 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     chips.push({ key: "hasRentContract", value: "1", label: "Ijaraga berilgan", removeHref: hrefWithout("hasRentContract") });
   if (fullyRentedStr === "1")
     chips.push({ key: "fullyRented", value: "1", label: "To'liq ijara berilgan", removeHref: hrefWithout("fullyRented") });
+  if (isLandStr === "1") chips.push({ key: "isLand", value: "1", label: "Yer", removeHref: hrefWithout("isLand") });
+  if (isLandStr === "0") chips.push({ key: "isLand", value: "0", label: "Bino", removeHref: hrefWithout("isLand") });
   if (syncStatus)
     chips.push({ key: "status", value: syncStatus, label: `Sinxronizatsiya: ${syncStatus}`, removeHref: hrefWithout("status") });
 

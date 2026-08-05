@@ -33,8 +33,22 @@ export async function triggerFullSync(userId?: string, sourceName?: string) {
   const run = await prisma.syncRun.create({
     data: { type: "FULL_ALL", status: "QUEUED", triggeredById: userId ?? null, sourceName: sourceName ?? null },
   });
+  // ⚠️ `restrictedRegionId` (masalan Direksiya → Toshkent sh.) shu yerda `filterRegionId`
+  // sifatida uzatiladi — REGION triggeridan farqli, bu FULL_ALL (va kunlik avtomatik
+  // sync, ikkalasi ham shu funksiyani chaqiradi) uchun yagona joy, chunki bu yerda
+  // hech qanday ad-hoc hudud filtri berilmaydi. `processSyncSource` prefiksdan aniqlagan
+  // hududni shu bilan solishtirib, mos kelmasa obyektni butunlay o'tkazib yuboradi
+  // (boshqa hududga yozmaydi) — `OrganizationSource.regionId`ni o'zgartirish EMAS,
+  // chunki u "ko'r-ko'rona ishonch" branchiga tushirib, mos kelmagan kadastrni ham
+  // shu hudud deb noto'g'ri yozib qo'yardi.
   await enqueueSyncSources(
-    sources.map<SyncSourceJob>((s) => ({ syncRunId: run.id, sourceId: s.id, stir: s.stir, regionId: s.regionId })),
+    sources.map<SyncSourceJob>((s) => ({
+      syncRunId: run.id,
+      sourceId: s.id,
+      stir: s.stir,
+      regionId: s.regionId,
+      filterRegionId: s.restrictedRegionId ?? undefined,
+    })),
   );
   return run;
 }

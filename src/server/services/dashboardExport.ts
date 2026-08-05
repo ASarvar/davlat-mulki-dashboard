@@ -1,7 +1,9 @@
 import ExcelJS from "exceljs";
 import {
   buildDashboardColumns,
+  buildJamiColumn,
   type DashboardColumnSub,
+  type DashboardColumnsVariant,
   type DashboardStats,
   type RegionCategoryRow,
 } from "./stats";
@@ -26,6 +28,11 @@ type SheetRow = { labels: (string | number)[]; data: RegionCategoryRow };
  * Varaqni to'liq quradi: ikki qatorli sarlavha, JAMI qatori va ma'lumot qatorlari.
  * ⚠️ Ikkala varaq ham SHU funksiyani chaqiradi — ustun qo'shilganda bir joyda o'zgaradi,
  * aks holda "Hududlar" va "Tumanlar" varaqlari bir-biridan farq qilib qolardi.
+ *
+ * ⚠️ `exportCols[0]` HAR DOIM "Jami" ustuni (`buildJamiColumn()` bilan tuzilgan, chaqiruvchi
+ * qo'shadi) — "landSplit" variantida Yer/Bino'ga ajralib 2 sub-ustunga aylanadi. Alohida
+ * "jamiCol" tushunchasi yo'q: Jami boshqa har qanday ustun kabi umumiy sikldan o'tadi,
+ * faqat kengligi (12) birinchi ustun ekanidan kelib chiqadi.
  */
 function writeSheet(
   sheet: ExcelJS.Worksheet,
@@ -41,15 +48,14 @@ function writeSheet(
 ) {
   const { labelHeaders, labelWidths, rows, totalsFrom } = opts;
   const labelCount = labelHeaders.length;
-  const jamiCol = labelCount + 1; // "Jami" ustuni
+  const dataStartCol = labelCount + 1;
 
   labelWidths.forEach((w, i) => (sheet.getColumn(i + 1).width = w));
-  sheet.getColumn(jamiCol).width = 12;
 
-  let colIdx = jamiCol + 1;
-  for (const c of exportCols) {
-    for (let i = 0; i < c.subs.length; i++) sheet.getColumn(colIdx++).width = c.subs.length > 1 ? 15 : 18;
-  }
+  let colIdx = dataStartCol;
+  exportCols.forEach((c, ci) => {
+    for (let i = 0; i < c.subs.length; i++) sheet.getColumn(colIdx++).width = ci === 0 ? 12 : c.subs.length > 1 ? 15 : 18;
+  });
   const totalCols = colIdx - 1;
 
   // Sarlavha: 1-qator kategoriya nomlari (birlashtirilgan), 2-qator kichik ustunlar.
@@ -57,10 +63,8 @@ function writeSheet(
     sheet.mergeCells(1, i + 1, 2, i + 1);
     sheet.getCell(1, i + 1).value = h;
   });
-  sheet.mergeCells(1, jamiCol, 2, jamiCol);
-  sheet.getCell(1, jamiCol).value = "Jami";
 
-  colIdx = jamiCol + 1;
+  colIdx = dataStartCol;
   for (const c of exportCols) {
     if (c.subs.length > 1) {
       sheet.mergeCells(1, colIdx, 1, colIdx + c.subs.length - 1);
@@ -88,8 +92,7 @@ function writeSheet(
   // JAMI — birinchi ma'lumot qatori (oltin fon, qizil raqamlar — rasmiy hisobot shakli).
   const jamiRow = sheet.getRow(3);
   jamiRow.getCell(1).value = "J A M I:";
-  jamiRow.getCell(jamiCol).value = totalsFrom.reduce((a, r) => a + r.total, 0);
-  colIdx = jamiCol + 1;
+  colIdx = dataStartCol;
   for (const c of exportCols) {
     for (const sub of c.subs) {
       const sum = totalsFrom.reduce((a, r) => a + sub.get(r), 0);
@@ -100,14 +103,13 @@ function writeSheet(
     const cell = jamiRow.getCell(ci);
     cell.font = { bold: true, color: { argb: "FFB91C1C" } };
     cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFF7F1E4" } };
-    cell.alignment = { horizontal: ci >= jamiCol ? "center" : "left" };
+    cell.alignment = { horizontal: ci >= dataStartCol ? "center" : "left" };
   }
 
   rows.forEach((r, i) => {
     const row = sheet.getRow(4 + i);
     r.labels.forEach((v, li) => (row.getCell(li + 1).value = v));
-    row.getCell(jamiCol).value = r.data.total;
-    let ci = jamiCol + 1;
+    let ci = dataStartCol;
     for (const c of exportCols) {
       for (const sub of c.subs) {
         const v = sub.get(r.data);
@@ -122,16 +124,21 @@ function writeSheet(
  * Hisobot kitobini quradi. Ma'lumotni O'ZI olmaydi — chaqiruvchi beradi: route keshlangan
  * `getDashboardStats()` ni ishlatadi, sinov esa keshsiz `computeDashboardStats()` ni
  * (unstable_cache Next so'rov konteksti tashqarisida ishlamaydi).
+ *
+ * `variant` — dashboard sahifasi bilan BIR XIL tanlov (`isLandSplitSoha()`), chaqiruvchi
+ * beradi: faqat Davlat aktivlari agentligi/Direksiya eksportida "landSplit".
  */
 export function buildDashboardWorkbook(
   stats: DashboardStats,
   byRegionDistricts: { regionId: string; regionName: string; districts: RegionCategoryRow[] }[],
+  variant: DashboardColumnsVariant = "default",
 ): ExcelJS.Workbook {
-  const columns = buildDashboardColumns();
+  const columns = buildDashboardColumns(variant);
 
   // Yagona tartiblangan ustunlar ro'yxati — kengligi, sarlavhasi va qiymati BIR marta,
   // BIR joyda hisoblanadi (avval 3 ta alohida siklda takrorlanardi — nomuvofiqlik xavfi bor edi).
-  const exportCols: ExportCol[] = [];
+  // Birinchi element har doim "Jami" — sahifadagi bilan bir xil `buildJamiColumn()`.
+  const exportCols: ExportCol[] = [{ title: "Jami", subs: buildJamiColumn(variant) }];
   for (const c of columns) {
     exportCols.push({ title: `${c.code}. ${c.nameUz}`, subs: c.subs });
     if (c.code === 4) {

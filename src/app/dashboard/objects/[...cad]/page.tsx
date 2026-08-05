@@ -90,6 +90,17 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
   // bino emas — yorliq "Binoning umumiy maydoni" emas, "Umumiy maydoni" bo'ladi.
   const totalAreaFieldLabel = totalAreaLabel(totalArea?.source);
 
+  // "DM ID" — API 3 dagi `id` (e-auksion tizimidagi obyekt identifikatori). Alohida
+  // ustun sifatida saqlanmaydi — API3/4 natijasi "AUCTION" apiSource ostida
+  // ObjectStatusCheck.rawResponse'da { api3: {...}, api4: {...} } shaklida saqlanadi
+  // (checkAuction() -> auction.ts), shu yerdan o'qiladi (CadastreRawData bilan bir xil
+  // yondashuv — bor xom javobdan, API'ni qayta chaqirmasdan).
+  const auctionRaw = p.statusChecks.find((s) => s.apiSource === "AUCTION")?.rawResponse as
+    | { api3?: { id?: number | string | null } }
+    | null
+    | undefined;
+  const dmId = auctionRaw?.api3?.id ?? null;
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -136,6 +147,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
               <Field label="Hudud" value={p.region.name} />
               <Field label="Tuman" value={p.district?.name ?? null} />
               <Field label="Manba" value={p.source.name} />
+              <Field label="DM ID" value={dmId} />
               <Field label="Nomi" value={p.name} />
               <Field label="Manzil" value={p.address} />
               <Field label={totalAreaFieldLabel} value={objectAreaP != null ? `${objectAreaP.toLocaleString("uz")} m²` : null} />

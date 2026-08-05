@@ -1,7 +1,7 @@
 import { API2 } from "./config";
 import { httpJson, NotFoundError } from "./http";
 import type { PropertyBaseData } from "./types";
-import { totalBuildingArea, usefulArea } from "@/lib/area";
+import { totalBuildingArea, usefulArea, isLandOnly } from "@/lib/area";
 
 // API 2 ning HAQIQIY javob shakli (UZKAD). To'liq javob rawApi2'ga saqlanadi,
 // bu yerda faqat bizga kerakli maydonlar tiplangan.
@@ -112,6 +112,7 @@ export async function fetchPropertyBase(cadNumber: string): Promise<Api2Result> 
       // AYNAN shu funksiyalarni ishlatadi, aks holda ikki joyda farqli son chiqardi.
       area: totalBuildingArea(res),
       buildingArea: usefulArea(res),
+      isLand: isLandOnly(res),
       region: str(res.region),
       district: str(res.district),
       districtCode: num(res.district_id),

@@ -2,7 +2,7 @@ import { unstable_cache } from "next/cache";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { CATEGORIES } from "@/lib/categories";
-import { sourceScopeLabel } from "@/lib/sourceLabel";
+import { sourceScopeLabel, isLandSplitSoha } from "@/lib/sourceLabel";
 
 export interface RegionStat {
   regionId: string;
@@ -28,6 +28,30 @@ export interface CategoryStat {
   count: number;
 }
 
+/** Yer/Bino soni (bitta kesishma uchun). */
+export interface LandSplitStat {
+  land: number;
+  building: number;
+}
+
+/**
+ * Yer/Bino ajratish — FAQAT "Davlat aktivlari agentligi" va "Direksiya" dashboard
+ * jadvalida ko'rsatiladi (`isLandSplitSoha`), lekin `RegionCategoryRow`ning o'zi
+ * har doim shu maydonga ega (soha mos kelmasa nol qiymatlar bilan — hisoblash
+ * qimmat bo'lgani uchun faqat kerak bo'lganda so'raladi, quyida `landCategoryCountRows`ga qarang).
+ */
+export interface LandSplit {
+  total: LandSplitStat;
+  cat1: LandSplitStat;
+  cat2: LandSplitStat;
+  cat3: LandSplitStat;
+  cat4: LandSplitStat;
+}
+
+function emptyLandSplit(): LandSplit {
+  return { total: { land: 0, building: 0 }, cat1: { land: 0, building: 0 }, cat2: { land: 0, building: 0 }, cat3: { land: 0, building: 0 }, cat4: { land: 0, building: 0 } };
+}
+
 /**
  * Hudud × kategoriya kesishmasi. `counts` kaliti: kategoriya kodi.
  * ⚠️ Bu tuzilma TUMAN kesimida ham ishlatiladi (`computeDistrictStats`) — o'shanda
@@ -49,15 +73,19 @@ export interface RegionCategoryRow {
     /** Ijara shartnomasi bor (jami summa > 0) */
     paid: RentAreaStat;
     /** Bo'sh maydoni bor (ijarasi bor, lekin maydon to'liq band emas) */
-    hasVacant: { count: number; area: number };
+    hasVacant: { count: number; area: number; buildingCount: number; buildingArea: number };
     /**
      * Kat 5 (Tekin foydalanish) yoki kat 6 (Ijara shartnomasi bor) — FAQAT shu ikkisiga EFFEKTIV
      * kategoriyasi bo'yicha tegishli obyektlar (`counts["5"] + counts["6"]`). `free`/`paid` dan farqli:
      * ular xususiyat bo'yicha (savdodagi obyekt ham kirishi mumkin), bu yerda faqat sof kat 5/6.
      */
     onlyFreeOrPaidCategory: { count: number };
-    /** Bo'sh turgan (kat 11) — ijara yo'q, butun foydali maydon bo'sh */
-    vacant: { count: number; usefulArea: number };
+    /**
+     * Bo'sh turgan (kat 11) — ijara yo'q, butun foydali maydon bo'sh.
+     * `buildingCount`/`buildingUsefulArea` — FAQAT bino (isLand=false) obyektlar bo'yicha,
+     * Davlat aktivlari/Direksiya jadvalida 11-ustun shu ikkisini ko'rsatadi (foydalanuvchi talabi).
+     */
+    vacant: { count: number; usefulArea: number; buildingCount: number; buildingUsefulArea: number };
     /**
      * To'liq ijaraga berilgan: ijara shartnomasi bor (tekin foydalanish yoki pullik —
      * ikkisidan biri yoki ikkisi birga) VA foydali maydon to'liq band (vacantArea = 0).
@@ -77,6 +105,8 @@ export interface RegionCategoryRow {
     /** Kat 7 (Savdoga chiqarish jarayonida) obyektlaridan ijara shartnomasi borlari soni. */
     onAuctionProcessRented: { count: number };
   };
+  /** Yer/Bino ajratish — `isLandSplitSoha()` uchun, boshqa sohada nol qiymatlar. */
+  landSplit: LandSplit;
 }
 
 export interface RentAreaStat {
@@ -121,7 +151,9 @@ type RentRow = {
   freeCount: bigint; freeUseful: string | null; freeRented: string | null; freeVacant: string | null;
   paidCount: bigint; paidUseful: string | null; paidRented: string | null; paidVacant: string | null;
   hasVacantCount: bigint; hasVacantArea: string | null;
+  hasVacantBuildingCount: bigint; hasVacantBuildingArea: string | null;
   vacantCount: bigint; vacantUseful: string | null;
+  vacantBuildingCount: bigint; vacantBuildingUseful: string | null;
   privLotCount: bigint; rentLotCount: bigint; rentLotArea: string | null;
   privLotContracts: string | null; rentLotOnlyContracts: string | null;
   fullyRentedCount: bigint;
@@ -178,7 +210,11 @@ function sourceWhere(scope: StatsScope): Prisma.PropertyWhereInput {
  * hudud qatoriga QO'SHILMAYDI, aks holda qaysi hisob qayerdan kelgani ko'rinmay qolardi).
  */
 async function nationalOrgRows(scope: StatsScope): Promise<{ id: string; name: string }[]> {
-  const where: Prisma.OrganizationSourceWhereInput = { regionId: null };
+  // `restrictedRegionId` bor manba (masalan Direksiya → Toshkent sh.) BU YERGA
+  // kirmaydi — u endi oddiy hudud qatori sifatida ko'rinadi (uning Property'lari
+  // haqiqatda ham shu bitta hududda, fan-out'da tekshirilgan — enqueue.ts'ga qarang),
+  // "Respublika"/"Markaziy apparat" alohida qatoriga emas.
+  const where: Prisma.OrganizationSourceWhereInput = { regionId: null, restrictedRegionId: null };
   if (scope.sourceName) where.name = scope.sourceName;
   if (scope.sourceIds != null) {
     if (scope.sourceIds.length === 0) return [];
@@ -212,6 +248,7 @@ function rentBreakdownRows(groupCol: Prisma.Sql, cond: Prisma.Sql) {
              COALESCE(p."auctionTotalArea", 0)  AS lotarea,
              p."hasPrivatizationLot"            AS priv,
              p."hasRentLot"                     AS rentlot,
+             p."isLand"                         AS land,
              COALESCE(p."integrationCategoryCode", p."manualCategoryCode", 11) AS cat
       FROM "Property" p
       WHERE ${cond}
@@ -227,11 +264,17 @@ function rentBreakdownRows(groupCol: Prisma.Sql, cond: Prisma.Sql) {
            COALESCE(SUM(vacant) FILTER (WHERE cnt > 0 AND sum > 0), 0) AS "paidVacant",
            COUNT(*)      FILTER (WHERE cnt > 0 AND vacant > 0) AS "hasVacantCount",
            COALESCE(SUM(vacant) FILTER (WHERE cnt > 0 AND vacant > 0), 0) AS "hasVacantArea",
+           -- Davlat aktivlari/Direksiya jadvalida 12-ustun FAQAT bino (isLand=false).
+           COUNT(*)      FILTER (WHERE cnt > 0 AND vacant > 0 AND NOT land) AS "hasVacantBuildingCount",
+           COALESCE(SUM(vacant) FILTER (WHERE cnt > 0 AND vacant > 0 AND NOT land), 0) AS "hasVacantBuildingArea",
            -- To'liq ijaraga berilgan: shartnoma bor (tekin yoki pullik) VA foydali maydon
            -- to'liq band (bo'sh joy qolmagan).
            COUNT(*)      FILTER (WHERE cnt > 0 AND vacant = 0) AS "fullyRentedCount",
            COUNT(*)      FILTER (WHERE cat = 11) AS "vacantCount",
            COALESCE(SUM(useful) FILTER (WHERE cat = 11), 0) AS "vacantUseful",
+           -- Davlat aktivlari/Direksiya jadvalida 11-ustun FAQAT bino (isLand=false).
+           COUNT(*)      FILTER (WHERE cat = 11 AND NOT land) AS "vacantBuildingCount",
+           COALESCE(SUM(useful) FILTER (WHERE cat = 11 AND NOT land), 0) AS "vacantBuildingUseful",
            COUNT(*)      FILTER (WHERE priv)    AS "privLotCount",
            COUNT(*)      FILTER (WHERE rentlot) AS "rentLotCount",
            COALESCE(SUM(lotarea) FILTER (WHERE rentlot), 0) AS "rentLotArea",
@@ -250,6 +293,42 @@ function rentBreakdownRows(groupCol: Prisma.Sql, cond: Prisma.Sql) {
   `);
 }
 
+// Yer/Bino kesimi, kategoriya bo'yicha — FAQAT `isLandSplitSoha()` chaqirilganda
+// so'raladi (qo'shimcha jadval skani, boshqa sohalarda kerak emas).
+type LandCatRow = { gid: string | null; code: number | null; isLand: boolean; count: bigint };
+function landCategoryCountRows(groupCol: Prisma.Sql, cond: Prisma.Sql) {
+  return prisma.$queryRaw<LandCatRow[]>(Prisma.sql`
+    SELECT ${groupCol} AS gid,
+           COALESCE(p."integrationCategoryCode", p."manualCategoryCode", 11) AS code,
+           p."isLand" AS "isLand",
+           COUNT(*) AS count
+    FROM "Property" p
+    WHERE ${cond}
+    GROUP BY 1, 2, 3
+  `);
+}
+
+// gid → LandSplit xaritasi (`countsByGid()` bilan bir xil bir-o'tishli naqsh).
+function landSplitByGid(rows: LandCatRow[]): Map<string, LandSplit> {
+  const m = new Map<string, LandSplit>();
+  for (const row of rows) {
+    if (row.gid == null) continue;
+    let split = m.get(row.gid);
+    if (!split) {
+      split = emptyLandSplit();
+      m.set(row.gid, split);
+    }
+    const n = Number(row.count);
+    const bucket = row.isLand ? "land" : "building";
+    split.total[bucket] += n;
+    if (row.code === 1) split.cat1[bucket] += n;
+    else if (row.code === 2) split.cat2[bucket] += n;
+    else if (row.code === 3) split.cat3[bucket] += n;
+    else if (row.code === 4) split.cat4[bucket] += n;
+  }
+  return m;
+}
+
 const n0 = (v: string | null | undefined) => Number(v ?? 0);
 
 // Guruh (hudud/tuman) uchun bitta qatorni yig'adi — jadval ustunlari shu tuzilmadan o'qiydi.
@@ -258,6 +337,7 @@ function buildRow(
   name: string,
   counts: Record<string, number>,
   rr: RentRow | undefined,
+  landSplit?: LandSplit,
 ): RegionCategoryRow {
   const mk = (
     count: bigint | undefined,
@@ -279,9 +359,19 @@ function buildRow(
     rentBreakdown: {
       free: mk(rr?.freeCount, rr?.freeUseful, rr?.freeRented, rr?.freeVacant),
       paid: mk(rr?.paidCount, rr?.paidUseful, rr?.paidRented, rr?.paidVacant),
-      hasVacant: { count: Number(rr?.hasVacantCount ?? 0), area: n0(rr?.hasVacantArea) },
+      hasVacant: {
+        count: Number(rr?.hasVacantCount ?? 0),
+        area: n0(rr?.hasVacantArea),
+        buildingCount: Number(rr?.hasVacantBuildingCount ?? 0),
+        buildingArea: n0(rr?.hasVacantBuildingArea),
+      },
       onlyFreeOrPaidCategory: { count: (counts["5"] ?? 0) + (counts["6"] ?? 0) },
-      vacant: { count: Number(rr?.vacantCount ?? 0), usefulArea: n0(rr?.vacantUseful) },
+      vacant: {
+        count: Number(rr?.vacantCount ?? 0),
+        usefulArea: n0(rr?.vacantUseful),
+        buildingCount: Number(rr?.vacantBuildingCount ?? 0),
+        buildingUsefulArea: n0(rr?.vacantBuildingUseful),
+      },
       fullyRented: { count: Number(rr?.fullyRentedCount ?? 0) },
       privatizationLot: {
         count: Number(rr?.privLotCount ?? 0),
@@ -298,6 +388,7 @@ function buildRow(
       installmentSoldRented: { count: Number(rr?.cat1RentedObjects ?? 0) },
       onAuctionProcessRented: { count: Number(rr?.cat7RentedObjects ?? 0) },
     },
+    landSplit: landSplit ?? emptyLandSplit(),
   };
 }
 
@@ -421,7 +512,7 @@ async function districtRows(regionId: string | undefined, scope: StatsScope) {
   const cond = Prisma.sql`p."districtId" IS NOT NULL ${regionPart} ${srcPart}`;
   const groupCol = Prisma.sql`p."districtId"`;
 
-  const [districts, catRows, rentRows] = await Promise.all([
+  const [districts, catRows, rentRows, landRows] = await Promise.all([
     prisma.district.findMany({
       where: regionId ? { regionId } : {},
       orderBy: [{ region: { sortOrder: "asc" } }, { name: "asc" }],
@@ -429,15 +520,17 @@ async function districtRows(regionId: string | undefined, scope: StatsScope) {
     }),
     categoryCountRows(groupCol, cond),
     rentBreakdownRows(groupCol, cond),
+    isLandSplitSoha(scope.sourceName) ? landCategoryCountRows(groupCol, cond) : Promise.resolve([] as LandCatRow[]),
   ]);
 
   const counts = countsByGid(catRows);
   const rentMap = new Map(rentRows.filter((r) => r.gid != null).map((r) => [r.gid as string, r]));
+  const landMap = landSplitByGid(landRows);
 
   return districts.map((d) => ({
     regionId: d.regionId,
     regionName: d.region.name,
-    row: buildRow(d.id, d.name, counts.get(d.id) ?? {}, rentMap.get(d.id)),
+    row: buildRow(d.id, d.name, counts.get(d.id) ?? {}, rentMap.get(d.id), landMap.get(d.id)),
   }));
 }
 
@@ -539,13 +632,20 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
   // Ijara xususiyati bo'yicha kesim — hudud bo'yicha (tuman kesimi ham shu funksiyani ishlatadi).
   const rentRaw = await rentBreakdownRows(Prisma.sql`p."regionId"`, regionSrcCond);
 
+  // Yer/Bino kesimi — FAQAT Davlat aktivlari agentligi/Direksiya sohasi tanlanganda
+  // (qo'shimcha jadval skani, boshqa sohada kerak emas).
+  const landRaw = isLandSplitSoha(scope.sourceName)
+    ? await landCategoryCountRows(Prisma.sql`p."regionId"`, regionSrcCond)
+    : [];
+  const landByRegion = landSplitByGid(landRaw);
+
   // Respublika darajasidagi tashkilotlar — bir XIL mantiq, lekin guruh ustuni
   // `p."sourceId"` (`OrganizationSource.id`), hudud emas.
   let nationalRegionStats: RegionStat[] = [];
   let nationalCategoryRows: RegionCategoryRow[] = [];
   if (natIds.length > 0) {
     const natCond = Prisma.sql`${srcCond} AND p."sourceId" IN (${Prisma.join(natIds)})`;
-    const [natTotalsRaw, natCatRaw, natRentRaw] = await Promise.all([
+    const [natTotalsRaw, natCatRaw, natRentRaw, natLandRaw] = await Promise.all([
       groupTotalsRows({
         table: Prisma.sql`"OrganizationSource"`,
         joinOn: Prisma.sql`p."sourceId" = g.id`,
@@ -557,9 +657,13 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
       }),
       categoryCountRows(Prisma.sql`p."sourceId"`, natCond),
       rentBreakdownRows(Prisma.sql`p."sourceId"`, natCond),
+      isLandSplitSoha(scope.sourceName)
+        ? landCategoryCountRows(Prisma.sql`p."sourceId"`, natCond)
+        : Promise.resolve([] as LandCatRow[]),
     ]);
     const natCounts = countsByGid(natCatRaw);
     const natRentByGid = new Map(natRentRaw.filter((r) => r.gid != null).map((r) => [r.gid as string, r]));
+    const natLandByGid = landSplitByGid(natLandRaw);
     const labelById = new Map(natOrgs.map((o) => [o.id, sourceScopeLabel(o.name, null)]));
 
     nationalRegionStats = natTotalsRaw.map((r) => ({
@@ -567,7 +671,7 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
       name: labelById.get(r.id) ?? r.name,
     }));
     nationalCategoryRows = natTotalsRaw.map((r) =>
-      buildRow(r.id, labelById.get(r.id) ?? r.name, natCounts.get(r.id) ?? {}, natRentByGid.get(r.id)),
+      buildRow(r.id, labelById.get(r.id) ?? r.name, natCounts.get(r.id) ?? {}, natRentByGid.get(r.id), natLandByGid.get(r.id)),
     );
   }
 
@@ -581,7 +685,7 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
 
   const byRegionCategory: RegionCategoryRow[] = [
     ...regionRows.map((r) =>
-      buildRow(r.id, r.name, countsByRegion.get(r.id) ?? {}, rentByRegion.get(r.id)),
+      buildRow(r.id, r.name, countsByRegion.get(r.id) ?? {}, rentByRegion.get(r.id), landByRegion.get(r.id)),
     ),
     ...nationalCategoryRows,
   ];
@@ -624,17 +728,79 @@ export const getDashboardStats = unstable_cache(computeDashboardStats, ["dashboa
   revalidate: 60,
 });
 
-export type DashboardColumnSub = { label: string; area?: boolean; get: (r: RegionCategoryRow) => number };
+export type DashboardColumnSub = {
+  label: string;
+  area?: boolean;
+  /** Drill-down havolasiga QO'SHIMCHA qism (masalan "&isLand=1") — "Soni" sub-ustunlar uchun. */
+  qsExtra?: string;
+  get: (r: RegionCategoryRow) => number;
+};
 export type DashboardColumn = { code: number; short: string; nameUz: string; subs: DashboardColumnSub[] };
+
+/**
+ * "default" — barcha sohalar uchun standart ko'rinish (o'zgarmagan).
+ * "landSplit" — FAQAT Davlat aktivlari agentligi/Direksiya tanlanganda (`isLandSplitSoha()`):
+ * 7/9/10 ustunlari yo'q, 1/2/3/4 (va "Jami" — `buildJamiColumn()`) Yer/Bino'ga ajraladi,
+ * 11/12 FAQAT bino bo'yicha hisoblanadi. Foydalanuvchi talabi, 2026-08-06.
+ */
+export type DashboardColumnsVariant = "default" | "landSplit";
+
+const LAND_SPLIT_HIDDEN_CODES = new Set([7, 9, 10]);
+const LAND_SPLIT_CODES = new Set([1, 2, 3]);
+type LandSplitCatKey = "cat1" | "cat2" | "cat3" | "cat4";
 
 /**
  * "Davlat obyektlaridan foydalanish markazi balansidagi obyektlar" jadvalining ustun
  * tuzilishi — sahifa (UI) va Excel eksporti bir xil mantiqni ishlatishi uchun shu yerda
  * markazlashtirilgan (properties.ts dagi buildWhere() bilan bir xil printsip).
  */
-export function buildDashboardColumns(): DashboardColumn[] {
-  return CATEGORIES.map((c) => {
+export function buildDashboardColumns(variant: DashboardColumnsVariant = "default"): DashboardColumn[] {
+  const landSplit = variant === "landSplit";
+  const cats = landSplit ? CATEGORIES.filter((c) => !LAND_SPLIT_HIDDEN_CODES.has(c.code)) : CATEGORIES;
+
+  return cats.map((c) => {
     const base = { code: c.code, short: c.short, nameUz: c.nameUz };
+
+    if (landSplit && LAND_SPLIT_CODES.has(c.code)) {
+      const key = `cat${c.code}` as LandSplitCatKey;
+      return {
+        ...base,
+        subs: [
+          { label: "Yer", qsExtra: "&isLand=1", get: (r: RegionCategoryRow) => r.landSplit[key].land },
+          { label: "Bino", qsExtra: "&isLand=0", get: (r: RegionCategoryRow) => r.landSplit[key].building },
+        ],
+      };
+    }
+    if (landSplit && c.code === 4) {
+      return {
+        ...base,
+        subs: [
+          { label: "Yer", qsExtra: "&isLand=1", get: (r: RegionCategoryRow) => r.landSplit.cat4.land },
+          { label: "Bino", qsExtra: "&isLand=0", get: (r: RegionCategoryRow) => r.landSplit.cat4.building },
+          // Maydon umumiy turaveradi — foydalanuvchi talabi, Yer/Bino'ga ajratilmaydi.
+          { label: "Maydon", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.rentLot.area },
+        ],
+      };
+    }
+    if (landSplit && c.code === 11) {
+      return {
+        ...base,
+        subs: [
+          { label: "Soni", qsExtra: "&isLand=0", get: (r: RegionCategoryRow) => r.rentBreakdown.vacant.buildingCount },
+          { label: "Maydoni", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.vacant.buildingUsefulArea },
+        ],
+      };
+    }
+    if (landSplit && c.code === 12) {
+      return {
+        ...base,
+        subs: [
+          { label: "Soni", qsExtra: "&isLand=0", get: (r: RegionCategoryRow) => r.rentBreakdown.hasVacant.buildingCount },
+          { label: "Bo'sh maydoni", area: true, get: (r: RegionCategoryRow) => r.rentBreakdown.hasVacant.buildingArea },
+        ],
+      };
+    }
+
     switch (c.code) {
       case 1:
         return {
@@ -711,4 +877,20 @@ export function buildDashboardColumns(): DashboardColumn[] {
         return { ...base, subs: [{ label: "Soni", get: (r: RegionCategoryRow) => r.counts[String(c.code)] ?? 0 }] };
     }
   });
+}
+
+/**
+ * "Jami" (jadval boshidagi umumiy ustun) — `buildDashboardColumns()` bilan bir xil
+ * sabab bilan markazlashtirilgan: "default"da bitta ustun (`row.total`), "landSplit"da
+ * Yer/Bino sub-ustunlariga ajraladi. Sahifa (UI) va Excel eksporti shu bitta funksiyani
+ * chaqiradi — ikkalasi orasida tafovut bo'lmasligi uchun.
+ */
+export function buildJamiColumn(variant: DashboardColumnsVariant = "default"): DashboardColumnSub[] {
+  if (variant === "landSplit") {
+    return [
+      { label: "Yer", get: (r: RegionCategoryRow) => r.landSplit.total.land },
+      { label: "Bino", get: (r: RegionCategoryRow) => r.landSplit.total.building },
+    ];
+  }
+  return [{ label: "Jami", get: (r: RegionCategoryRow) => r.total }];
 }

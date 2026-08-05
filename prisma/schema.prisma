@@ -90,7 +90,10 @@ model Region {
   // aynan bitta prefiks, hech qanday chalkashish yo'q.
   cadastrePrefix String?           @unique
   properties      Property[]
-  sources         OrganizationSource[]
+  sources         OrganizationSource[] @relation("OrgRegion")
+  // Respublika darajasidagi manbani shu hududga cheklaydi (masalan Direksiya →
+  // faqat Toshkent sh.) — `OrganizationSource.restrictedRegionId` ga qarang.
+  restrictedByOrgs OrganizationSource[] @relation("OrgRestrictedRegion")
   districts       District[]
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
@@ -131,7 +134,14 @@ model OrganizationSource {
   // Agentlikning o'zi yoki Direksiya. Ularning obyektlari kadastr prefiksi orqali
   // tegishli hududga taqsimlanadi (`Region.cadastrePrefix`).
   regionId   String?
-  region     Region?    @relation(fields: [regionId], references: [id])
+  region     Region?    @relation("OrgRegion", fields: [regionId], references: [id])
+  // ⚠️ `regionId`dan farqli: bu "ko'r-ko'rona ishonch" EMAS. Faqat regionId=null
+  // (respublika darajasidagi) manba uchun ma'noli — fan-out bosqichida kadastr
+  // PREFIKSI baribir tekshiriladi, natija shu hududga mos kelmasa obyekt olib
+  // tashlanadi (yozilmaydi ham, boshqa hududga ham yozilmaydi). Masalan Direksiya
+  // → faqat Toshkent sh. (2026-08-05, foydalanuvchi qarori). Bo'sh bo'lsa cheklov yo'q.
+  restrictedRegionId String?
+  restrictedRegion   Region? @relation("OrgRestrictedRegion", fields: [restrictedRegionId], references: [id])
   isActive   Boolean    @default(true)
   properties Property[]
   // Foydalanuvchi doirasi shu tashkilotga bog'lanadi (IJROCHI — bitta, MODERATOR — ko'p).
@@ -192,6 +202,12 @@ model Property {
   area         Decimal? @db.Decimal(14, 2)
   buildingArea Decimal? @db.Decimal(14, 2)
   rawApi2      Json? // to'liq javob (audit/kelajak uchun)
+
+  // Yer uchastkasimi yoki bino — rawApi2'dagi 11 ta maydon (object_area*, object_rooms)
+  // HAMMASI 0/bo'sh bo'lsa YER, aks holda BINO (`src/lib/area.ts` → isLandOnly()).
+  // Faqat "Davlat aktivlari agentligi" va "Direksiya" balansidagi obyektlar uchun
+  // dashboard jadvalida ko'rsatiladi, lekin hisoblanishi barcha obyektlar uchun bir xil.
+  isLand Boolean @default(false)
 
   // Hisoblangan holat (materialized — dashboard tezligi uchun)
   integrationCategoryCode Int? // 1–4 (integratsiyadan)

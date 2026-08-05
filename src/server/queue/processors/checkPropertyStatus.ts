@@ -144,6 +144,7 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
           address: b.address,
           area: b.area != null ? new Prisma.Decimal(b.area) : null,
           buildingArea: b.buildingArea != null ? new Prisma.Decimal(b.buildingArea) : null,
+          isLand: b.isLand,
           rawApi2: b.raw as Prisma.InputJsonValue,
         },
       });

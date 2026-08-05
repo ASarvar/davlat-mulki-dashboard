@@ -28,6 +28,8 @@ export interface PropertyFilters {
   hasRentContract?: boolean;
   /** Xususiylashtirish YOKI ijara savdosida (kat 3 va 4 birlashmasi, takror sanalmaydi). */
   onAnyAuction?: boolean;
+  /** Yer uchastkasimi (true) yoki bino (false) — Davlat aktivlari/Direksiya jadvalidagi Yer/Bino ustunlaridan. */
+  isLand?: boolean;
   /** MODERATOR uchun: faqat o'ziga biriktirilgan hudud(lar) bo'yicha saralash (ko'rish cheklovi emas). */
   myRegionsOnly?: boolean;
 }
@@ -128,6 +130,7 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
   // "Auksion savdolarida (Xususiy. va Ijara)" ustuni — xususiylashtirish YOKI ijara savdosida.
   if (f.onAnyAuction) and.push({ OR: [{ hasPrivatizationLot: true }, { hasRentLot: true }] });
 
+  if (typeof f.isLand === "boolean") and.push({ isLand: f.isLand });
   if (typeof f.inefficient === "boolean") and.push({ isInefficient: f.inefficient });
   if (f.syncStatus) and.push({ syncStatus: f.syncStatus });
 

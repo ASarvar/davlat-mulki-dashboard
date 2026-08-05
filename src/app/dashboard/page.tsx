@@ -24,6 +24,7 @@ import {
   getDashboardStats,
   computeDistrictStats,
   buildDashboardColumns,
+  buildJamiColumn,
   computeDistrictRentStats,
   type DashboardColumnSub,
   type RegionCategoryRow,
@@ -31,6 +32,7 @@ import {
   type StatsScope,
 } from "@/server/services/stats";
 import { listSourceNames } from "@/server/services/sources";
+import { isLandSplitSoha } from "@/lib/sourceLabel";
 import { SyncRunStatusBadge } from "@/components/badges";
 import { SourceFilter, ALL_SOHA, OWN_SOHA } from "./SourceFilter";
 
@@ -115,6 +117,7 @@ function SectionTitle({
 function CategoryTableRow({
   row,
   columns,
+  jamiSubs,
   zebra,
   objHref,
   scope,
@@ -125,6 +128,8 @@ function CategoryTableRow({
 }: {
   row: RegionCategoryRow;
   columns: ReturnType<typeof buildDashboardColumns>;
+  /** "default"da bitta ustun (jami), "landSplit"da Yer/Bino — `buildJamiColumn()`. */
+  jamiSubs: DashboardColumnSub[];
   zebra: string;
   objHref: (qs?: string) => string;
   scope: string;
@@ -153,7 +158,27 @@ function CategoryTableRow({
       <td className={`sticky left-4 right-4 z-10 ${zebra} py-2.5 pr-4 whitespace-nowrap group-hover:bg-slate-50`}>
         {label}
       </td>
-      <td className="py-2.5 text-center font-semibold tabular-nums">{nf(row.total)}</td>
+      {jamiSubs.length > 1 ? (
+        jamiSubs.map((sub, si) => {
+          const v = sub.get(row);
+          return (
+            <td
+              key={`jami-${sub.label}`}
+              className={`px-2 py-2.5 text-center font-semibold tabular-nums ${si === 0 ? "" : "border-l border-border"}`}
+            >
+              {v === 0 ? (
+                <span className="text-slate-300">0</span>
+              ) : (
+                <Link href={objHref(`${scope}&isLand=${sub.label === "Yer" ? 1 : 0}`)} className="hover:underline" style={{ color: "var(--cobalt)" }}>
+                  {nf(v)}
+                </Link>
+              )}
+            </td>
+          );
+        })
+      ) : (
+        <td className="py-2.5 text-center font-semibold tabular-nums">{nf(row.total)}</td>
+      )}
       {columns.map((c) => (
         <Fragment key={c.code}>
           {c.subs.map((sub, si) => {
@@ -173,7 +198,7 @@ function CategoryTableRow({
                   <span className="text-muted-foreground">{km(v)}</span>
                 ) : (
                   <Link
-                    href={objHref(`${scope}&category=${c.code}`)}
+                    href={objHref(`${scope}&category=${c.code}${sub.qsExtra ?? ""}`)}
                     className="hover:underline"
                     style={{ color: "var(--cobalt)" }}
                   >
@@ -290,8 +315,30 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // null) yoki bir nechta hudud bo'lsa — avtomatik ochilmaydi, foydalanuvchi o'zi tanlaydi.
   const scopedRegionIds =
     hardScope || usingDefaultScope ? [...new Set((ownSources ?? []).map((s) => s.regionId))] : [];
+  // Rol doirasi bitta hududni ANIQLAB bermasa (masalan cheklovsiz admin), tanlangan
+  // SOHA o'zi bitta hududga tegishli bo'lsa ham xuddi shunday avtomatik ochiladi —
+  // masalan Direksiya endi doim faqat Toshkent sh.ga cheklangan (`restrictedRegionId`).
+  const sohaSourceRegionIds =
+    soha && scopedRegionIds.length !== 1
+      ? [
+          ...new Set(
+            (
+              await prisma.organizationSource.findMany({
+                where: { name: soha, ...(effectiveSourceIds ? { id: { in: effectiveSourceIds } } : {}) },
+                select: { regionId: true, restrictedRegionId: true },
+              })
+              // `regionId` bo'lmasa (respublika darajasidagi manba) `restrictedRegionId`ga
+              // qaraymiz — masalan Direksiya doim regionId=null, lekin restrictedRegionId
+              // Toshkent sh.ni ko'rsatadi (`enqueue.ts`dagi fan-out cheklovi bilan bir xil manba).
+            ).map((s) => s.regionId ?? s.restrictedRegionId),
+          ),
+        ]
+      : [];
+  const singleRegionCandidates = scopedRegionIds.length > 0 ? scopedRegionIds : sohaSourceRegionIds;
   const autoTuman =
-    scopedRegionIds.length === 1 && scopedRegionIds[0] != null ? scopedRegionIds[0] : undefined;
+    singleRegionCandidates.length === 1 && singleRegionCandidates[0] != null
+      ? singleRegionCandidates[0]
+      : undefined;
   // `?tuman=none` — avtomatik ochilishni bekor qilish uchun (hudud qatorini yopish).
   const tumanRaw = str(sp.tuman) || undefined;
   const tuman = tumanRaw === "none" ? undefined : (tumanRaw ?? autoTuman);
@@ -341,13 +388,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   // Ustun tuzilishi markazlashtirilgan (stats.ts) — UI va Excel eksporti bir xil
   // mantiqni ishlatadi, aks holda ikkisi orasida tafovut paydo bo'lishi mumkin.
-  const COLUMNS = buildDashboardColumns();
+  // "landSplit" — FAQAT Davlat aktivlari agentligi/Direksiya tanlanganda (7/9/10 yo'q,
+  // 1-4 va Jami Yer/Bino'ga ajraladi, 11/12 faqat bino bo'yicha).
+  const variant = isLandSplitSoha(soha) ? "landSplit" : "default";
+  const COLUMNS = buildDashboardColumns(variant);
+  const jamiSubs = buildJamiColumn(variant);
 
-  // ⚠️ Cheklangan foydalanuvchi (bitta tashkilot) uchun 13 ta hudud qatori nol bo'lardi —
-  // shuning uchun bo'sh hududlar yashiriladi. Cheklovsiz foydalanuvchida har bir hududda
-  // obyekt bor, ya'ni rasmiy hisobot shakli (14 hudud) o'zgarmaydi.
-  const catRows = effectiveSourceIds === null ? s.byRegionCategory : s.byRegionCategory.filter((r) => r.total > 0);
-  const rentRows = effectiveSourceIds === null ? s.byRegion : s.byRegion.filter((r) => r.total > 0);
+  // ⚠️ Cheklangan foydalanuvchi (bitta tashkilot) YOKI aniq bitta SOHA tanlanganda
+  // (masalan Direksiya — endi doim bitta hududga cheklangan) bo'sh hududlar yashiriladi.
+  // Cheklovsiz + "Hammasi"da har bir hududda obyekt bor, rasmiy hisobot shakli (14 hudud)
+  // o'zgarmaydi.
+  const hideZeroRows = effectiveSourceIds !== null || soha !== undefined;
+  const catRows = hideZeroRows ? s.byRegionCategory.filter((r) => r.total > 0) : s.byRegionCategory;
+  const rentRows = hideZeroRows ? s.byRegion.filter((r) => r.total > 0) : s.byRegion;
   // Bitta hudud qolganda JAMI qatori shu qatorning aynan nusxasi bo'lardi — ko'rsatmaymiz.
   const showCatTotals = catRows.length > 1;
   const showRentTotals = rentRows.length > 1;
@@ -360,12 +413,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // JAMI qatori — hududlar yig'indisi (har bir kichik ustun uchun alohida).
   const totalObjects = catRows.reduce((a, r) => a + r.total, 0);
   const sumSub = (sub: DashboardColumnSub) => catRows.reduce((a, r) => a + sub.get(r), 0);
-  // "Bo'sh turgan maydoni" kartasi — kat 11 (Bo'sh turgan, ijarasi umuman yo'q)
-  // obyektlarining FOYDALI MAYDONI. `hasVacant.area` (kat 12 — "Bo'sh maydoni bor")
-  // BILAN ARALASHTIRMANG: u ijara shartnomasi bor, lekin qisman bo'sh qolgan
-  // obyektlarning bo'sh qismi — butunlay boshqa ustun.
-  const vacantAreaTotal = s.byRegionCategory.reduce(
-    (a, r) => a + r.rentBreakdown.vacant.usefulArea,
+  // "Bo'sh turgan" va "Bo'sh turgan maydoni" kartalari — kat 11 (Bo'sh turgan, ijarasi
+  // umuman yo'q) obyektlari. `hasVacant.area` (kat 12 — "Bo'sh maydoni bor") BILAN
+  // ARALASHTIRMANG: u ijara shartnomasi bor, lekin qisman bo'sh qolgan obyektlarning
+  // bo'sh qismi — butunlay boshqa ustun.
+  // ⚠️ "landSplit" variantida (Davlat aktivlari/Direksiya) kartalar ham jadvaldagi
+  // 11-ustun bilan BIR XIL bo'lishi kerak — FAQAT bino (isLand=false), aks holda
+  // kartada 2990 turib, jadvalda 600 chiqib, ikkalasi mos kelmasdi (foydalanuvchi topdi).
+  const vacantCountTotal = catRows.reduce(
+    (a, r) => a + (variant === "landSplit" ? r.rentBreakdown.vacant.buildingCount : r.counts["11"] ?? 0),
+    0,
+  );
+  const vacantAreaTotal = catRows.reduce(
+    (a, r) =>
+      a + (variant === "landSplit" ? r.rentBreakdown.vacant.buildingUsefulArea : r.rentBreakdown.vacant.usefulArea),
     0,
   );
 
@@ -412,11 +473,11 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           href={objHref()}
         />
         <StatCard
-          label="Bo'sh turgan"
-          value={s.inefficient}
+          label={variant === "landSplit" ? "Bo'sh turgan (bino)" : "Bo'sh turgan"}
+          value={vacantCountTotal}
           icon={TrendingDown}
           tone="gold"
-          href={objHref("inefficient=1")}
+          href={objHref(variant === "landSplit" ? "inefficient=1&isLand=0" : "inefficient=1")}
         />
         <StatCard
           label="Bo'sh turgan maydoni"
@@ -467,12 +528,21 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 >
                   Hududlar nomi
                 </th>
-                <th
-                  className="py-2 px-4 text-center align-middle font-bold"
-                  rowSpan={2}
-                >
-                  Jami
-                </th>
+                {jamiSubs.length > 1 ? (
+                  <th
+                    colSpan={jamiSubs.length}
+                    className="py-2 px-4 text-center align-middle font-bold"
+                  >
+                    Jami
+                  </th>
+                ) : (
+                  <th
+                    className="py-2 px-4 text-center align-middle font-bold"
+                    rowSpan={2}
+                  >
+                    Jami
+                  </th>
+                )}
                 {COLUMNS.map((c) => (
                   <Fragment key={c.code}>
                     <th
@@ -521,6 +591,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               </tr>
               {/* 2-qator: kichik ustunlar */}
               <tr className="border-b border-border text-center text-[10px]">
+                {jamiSubs.length > 1
+                  ? jamiSubs.map((sub, si) => (
+                      <th
+                        key={`jami-${sub.label}`}
+                        className={`px-2 py-1 text-center align-middle font-normal ${si === 0 ? "" : "border-l border-border"}`}
+                      >
+                        {sub.label}
+                      </th>
+                    ))
+                  : null}
                 {COLUMNS.map((c) =>
                   c.subs.map((sub, si) => (
                     <th
@@ -556,12 +636,24 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 >
                   J A M I:
                 </td>
-                <td
-                  className="py-3 text-center tabular-nums"
-                  style={{ color: "var(--navy)" }}
-                >
-                  {nf(totalObjects)}
-                </td>
+                {jamiSubs.length > 1 ? (
+                  jamiSubs.map((sub, si) => (
+                    <td
+                      key={`jami-${sub.label}`}
+                      className={`px-2 py-3 text-center tabular-nums ${si === 0 ? "" : "border-l border-border"}`}
+                      style={{ color: "var(--navy)" }}
+                    >
+                      {nf(sumSub(sub))}
+                    </td>
+                  ))
+                ) : (
+                  <td
+                    className="py-3 text-center tabular-nums"
+                    style={{ color: "var(--navy)" }}
+                  >
+                    {nf(totalObjects)}
+                  </td>
+                )}
                 {COLUMNS.map((c) => (
                   <Fragment key={c.code}>
                     {c.subs.map((sub, si) => (
@@ -630,6 +722,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     <CategoryTableRow
                       row={r}
                       columns={COLUMNS}
+                      jamiSubs={jamiSubs}
                       zebra={zebra}
                       objHref={objHref}
                       scope={rowScope}
@@ -671,6 +764,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                             key={d.regionId}
                             row={d}
                             columns={COLUMNS}
+                            jamiSubs={jamiSubs}
                             zebra="bg-slate-50/60"
                             objHref={objHref}
                             scope={`region=${r.regionId}&district=${d.regionId}`}
