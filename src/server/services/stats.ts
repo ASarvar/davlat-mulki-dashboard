@@ -46,10 +46,20 @@ export interface LandSplit {
   cat2: LandSplitStat;
   cat3: LandSplitStat;
   cat4: LandSplitStat;
+  /** Kat 5+6 (Tekin foydalanish + Ijara shartnomasi bor) yig'indisi — "Ijaraga berilgan
+   * obyektlar" ustuni uchun, `rentBreakdown.onlyFreeOrPaidCategory` bilan bir xil mezon. */
+  onlyFreeOrPaid: LandSplitStat;
 }
 
 function emptyLandSplit(): LandSplit {
-  return { total: { land: 0, building: 0 }, cat1: { land: 0, building: 0 }, cat2: { land: 0, building: 0 }, cat3: { land: 0, building: 0 }, cat4: { land: 0, building: 0 } };
+  return {
+    total: { land: 0, building: 0 },
+    cat1: { land: 0, building: 0 },
+    cat2: { land: 0, building: 0 },
+    cat3: { land: 0, building: 0 },
+    cat4: { land: 0, building: 0 },
+    onlyFreeOrPaid: { land: 0, building: 0 },
+  };
 }
 
 /**
@@ -325,6 +335,9 @@ function landSplitByGid(rows: LandCatRow[]): Map<string, LandSplit> {
     else if (row.code === 2) split.cat2[bucket] += n;
     else if (row.code === 3) split.cat3[bucket] += n;
     else if (row.code === 4) split.cat4[bucket] += n;
+    // "Ijaraga berilgan obyektlar" = kat 5 (Tekin foydalanish) + kat 6 (Ijara
+    // shartnomasi bor) — `rentBreakdown.onlyFreeOrPaidCategory` bilan BIR XIL mezon.
+    if (row.code === 5 || row.code === 6) split.onlyFreeOrPaid[bucket] += n;
   }
   return m;
 }
@@ -888,9 +901,25 @@ export function buildDashboardColumns(variant: DashboardColumnsVariant = "defaul
 export function buildJamiColumn(variant: DashboardColumnsVariant = "default"): DashboardColumnSub[] {
   if (variant === "landSplit") {
     return [
-      { label: "Yer", get: (r: RegionCategoryRow) => r.landSplit.total.land },
-      { label: "Bino", get: (r: RegionCategoryRow) => r.landSplit.total.building },
+      { label: "Yer", qsExtra: "&isLand=1", get: (r: RegionCategoryRow) => r.landSplit.total.land },
+      { label: "Bino", qsExtra: "&isLand=0", get: (r: RegionCategoryRow) => r.landSplit.total.building },
     ];
   }
   return [{ label: "Jami", get: (r: RegionCategoryRow) => r.total }];
+}
+
+/**
+ * "Ijaraga berilgan obyektlar (Sotilgan / Savdodagilardan tashqari)" — kat 6 dan keyingi
+ * qo'shimcha ustun. `buildJamiColumn()` bilan bir xil sabab: "landSplit"da Yer/Bino'ga
+ * ajraladi (foydalanuvchi talabi, 2026-08-06), "default"da bitta "Soni" ustuni
+ * (ilgarigidek). Sahifa (UI) va Excel eksporti shu bitta funksiyani chaqiradi.
+ */
+export function buildOnlyFreeOrPaidColumn(variant: DashboardColumnsVariant = "default"): DashboardColumnSub[] {
+  if (variant === "landSplit") {
+    return [
+      { label: "Yer", qsExtra: "&isLand=1", get: (r: RegionCategoryRow) => r.landSplit.onlyFreeOrPaid.land },
+      { label: "Bino", qsExtra: "&isLand=0", get: (r: RegionCategoryRow) => r.landSplit.onlyFreeOrPaid.building },
+    ];
+  }
+  return [{ label: "Soni", get: (r: RegionCategoryRow) => r.rentBreakdown.onlyFreeOrPaidCategory.count }];
 }

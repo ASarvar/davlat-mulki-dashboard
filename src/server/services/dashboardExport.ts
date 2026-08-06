@@ -2,6 +2,7 @@ import ExcelJS from "exceljs";
 import {
   buildDashboardColumns,
   buildJamiColumn,
+  buildOnlyFreeOrPaidColumn,
   type DashboardColumnSub,
   type DashboardColumnsVariant,
   type DashboardStats,
@@ -147,9 +148,7 @@ export function buildDashboardWorkbook(
       );
     }
     if (c.code === 6) {
-      exportCols.push(
-        standaloneCol("Ijaraga berilgan obyektlar", (r) => r.rentBreakdown.onlyFreeOrPaidCategory.count),
-      );
+      exportCols.push({ title: "Ijaraga berilgan obyektlar", subs: buildOnlyFreeOrPaidColumn(variant) });
     }
   }
   exportCols.push(standaloneCol("To'liq ijara berilgan", (r) => r.rentBreakdown.fullyRented.count));

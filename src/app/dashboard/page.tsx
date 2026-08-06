@@ -25,6 +25,7 @@ import {
   computeDistrictStats,
   buildDashboardColumns,
   buildJamiColumn,
+  buildOnlyFreeOrPaidColumn,
   computeDistrictRentStats,
   type DashboardColumnSub,
   type RegionCategoryRow,
@@ -46,6 +47,40 @@ const TONES: Record<Tone, { bg: string; color: string }> = {
   amber: { bg: "rgba(245,158,11,0.12)", color: "#b45309" },
   red: { bg: "rgba(239,68,68,0.10)", color: "#b91c1c" },
 };
+
+// ── Jadval uslubi — IKKALA jadval uchun umumiy tokenlar ──
+// ⚠️ Jadvallar `border-separate border-spacing-0` bilan quriladi (`border-collapse`
+// EMAS): faqat shunda muzlatilgan (sticky) ustunlarning chegaralari gorizontal
+// aylantirishda ham to'g'ri chiziladi. Shu sabab chegara har bir KATAKKA qo'yiladi,
+// qatorga emas.
+const ROW_LINE = "border-b border-slate-100";
+/** Kategoriya guruhlari orasidagi vertikal ajratkich. */
+const GROUP_LINE = "border-l border-slate-200/70";
+const CELL = "px-3 py-2.5 text-center tabular-nums";
+/** Qator ustiga kelganda — oddiy kataklar uchun (fon `tr`da). */
+const ROW_HOVER = "transition-colors hover:bg-[#eef4fc]";
+/** ...va muzlatilgan kataklar uchun (ularda o'z foni bor, `tr` foni ko'rinmaydi). */
+const CELL_HOVER = "transition-colors group-hover:bg-[#eef4fc]";
+/** Muzlatilgan ustunlar chetidagi soya — aylantirish chegarasini bildiradi. */
+const STICKY_EDGE = "shadow-[6px_0_10px_-8px_rgba(15,23,42,0.35)]";
+const NUM_LINK = "font-medium text-[var(--cobalt)] underline-offset-2 hover:underline";
+const ZERO = "text-slate-300";
+// JAMI qatori — rasmiy hisobot shakli: BIRINCHI qator, oltin fon (CLAUDE.md).
+// ⚠️ Zebra endi neytral (slate), oltin esa FAQAT shu qatorda — ilgari ikkalasi ham
+// `--gold-lighter` edi va JAMI oddiy qatordan deyarli farq qilmasdi.
+const TOTALS_BG = "bg-[var(--gold-lighter)]";
+const TOTALS_ROW = `${TOTALS_BG} font-bold text-[var(--navy)]`;
+const TOTALS_LINE = "border-b-2 border-[var(--gold)]";
+/** Ochilgan tuman qatorlari — hudud qatoridan ko'kish tus bilan ajraladi. */
+const DISTRICT_BG = "bg-[#f5f8fd]";
+/** Muzlatilgan № ustunining kengligi — thead/tbody/JAMI da BIR XIL bo'lishi shart. */
+const LEAD_W = "w-14 min-w-[3.5rem]";
+const NAME_LEFT = "left-14";
+/** Bo'lim kartasi. */
+const CARD =
+  "mt-6 rounded-2xl bg-card p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/70";
+const EXPORT_BTN =
+  "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-900 hover:ring-slate-300";
 
 function StatCard({
   label,
@@ -118,6 +153,7 @@ function CategoryTableRow({
   row,
   columns,
   jamiSubs,
+  onlyFreeOrPaidSubs,
   zebra,
   objHref,
   scope,
@@ -130,6 +166,8 @@ function CategoryTableRow({
   columns: ReturnType<typeof buildDashboardColumns>;
   /** "default"da bitta ustun (jami), "landSplit"da Yer/Bino — `buildJamiColumn()`. */
   jamiSubs: DashboardColumnSub[];
+  /** "Ijaraga berilgan obyektlar" ustuni — `buildOnlyFreeOrPaidColumn()`. */
+  onlyFreeOrPaidSubs: DashboardColumnSub[];
   zebra: string;
   objHref: (qs?: string) => string;
   scope: string;
@@ -139,55 +177,64 @@ function CategoryTableRow({
   lead: React.ReactNode;
 }) {
   const numCell = (value: number, qs: string, extraCls = "") => (
-    <td className={`px-2 py-2.5 text-center tabular-nums ${extraCls}`}>
+    <td className={`${CELL} ${ROW_LINE} ${extraCls}`}>
       {value === 0 ? (
-        <span className="text-slate-300">0</span>
+        <span className={ZERO}>0</span>
       ) : (
-        <Link href={objHref(qs)} className="hover:underline" style={{ color: "var(--cobalt)" }}>
+        <Link href={objHref(qs)} className={NUM_LINK}>
           {nf(value)}
         </Link>
       )}
     </td>
   );
 
+  // Bir nechta sub-ustunga ajraladigan qo'shimcha ustunlar uchun umumiy render
+  // ("Jami" va "Ijaraga berilgan obyektlar" — `landSplit`da ikkalasi ham Yer/Bino'ga
+  // bo'linadi). `baseQs` — kategoriya/xususiyat filtri, `sub.qsExtra` (masalan
+  // "&isLand=1") shunga qo'shiladi.
+  const subGroupCells = (subs: DashboardColumnSub[], keyPrefix: string, baseQs: string, bold = false) =>
+    subs.map((sub, si) => {
+      const v = sub.get(row);
+      const cls = `${CELL} ${ROW_LINE} ${bold ? "font-semibold" : ""} ${si === 0 ? "" : GROUP_LINE}`;
+      return (
+        <td key={`${keyPrefix}-${sub.label}`} className={cls}>
+          {v === 0 ? (
+            <span className={ZERO}>0</span>
+          ) : (
+            <Link href={objHref(`${baseQs}${sub.qsExtra ?? ""}`)} className={NUM_LINK}>
+              {nf(v)}
+            </Link>
+          )}
+        </td>
+      );
+    });
+
   return (
-    <tr className={`group border-b border-border last:border-0 hover:bg-slate-50/70 ${zebra}`}>
-      <td className={`sticky left-0 z-10 ${zebra} py-2.5 pr-3 tabular-nums text-muted-foreground group-hover:bg-slate-50`}>
+    <tr className={`group ${zebra} ${ROW_HOVER}`}>
+      <td
+        className={`sticky left-0 z-20 ${LEAD_W} ${zebra} ${ROW_LINE} ${CELL_HOVER} px-2 py-2.5 text-center tabular-nums text-slate-400`}
+      >
         {lead}
       </td>
-      <td className={`sticky left-4 right-4 z-10 ${zebra} py-2.5 pr-4 whitespace-nowrap group-hover:bg-slate-50`}>
+      <td
+        className={`sticky ${NAME_LEFT} z-20 ${zebra} ${ROW_LINE} ${CELL_HOVER} ${STICKY_EDGE} whitespace-nowrap py-2.5 pl-1 pr-4`}
+      >
         {label}
       </td>
       {jamiSubs.length > 1 ? (
-        jamiSubs.map((sub, si) => {
-          const v = sub.get(row);
-          return (
-            <td
-              key={`jami-${sub.label}`}
-              className={`px-2 py-2.5 text-center font-semibold tabular-nums ${si === 0 ? "" : "border-l border-border"}`}
-            >
-              {v === 0 ? (
-                <span className="text-slate-300">0</span>
-              ) : (
-                <Link href={objHref(`${scope}&isLand=${sub.label === "Yer" ? 1 : 0}`)} className="hover:underline" style={{ color: "var(--cobalt)" }}>
-                  {nf(v)}
-                </Link>
-              )}
-            </td>
-          );
-        })
+        subGroupCells(jamiSubs, "jami", scope, true)
       ) : (
-        <td className="py-2.5 text-center font-semibold tabular-nums">{nf(row.total)}</td>
+        <td className={`${CELL} ${ROW_LINE} font-semibold text-slate-900`}>{nf(row.total)}</td>
       )}
       {columns.map((c) => (
         <Fragment key={c.code}>
           {c.subs.map((sub, si) => {
             const v = sub.get(row);
-            const cls = `px-2 py-2.5 text-center tabular-nums ${si === 0 ? "border-l border-border" : ""}`;
+            const cls = `${CELL} ${ROW_LINE} ${si === 0 ? GROUP_LINE : ""}`;
             if (v === 0) {
               return (
                 <td key={`${c.code}-${sub.label}`} className={cls}>
-                  <span className="text-slate-300">0</span>
+                  <span className={ZERO}>0</span>
                 </td>
               );
             }
@@ -195,12 +242,11 @@ function CategoryTableRow({
             return (
               <td key={`${c.code}-${sub.label}`} className={cls}>
                 {sub.area ? (
-                  <span className="text-muted-foreground">{km(v)}</span>
+                  <span className="text-slate-500">{km(v)}</span>
                 ) : (
                   <Link
                     href={objHref(`${scope}&category=${c.code}${sub.qsExtra ?? ""}`)}
-                    className="hover:underline"
-                    style={{ color: "var(--cobalt)" }}
+                    className={NUM_LINK}
                   >
                     {nf(v)}
                   </Link>
@@ -209,14 +255,12 @@ function CategoryTableRow({
             );
           })}
           {c.code === 4
-            ? numCell(row.rentBreakdown.onAnyAuction.count, `${scope}&onAnyAuction=1`, "border-l border-border")
+            ? numCell(row.rentBreakdown.onAnyAuction.count, `${scope}&onAnyAuction=1`, GROUP_LINE)
             : null}
-          {c.code === 6
-            ? numCell(row.rentBreakdown.onlyFreeOrPaidCategory.count, `${scope}&hasRentContract=1`, "border-l border-border")
-            : null}
+          {c.code === 6 ? subGroupCells(onlyFreeOrPaidSubs, "ofp", `${scope}&hasRentContract=1`) : null}
         </Fragment>
       ))}
-      {numCell(row.rentBreakdown.fullyRented.count, `${scope}&fullyRented=1`, "border-l border-border")}
+      {numCell(row.rentBreakdown.fullyRented.count, `${scope}&fullyRented=1`, GROUP_LINE)}
     </tr>
   );
 }
@@ -238,15 +282,25 @@ function RentTableRow({
   label: React.ReactNode;
   lead: React.ReactNode;
 }) {
+  const num = (v: string) => (
+    <td className={`${ROW_LINE} py-2.5 pr-4 text-right tabular-nums`}>{v}</td>
+  );
+
   return (
-    <tr className={`border-b border-border last:border-0 hover:bg-slate-50/70 ${zebra}`}>
-      <td className="py-2.5 pr-3 tabular-nums text-muted-foreground">{lead}</td>
-      <td className="py-2.5 pr-4">{label}</td>
-      <td className="py-2.5 pr-4 text-right tabular-nums">{nf(row.total)}</td>
-      <td className="py-2.5 pr-4 text-right tabular-nums">{nf(row.rentedObjects)}</td>
-      <td className="py-2.5 pr-4 text-right tabular-nums">{nf(row.contractCount)}</td>
-      <td className="py-2.5 pr-4 text-right tabular-nums">{nf(row.rentArea, 1)}</td>
-      <td className="py-2.5 text-right tabular-nums">{nf(row.rentSum / 1_000_000, 1)}</td>
+    <tr className={`${zebra} ${ROW_HOVER}`}>
+      <td className={`${ROW_LINE} ${LEAD_W} px-2 py-2.5 text-center tabular-nums text-slate-400`}>
+        {lead}
+      </td>
+      <td className={`${ROW_LINE} py-2.5 pl-1 pr-4`}>{label}</td>
+      <td className={`${ROW_LINE} py-2.5 pr-4 text-right font-semibold tabular-nums text-slate-900`}>
+        {nf(row.total)}
+      </td>
+      {num(nf(row.rentedObjects))}
+      {num(nf(row.contractCount))}
+      {num(nf(row.rentArea, 1))}
+      <td className={`${ROW_LINE} py-2.5 text-right tabular-nums`}>
+        {nf(row.rentSum / 1_000_000, 1)}
+      </td>
     </tr>
   );
 }
@@ -393,6 +447,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   const variant = isLandSplitSoha(soha) ? "landSplit" : "default";
   const COLUMNS = buildDashboardColumns(variant);
   const jamiSubs = buildJamiColumn(variant);
+  const onlyFreeOrPaidSubs = buildOnlyFreeOrPaidColumn(variant);
 
   // ⚠️ Cheklangan foydalanuvchi (bitta tashkilot) YOKI aniq bitta SOHA tanlanganda
   // (masalan Direksiya — endi doim bitta hududga cheklangan) bo'sh hududlar yashiriladi.
@@ -496,34 +551,34 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
 
       {/* Kategoriyalar kesimi — hududlar bo'yicha (JAMI yuqorida) */}
-      <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-sm">
+      <section className={CARD}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <SectionTitle icon={Tags}>
             {soha ? `${soha} balansidagi obyektlar` : "Davlat mulki balansidagi obyektlar"}
           </SectionTitle>
           <a
             href={`/api/export/dashboard-categories${sohaParam ? `?${sohaParam}` : ""}`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-slate-50 hover:text-slate-700"
+            className={EXPORT_BTN}
           >
             <Download className="h-3.5 w-3.5" />
             Excelga eksport
           </a>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm left-4">
-            <thead style={{ background: "var(--cobalt)", color: "#fff" }}>
+        <div className="overflow-x-auto rounded-xl ring-1 ring-slate-200">
+          <table className="w-full border-separate border-spacing-0 text-sm">
+            {/* 1-qator — navy (guruh nomlari), 2-qator — kobalt (kichik ustunlar):
+                ikki daraja rangda ham ajralib turadi. */}
+            <thead className="text-white">
               {/* 1-qator: kategoriya nomlari (kengaytirilganlari colSpan bilan) */}
-              <tr className="text-center text-xs uppercase tracking-wide">
+              <tr className="text-center">
                 <th
-                  className="sticky left-0 z-10 py-2 pr-3 text-center align-middle font-bold"
-                  style={{ background: "var(--cobalt)" }}
+                  className={`sticky left-0 z-30 ${LEAD_W} bg-[var(--navy-mid)] px-2 py-2.5 text-center align-middle text-xs font-semibold uppercase tracking-wide`}
                   rowSpan={2}
                 >
                   №
                 </th>
                 <th
-                  className="sticky left-8 z-10 py-2 pr-4 text-center align-middle font-bold"
-                  style={{ background: "var(--cobalt)" }}
+                  className={`sticky ${NAME_LEFT} z-30 bg-[var(--navy-mid)] ${STICKY_EDGE} py-2.5 pl-1 pr-4 text-left align-middle text-xs font-semibold uppercase tracking-wide`}
                   rowSpan={2}
                 >
                   Hududlar nomi
@@ -531,13 +586,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 {jamiSubs.length > 1 ? (
                   <th
                     colSpan={jamiSubs.length}
-                    className="py-2 px-4 text-center align-middle font-bold"
+                    className="bg-[var(--navy-mid)] px-3 py-2.5 text-center align-middle text-xs font-semibold uppercase tracking-wide"
                   >
                     Jami
                   </th>
                 ) : (
                   <th
-                    className="py-2 px-4 text-center align-middle font-bold"
+                    className="bg-[var(--navy-mid)] px-3 py-2.5 text-center align-middle text-xs font-semibold uppercase tracking-wide"
                     rowSpan={2}
                   >
                     Jami
@@ -548,91 +603,88 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                     <th
                       colSpan={c.subs.length}
                       title={`${c.code}. ${c.nameUz}`}
-                      className="border-l border-border px-2 py-2 text-center align-middle font-bold"
+                      className="border-l border-white/10 bg-[var(--navy-mid)] px-3 py-2.5 text-center align-middle"
                     >
-                      <span className="block text-[12px] font-medium normal-case leading-tight">
-                        {c.short}
-                      </span>
+                      <span className="block text-[12px] font-medium leading-tight">{c.short}</span>
                     </th>
                     {c.code === 4 ? (
                       <th
-                        className="border-l border-border px-2 py-2 text-center align-middle font-bold"
+                        className="border-l border-white/10 bg-[var(--navy-mid)] px-3 py-2.5 text-center align-middle"
                         rowSpan={2}
                         title="Xususiylashtirish yoki ijara savdosida turgan obyektlar (ikkalasida ham bo'lgan obyekt faqat bir marta sanaladi)"
                       >
-                        <span className="block text-[12px] font-medium normal-case leading-tight">
+                        <span className="block max-w-[9rem] text-[12px] font-medium leading-tight">
                           Auksion savdolarida (Xususiy. va Ijara)
                         </span>
                       </th>
                     ) : null}
                     {c.code === 6 ? (
                       <th
-                        className="border-l border-border px-2 py-2 text-center align-middle font-bold"
-                        rowSpan={2}
+                        className="border-l border-white/10 bg-[var(--navy-mid)] px-3 py-2.5 text-center align-middle"
+                        colSpan={onlyFreeOrPaidSubs.length}
+                        rowSpan={onlyFreeOrPaidSubs.length > 1 ? 1 : 2}
                         title="Tekin foydalanish yoki Ijara shartnomasi bor kategoriyalaridan biriga tegishli obyektlar"
                       >
-                        <span className="block text-[12px] font-medium normal-case leading-tight">
-                          Ijaraga berilgan obyektlar (Sotilgan / Savdodagilardan
-                          tashqari)
+                        <span className="block max-w-[10rem] text-[12px] font-medium leading-tight">
+                          Ijaraga berilgan obyektlar (Sotilgan / Savdodagilardan tashqari)
                         </span>
                       </th>
                     ) : null}
                   </Fragment>
                 ))}
                 <th
-                  className="border-l border-border px-2 py-2 text-center align-middle font-bold"
+                  className="border-l border-white/10 bg-[var(--navy-mid)] px-3 py-2.5 text-center align-middle"
                   rowSpan={2}
                   title="Ijara shartnomasi bor (tekin foydalanish yoki pullik) VA foydali maydon to'liq band"
                 >
-                  <span className="block text-[12px] font-medium normal-case leading-tight">
-                    To'liq ijara berilgan
+                  <span className="block max-w-[7rem] text-[12px] font-medium leading-tight">
+                    To&apos;liq ijara berilgan
                   </span>
                 </th>
               </tr>
               {/* 2-qator: kichik ustunlar */}
-              <tr className="border-b border-border text-center text-[10px]">
+              <tr className="text-center">
                 {jamiSubs.length > 1
                   ? jamiSubs.map((sub, si) => (
                       <th
                         key={`jami-${sub.label}`}
-                        className={`px-2 py-1 text-center align-middle font-normal ${si === 0 ? "" : "border-l border-border"}`}
+                        className={`bg-[var(--cobalt)]  px-3 py-1.5 text-center align-middle text-[10px] font-medium tracking-wide text-white/75 ${si === 0 ? "" : "border-l border-white/10"}`}
                       >
                         {sub.label}
                       </th>
                     ))
                   : null}
-                {COLUMNS.map((c) =>
-                  c.subs.map((sub, si) => (
-                    <th
-                      key={`${c.code}-${sub.label}`}
-                      className={`px-2 py-1 text-center align-middle font-normal ${si === 0 ? "border-l border-border" : ""}`}
-                    >
-                      {c.subs.length > 1 ? sub.label : ""}
-                    </th>
-                  )),
-                )}
+                {COLUMNS.map((c) => (
+                  <Fragment key={c.code}>
+                    {c.subs.map((sub, si) => (
+                      <th
+                        key={`${c.code}-${sub.label}`}
+                        className={`bg-[var(--cobalt)]  px-3 py-1.5 text-center align-middle text-[10px] font-medium tracking-wide text-white/75 ${si === 0 ? "border-l border-white/10" : ""}`}
+                      >
+                        {c.subs.length > 1 ? sub.label : ""}
+                      </th>
+                    ))}
+                    {c.code === 6 && onlyFreeOrPaidSubs.length > 1
+                      ? onlyFreeOrPaidSubs.map((sub, si) => (
+                          <th
+                            key={`ofp-${sub.label}`}
+                            className={`bg-[var(--cobalt)]  px-3 py-1.5 text-center align-middle text-[10px] font-medium tracking-wide text-white/75 ${si === 0 ? "border-l border-white/10" : ""}`}
+                          >
+                            {sub.label}
+                          </th>
+                        ))
+                      : null}
+                  </Fragment>
+                ))}
               </tr>
             </thead>
             <tbody>
               {/* JAMI — birinchi qator. Bitta hudud qolganda ko'rsatilmaydi (nusxa bo'lardi). */}
               {showCatTotals ? (
-              <tr
-                className="border-b-2 font-bold"
-                style={{
-                  background: "rgba(200,169,110,0.14)",
-                  borderColor: "var(--gold)",
-                }}
-              >
+              <tr className={TOTALS_ROW}>
+                <td className={`sticky left-0 z-20 ${LEAD_W} ${TOTALS_BG} ${TOTALS_LINE} px-2 py-3`} />
                 <td
-                  className="sticky left-0 z-10 py-3 pr-3"
-                  style={{ background: "var(--gold-lighter)" }}
-                />
-                <td
-                  className="sticky left-8 z-10 py-3 pr-4"
-                  style={{
-                    background: "var(--gold-lighter)",
-                    color: "var(--navy)",
-                  }}
+                  className={`sticky ${NAME_LEFT} z-20 ${TOTALS_BG} ${TOTALS_LINE} ${STICKY_EDGE} whitespace-nowrap py-3 pl-1 pr-4 tracking-wide`}
                 >
                   J A M I:
                 </td>
@@ -640,78 +692,52 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   jamiSubs.map((sub, si) => (
                     <td
                       key={`jami-${sub.label}`}
-                      className={`px-2 py-3 text-center tabular-nums ${si === 0 ? "" : "border-l border-border"}`}
-                      style={{ color: "var(--navy)" }}
+                      className={`${CELL} ${TOTALS_LINE} py-3 ${si === 0 ? "" : GROUP_LINE}`}
                     >
                       {nf(sumSub(sub))}
                     </td>
                   ))
                 ) : (
-                  <td
-                    className="py-3 text-center tabular-nums"
-                    style={{ color: "var(--navy)" }}
-                  >
-                    {nf(totalObjects)}
-                  </td>
+                  <td className={`${CELL} ${TOTALS_LINE} py-3`}>{nf(totalObjects)}</td>
                 )}
                 {COLUMNS.map((c) => (
                   <Fragment key={c.code}>
                     {c.subs.map((sub, si) => (
                       <td
                         key={`${c.code}-${sub.label}`}
-                        className={`px-2 py-3 text-center tabular-nums ${si === 0 ? "border-l border-border" : ""}`}
-                        style={{ color: "var(--navy)" }}
+                        className={`${CELL} ${TOTALS_LINE} py-3 ${si === 0 ? GROUP_LINE : ""}`}
                       >
                         {sub.area ? km(sumSub(sub)) : nf(sumSub(sub))}
                       </td>
                     ))}
                     {c.code === 4 ? (
-                      <td
-                        className="border-l border-border px-2 py-3 text-center tabular-nums"
-                        style={{ color: "var(--navy)" }}
-                      >
-                        {nf(
-                          catRows.reduce(
-                            (a, r) => a + r.rentBreakdown.onAnyAuction.count,
-                            0,
-                          ),
-                        )}
+                      <td className={`${CELL} ${TOTALS_LINE} ${GROUP_LINE} py-3`}>
+                        {nf(catRows.reduce((a, r) => a + r.rentBreakdown.onAnyAuction.count, 0))}
                       </td>
                     ) : null}
-                    {c.code === 6 ? (
-                      <td
-                        className="border-l border-border px-2 py-3 text-center tabular-nums"
-                        style={{ color: "var(--navy)" }}
-                      >
-                        {nf(
-                          catRows.reduce(
-                            (a, r) =>
-                              a + r.rentBreakdown.onlyFreeOrPaidCategory.count,
-                            0,
-                          ),
-                        )}
-                      </td>
-                    ) : null}
+                    {c.code === 6
+                      ? onlyFreeOrPaidSubs.map((sub, si) => (
+                          <td
+                            key={`ofp-${sub.label}`}
+                            className={`${CELL} ${TOTALS_LINE} py-3 ${si === 0 ? GROUP_LINE : ""}`}
+                          >
+                            {nf(catRows.reduce((a, r) => a + sub.get(r), 0))}
+                          </td>
+                        ))
+                      : null}
                   </Fragment>
                 ))}
-                <td
-                  className="border-l border-border px-2 py-3 text-center tabular-nums"
-                  style={{ color: "var(--navy)" }}
-                >
-                  {nf(
-                    catRows.reduce(
-                      (a, r) => a + r.rentBreakdown.fullyRented.count,
-                      0,
-                    ),
-                  )}
+                <td className={`${CELL} ${TOTALS_LINE} ${GROUP_LINE} py-3`}>
+                  {nf(catRows.reduce((a, r) => a + r.rentBreakdown.fullyRented.count, 0))}
                 </td>
               </tr>
               ) : null}
 
               {catRows.map((r, i) => {
-                // Zebra: juft qatorlar oq, toq qatorlar och-oltin (light-golden).
-                const zebra =
-                  i % 2 === 1 ? "bg-[var(--gold-lighter)]" : "bg-white";
+                // Zebra: neytral (oltin FAQAT JAMI qatorida — TOTALS_BG izohiga qarang).
+                // ⚠️ Fon SHAFFOF BO'LMASLIGI shart: muzlatilgan (sticky) ustunlar
+                // ostidan gorizontal aylantirilgan kataklar ko'rinib qolardi.
+                const zebra = i % 2 === 1 ? "bg-slate-50" : "bg-white";
                 const national = isNational(r.regionId);
                 const expanded = !national && tuman === r.regionId;
                 // Respublika darajasidagi qator (masalan "Markaziy apparat") haqiqiy
@@ -723,6 +749,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                       row={r}
                       columns={COLUMNS}
                       jamiSubs={jamiSubs}
+                      onlyFreeOrPaidSubs={onlyFreeOrPaidSubs}
                       zebra={zebra}
                       objHref={objHref}
                       scope={rowScope}
@@ -765,7 +792,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                             row={d}
                             columns={COLUMNS}
                             jamiSubs={jamiSubs}
-                            zebra="bg-slate-50/60"
+                            onlyFreeOrPaidSubs={onlyFreeOrPaidSubs}
+                            zebra={DISTRICT_BG}
                             objHref={objHref}
                             scope={`region=${r.regionId}&district=${d.regionId}`}
                             nf={nf}
@@ -803,49 +831,46 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </section>
 
       {/* Hududlar kesimi — rasmiy hisobot shakli (JAMI yuqorida) */}
-      <section className="mt-6 rounded-xl border border-border bg-card p-5 shadow-sm">
+      <section className={CARD}>
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <SectionTitle icon={MapPin}>
             Hududlar kesimi — ijara shartnomalari
           </SectionTitle>
-          <a
-            href="/api/export/dashboard-rent"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground transition hover:bg-slate-50 hover:text-slate-700"
-          >
+          <a href="/api/export/dashboard-rent" className={EXPORT_BTN}>
             <Download className="h-3.5 w-3.5" />
             Excelga eksport
           </a>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead style={{ background: "var(--cobalt)", color: "#fff" }}>
-              <tr className="text-xs uppercase tracking-wide">
-                <th className="py-2 pr-3 text-center align-middle font-medium">
+        <div className="overflow-x-auto rounded-xl ring-1 ring-slate-200">
+          <table className="w-full border-separate border-spacing-0 text-sm">
+            <thead className="bg-[var(--navy-mid)] text-white">
+              <tr className="text-xs tracking-wide">
+                <th className={`${LEAD_W} px-2 py-2.5 text-center align-middle font-semibold`}>
                   №
                 </th>
-                <th className="py-2 pr-4 text-left align-middle font-medium">
+                <th className="py-2.5 pl-1 pr-4 text-left align-middle font-semibold">
                   Hududlar nomi
                 </th>
-                <th className="py-2 pr-4 text-right align-middle font-medium">
+                <th className="py-2.5 pr-4 text-center align-middle font-semibold">
                   Obyektlar soni
-                  <span className="block text-[10px] font-normal normal-case">
+                  <span className="block text-[10px] font-normal normal-case text-white/60">
                     (Kadastr agentligi)
                   </span>
                 </th>
-                <th className="py-2 pr-4 text-right align-middle font-medium">
+                <th className="py-2.5 pr-4 text-right align-middle font-semibold">
                   Obyekt soni
-                  <span className="block text-[10px] font-normal normal-case">
+                  <span className="block text-[10px] font-normal normal-case text-white/60">
                     (ijaraga berilgan)
                   </span>
                 </th>
                 {/* <th className="py-2 pr-4 text-right font-medium">Ijaraga berilishi (%)</th> */}
-                <th className="py-2 pr-4 text-right align-middle font-medium">
+                <th className="py-2.5 pr-4 text-center align-middle font-semibold">
                   Shartnoma soni
                 </th>
-                <th className="py-2 pr-4 text-right align-middle font-medium">
+                <th className="py-2.5 pr-4 text-center align-middle font-semibold">
                   Maydoni (kv.m)
                 </th>
-                <th className="py-2 text-right align-middle font-medium">
+                <th className="py-2.5 pr-4 text-center align-middle font-semibold">
                   Yillik ijara summasi
                 </th>
               </tr>
@@ -853,55 +878,35 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <tbody>
               {/* JAMI — birinchi qator. Bitta hudud qolganda ko'rsatilmaydi (nusxa bo'lardi). */}
               {showRentTotals ? (
-              <tr
-                className="border-b-2 font-bold"
-                style={{
-                  background: "rgba(200,169,110,0.14)",
-                  borderColor: "var(--gold)",
-                }}
-              >
-                <td className="py-3 pr-3" />
-                <td className="py-3 pr-4" style={{ color: "var(--navy)" }}>
+              <tr className={TOTALS_ROW}>
+                <td className={`${TOTALS_LINE} ${LEAD_W} px-2 py-3`} />
+                <td className={`${TOTALS_LINE} whitespace-nowrap py-3 pl-1 pr-4 tracking-wide`}>
                   J A M I:
                 </td>
-                <td
-                  className="py-3 pr-4 text-right tabular-nums"
-                  style={{ color: "var(--navy)" }}
-                >
+                <td className={`${TOTALS_LINE} py-3 pr-4 text-right tabular-nums`}>
                   {nf(s.totals.total)}
                 </td>
-                <td
-                  className="py-3 pr-4 text-right tabular-nums"
-                  style={{ color: "var(--navy)" }}
-                >
+                <td className={`${TOTALS_LINE} py-3 pr-4 text-right tabular-nums`}>
                   {nf(s.totals.rentedObjects)}
                 </td>
-                {/* <td className="py-3 pr-4 text-right tabular-nums" style={{ color: "var(--navy)" }}>{s.totals.rentedPct}</td> */}
-                <td
-                  className="py-3 pr-4 text-right tabular-nums"
-                  style={{ color: "var(--navy)" }}
-                >
+                {/* <td className="py-3 pr-4 text-right tabular-nums">{s.totals.rentedPct}</td> */}
+                <td className={`${TOTALS_LINE} py-3 pr-4 text-right tabular-nums`}>
                   {nf(s.totals.contractCount)}
                 </td>
-                <td
-                  className="py-3 pr-4 text-right tabular-nums"
-                  style={{ color: "var(--navy)" }}
-                >
+                <td className={`${TOTALS_LINE} py-3 pr-4 text-right tabular-nums`}>
                   {nf(s.totals.rentArea, 1)}
                 </td>
-                <td
-                  className="py-3 text-right tabular-nums"
-                  style={{ color: "var(--navy)" }}
-                >
+                <td className={`${TOTALS_LINE} py-3 pr-4 text-right tabular-nums`}>
                   {nf(s.totals.rentSum / 1_000_000, 1)}
                 </td>
               </tr>
               ) : null}
 
               {rentRows.map((r, i) => {
-                // Zebra: juft qatorlar oq, toq qatorlar och-oltin (light-golden).
-                const zebra =
-                  i % 2 === 1 ? "bg-[var(--gold-lighter)]" : "bg-white";
+                // Zebra: neytral (oltin FAQAT JAMI qatorida — TOTALS_BG izohiga qarang).
+                // ⚠️ Fon SHAFFOF BO'LMASLIGI shart: muzlatilgan (sticky) ustunlar
+                // ostidan gorizontal aylantirilgan kataklar ko'rinib qolardi.
+                const zebra = i % 2 === 1 ? "bg-slate-50" : "bg-white";
                 const national = isNational(r.regionId);
                 const expanded = !national && tuman === r.regionId;
                 const rowScope = national ? `tashkilot=${r.regionId}` : `region=${r.regionId}`;
@@ -947,7 +952,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                           <RentTableRow
                             key={d.regionId}
                             row={d}
-                            zebra="bg-slate-50/60"
+                            zebra={DISTRICT_BG}
                             nf={nf}
                             lead={<span className="text-slate-300">·</span>}
                             label={
