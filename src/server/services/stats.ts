@@ -187,29 +187,36 @@ export interface StatsScope {
 }
 
 /**
- * Doirani SQL shartiga aylantiradi. `col` — `sourceId` ustuni ifodasi
- * (`p."sourceId"` yoki alias'siz `"sourceId"`). Qiymatlar PARAMETRLANADI.
+ * Doirani SQL shartiga aylantiradi. `alias` — jadval taxallusi nuqta bilan
+ * (`Prisma.sql`p.``), taxallussiz so'rovda esa berilmaydi. Qiymatlar PARAMETRLANADI.
+ *
+ * ⚠️ **Balansdan chiqarilgan obyektlar HAR DOIM chiqarib tashlanadi.** Dashboard
+ * statistikasining BARCHA raw-SQL so'rovlari shu funksiyadan o'tadi, shuning uchun
+ * cheklov aynan shu yerda — BIR joyda — turadi. Yangi agregat qo'shsangiz `sourceCond()`
+ * ni ishlating, shartni qo'lda yozmang (aks holda chiqarilgan obyekt hisobga qaytib kirardi).
  */
-function sourceCond(scope: StatsScope, col: Prisma.Sql): Prisma.Sql {
-  const parts: Prisma.Sql[] = [];
+function sourceCond(scope: StatsScope, alias: Prisma.Sql = Prisma.empty): Prisma.Sql {
+  // Bo'sh doira = biriktirilmagan foydalanuvchi: hech narsa ko'rmasligi kerak.
+  if (scope.sourceIds != null && scope.sourceIds.length === 0) return Prisma.sql`FALSE`;
+
+  const parts: Prisma.Sql[] = [Prisma.sql`${alias}"removedFromBalance" = false`];
   if (scope.sourceName) {
-    parts.push(Prisma.sql`${col} IN (SELECT id FROM "OrganizationSource" WHERE name = ${scope.sourceName})`);
+    parts.push(
+      Prisma.sql`${alias}"sourceId" IN (SELECT id FROM "OrganizationSource" WHERE name = ${scope.sourceName})`,
+    );
   }
   if (scope.sourceIds != null) {
-    // Bo'sh doira = biriktirilmagan foydalanuvchi: hech narsa ko'rmasligi kerak.
-    if (scope.sourceIds.length === 0) return Prisma.sql`FALSE`;
-    parts.push(Prisma.sql`${col} IN (${Prisma.join(scope.sourceIds)})`);
+    parts.push(Prisma.sql`${alias}"sourceId" IN (${Prisma.join(scope.sourceIds)})`);
   }
-  if (parts.length === 0) return Prisma.sql`TRUE`;
   return parts.reduce((a, b) => Prisma.sql`${a} AND ${b}`);
 }
 
-/** O'sha doiraning Prisma `where` ko'rinishi (count'lar uchun). */
+/** O'sha doiraning Prisma `where` ko'rinishi (count'lar uchun) — shu jumladan chiqarilganlarsiz. */
 function sourceWhere(scope: StatsScope): Prisma.PropertyWhereInput {
-  const and: Prisma.PropertyWhereInput[] = [];
+  const and: Prisma.PropertyWhereInput[] = [{ removedFromBalance: false }];
   if (scope.sourceName) and.push({ source: { name: scope.sourceName } });
   if (scope.sourceIds != null) and.push({ sourceId: { in: scope.sourceIds } });
-  return and.length ? { AND: and } : {};
+  return { AND: and };
 }
 
 /**
@@ -486,7 +493,7 @@ export async function computeDistrictRentStats(
   regionId: string,
   scope: StatsScope = {},
 ): Promise<RegionStat[]> {
-  const baseCond = sourceCond(scope, Prisma.sql`p."sourceId"`);
+  const baseCond = sourceCond(scope, Prisma.sql`p.`);
   // Respublika darajasidagi tashkilotlar bu yerda ham chiqarib tashlanadi —
   // districtRows() bilan bir xil printsip (computeDashboardStats izohiga qarang).
   const natIds = (await nationalOrgRows(scope)).map((o) => o.id);
@@ -516,7 +523,7 @@ async function districtRows(regionId: string | undefined, scope: StatsScope) {
   // butunlay chiqarilgan (computeDashboardStats bilan bir xil printsip) — ularning
   // sonlari dashboard'da alohida "Markaziy apparat"/"Respublika" qatorida ko'rinadi.
   const natIds = (await nationalOrgRows(scope)).map((o) => o.id);
-  const baseCond = sourceCond(scope, Prisma.sql`p."sourceId"`);
+  const baseCond = sourceCond(scope, Prisma.sql`p.`);
   const condExNat = natIds.length
     ? Prisma.sql`${baseCond} AND p."sourceId" NOT IN (${Prisma.join(natIds)})`
     : baseCond;
@@ -585,9 +592,9 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
   const srcWhere = sourceWhere(scope);
 
   // Raw SQL uchun filtr — PARAMETRLANGAN (Prisma.sql), satr sifatida yopishtirilmaydi.
-  const srcCond = sourceCond(scope, Prisma.sql`p."sourceId"`);
+  const srcCond = sourceCond(scope, Prisma.sql`p.`);
   // Alias'siz variant (CTE va oddiy FROM "Property" uchun).
-  const srcCondNoAlias = sourceCond(scope, Prisma.sql`"sourceId"`);
+  const srcCondNoAlias = sourceCond(scope);
 
   // Respublika darajasidagi tashkilotlar (masalan "Davlat aktivlari agentligi"ning
   // markaziy tashkiloti) — ularning obyektlari HECH QANDAY hudud qatoriga
@@ -736,7 +743,9 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
 // `scope` argumenti kesh kalitiga avtomatik kiradi — ya'ni har bir soha VA har bir
 // rol doirasi (sourceIds) o'z keshiga ega bo'ladi. ⚠️ Shuning uchun doirani argument
 // sifatida uzatish shart: keshdan boshqa foydalanuvchining natijasi qaytmasligi kerak.
-export const getDashboardStats = unstable_cache(computeDashboardStats, ["dashboard-stats-v9"], {
+// v10 — balansdan chiqarilganlar hisobdan chiqarildi (hisoblash mantiqi o'zgardi,
+// shuning uchun eski keshlangan qiymatlar yaroqsiz).
+export const getDashboardStats = unstable_cache(computeDashboardStats, ["dashboard-stats-v10"], {
   tags: ["dashboard"],
   revalidate: 60,
 });

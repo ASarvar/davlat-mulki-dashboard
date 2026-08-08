@@ -3,14 +3,15 @@ import { Building2, Download, ExternalLink } from "lucide-react";
 import { lotUrl } from "@/server/integrations/auction";
 import { SyncStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/authz";
+import { requireUser, isAdmin } from "@/lib/authz";
+import { CAT_REMOVED_FROM_BALANCE, REMOVED_FROM_BALANCE_LABEL } from "@/lib/categories";
 import { listProperties, PROPERTY_PAGE_SIZE, type PropertyFilters } from "@/server/services/properties";
 import { listSourceNames, listSources } from "@/server/services/sources";
 import { listDistricts } from "@/server/services/districts";
 import { CAT_HAS_VACANT_AREA } from "@/server/services/classification";
 import { objectHref } from "@/lib/cadastre";
 import { sourceScopeLabel } from "@/lib/sourceLabel";
-import { CategoryBadge, InefficientBadge, SyncStatusBadge } from "@/components/badges";
+import { CategoryBadge, InefficientBadge, RemovedFromBalanceBadge, SyncStatusBadge } from "@/components/badges";
 import { Pagination } from "@/components/Pagination";
 import { ObjectFilters, type FilterChip } from "./ObjectFilters";
 
@@ -57,6 +58,11 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
 
   // "Bo'sh maydoni bor" (kat 12) filtri tanlansa, maydon ustunida bo'sh maydon ko'rsatiladi.
   const showVacant = filters.categoryCode === CAT_HAS_VACANT_AREA;
+  // Balansdan chiqarilganlar — faqat admin ko'radi (server tomonda `buildWhere` ham
+  // tekshiradi). Bu rejimda "Samaradorlik" ustuni ma'nosini yo'qotadi, uning o'rniga
+  // yangi egasi va chiqarilgan sana ko'rsatiladi.
+  const canSeeRemoved = isAdmin(user.role);
+  const showRemoved = canSeeRemoved && filters.categoryCode === CAT_REMOVED_FROM_BALANCE;
 
   // MODERATOR "Faqat mening tashkilotlarim" bilan o'ziga biriktirilganlar bo'yicha
   // saralay oladi (myRegionsOnly, buildWhere()da qo'llanadi).
@@ -154,6 +160,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
         sohaList={sohaList}
         orgs={orgs}
         showMyRegionsToggle={showMyRegionsToggle}
+        canSeeRemoved={canSeeRemoved}
         chips={chips}
         total={result.total}
         clearHref="/dashboard/objects"
@@ -170,9 +177,9 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
               <th className="px-4 py-3 font-medium">Tuman</th>
               <th className="px-4 py-3 font-medium">Manzil</th>
               <th className="px-4 py-3 font-medium">{showVacant ? "Bo'sh maydon" : "Maydon"}</th>
-              <th className="px-4 py-3 font-medium">Lot</th>
+              <th className="px-4 py-3 font-medium">{showRemoved ? "Yangi egasi (STIR)" : "Lot"}</th>
               <th className="px-4 py-3 font-medium">Kategoriya</th>
-              <th className="px-4 py-3 font-medium">Samaradorlik</th>
+              <th className="px-4 py-3 font-medium">{showRemoved ? "Chiqarilgan sana" : "Samaradorlik"}</th>
             </tr>
           </thead>
           <tbody>
@@ -204,7 +211,20 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
                         : "—"}
                   </td>
                   <td className="px-4 py-3">
-                    {p.lotNumber ? (
+                    {showRemoved ? (
+                      p.removedToStir ? (
+                        <span title={p.removedToName ?? undefined}>
+                          <span className="font-medium">{p.removedToStir}</span>
+                          {p.removedToName ? (
+                            <span className="block text-xs text-muted-foreground">{p.removedToName}</span>
+                          ) : null}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground" title="API 2 yangi egasini qaytarmadi">
+                          Aniqlanmadi
+                        </span>
+                      )
+                    ) : p.lotNumber ? (
                       <a
                         href={lotUrl(p.lotNumber)}
                         target="_blank"
@@ -221,10 +241,20 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <CategoryBadge integrationCode={p.integrationCategoryCode} manualCode={p.manualCategoryCode} />
+                    {p.removedFromBalance ? (
+                      <RemovedFromBalanceBadge />
+                    ) : (
+                      <CategoryBadge integrationCode={p.integrationCategoryCode} manualCode={p.manualCategoryCode} />
+                    )}
                   </td>
                   <td className="px-4 py-3">
-                    <InefficientBadge value={p.isInefficient} />
+                    {showRemoved ? (
+                      <span className="text-muted-foreground">
+                        {p.removedAt ? p.removedAt.toLocaleDateString("uz") : "—"}
+                      </span>
+                    ) : (
+                      <InefficientBadge value={p.isInefficient} />
+                    )}
                   </td>
                 </tr>
               ))

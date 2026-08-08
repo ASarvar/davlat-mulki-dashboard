@@ -1,5 +1,18 @@
 import type { SyncStatus, SyncRunStatus } from "@prisma/client";
-import { effectiveCategory } from "@/lib/categories";
+import { effectiveCategory, REMOVED_FROM_BALANCE_LABEL } from "@/lib/categories";
+
+/**
+ * "Balansdan chiqarilgan" — obyekt endi tashkilot balansida emas (API 1 ro'yxatidan
+ * tushib qolgan). Effektiv kategoriya o'rniga ko'rsatiladi: eski kategoriyasi
+ * (masalan "Bo'sh turgan") bunday obyekt uchun ma'nosini yo'qotgan.
+ */
+export function RemovedFromBalanceBadge() {
+  return (
+    <span className="inline-flex rounded-full bg-slate-200 px-2 py-0.5 text-xs font-medium text-slate-700">
+      {REMOVED_FROM_BALANCE_LABEL}
+    </span>
+  );
+}
 
 // Effektiv kategoriya belgisi (rangi manba/samaradorlikка qarab).
 export function CategoryBadge({

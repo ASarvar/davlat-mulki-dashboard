@@ -7,6 +7,31 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.3.0
+
+- **Balansdan chiqarilgan obyektlar** — sinxronizatsiyada obyekt manba (STIR) API 1
+  ro'yxatidan tushib qolsa (odatda boshqa tashkilotga o'tkazilgan), o'chirilmaydi —
+  "Balansdan chiqarilgan" deb belgilanadi va imkon bo'lsa yangi egasi (STIR/nomi)
+  aniqlanadi. Bunday obyektlar asosiy dashboard hisoblariga **kirmaydi**, faqat
+  Obyektlar sahifasida shu kategoriyani tanlab, **faqat admin** ko'ra oladi.
+- **Yer/Bino ajratish** (Davlat aktivlari agentligi va Direksiya uchun) — obyekt
+  11 ta kadastr maydoni bo'yicha yer yoki bino deb aniqlanadi; shu ikki soha uchun
+  dashboard jadvalida tegishli ustunlar Yer/Bino kesimida ko'rsatiladi (jumladan
+  "Ijaraga berilgan obyektlar" ustuni). Direksiyaning sinxronizatsiya doirasi
+  Toshkent shahar bilan cheklandi.
+- **Kadastr tekshirish** (`/dashboard/cadastre-check`, faqat admin) — kadastr
+  raqami bo'yicha API 2 ga jonli so'rov yuborib, xom javobni ko'rsatuvchi
+  diagnostika vositasi.
+- **Moderator ko'rish doirasi kengaytirildi** — endi kuzatuvchi kabi barcha
+  obyekt va so'rovlar tarixini ko'radi; tasdiqlash huquqi esa faqat o'z
+  tashkiloti(lari) bilan cheklanadi ("Mening tashkilotim" tugmasi bilan qaytariladi).
+- **Boshqaruv panelidagi ikkala jadval qayta dizayn qilindi** — zamonaviy,
+  toza ko'rinish (sticky ustunlar, zebra qatorlar).
+- **Bug fix: "Savdoda ijara" Maydon ustuni** — kichik ijara lotlari
+  "ming m²"da 0,0 ga yaxlitlanib ko'rinardi, endi to'g'ri birlikda chiqadi.
+- **Bug fix: sinxronizatsiya xatosi matni** (masalan "fetch failed") endi
+  faqat adminlarga ko'rinadi — boshqa rollar uchun tushunarsiz va foydasiz edi.
+
 - **Tuman kesimi** — API 2 dagi `district_id` asosida `District` jadvali (205 tuman,
   mavjud 5441 obyekt backfill qilindi). Dashboard'da hudud qatorini ochib tumanlar
   statistikasini ko'rish, obyektlar ro'yxatida tuman filtri va ustuni, obyekt

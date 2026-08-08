@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Search, RotateCcw, SlidersHorizontal, X, ChevronDown } from "lucide-react";
-import { CATEGORIES } from "@/lib/categories";
+import { CATEGORIES, CAT_REMOVED_FROM_BALANCE, REMOVED_FROM_BALANCE_LABEL } from "@/lib/categories";
 import { formatNumber } from "@/lib/utils";
 
 const selectCls =
@@ -32,6 +32,11 @@ export interface ObjectFiltersProps {
   orgs: { id: string; label: string }[];
   /** MODERATOR uchun: "Faqat mening tashkilotlarim" — Hudud select'ining birinchi varianti. */
   showMyRegionsToggle?: boolean;
+  /**
+   * ADMIN uchun: Kategoriya ro'yxatiga "Balansdan chiqarilgan" varianti qo'shiladi.
+   * Bunday obyektlar boshqa hech qayerda (dashboard, standart ro'yxat) ko'rinmaydi.
+   */
+  canSeeRemoved?: boolean;
   chips: FilterChip[];
   /** Topilgan obyektlar soni — filtr ta'sirini darhol ko'rsatadi. */
   total: number;
@@ -61,6 +66,7 @@ export function ObjectFilters({
   sohaList,
   orgs,
   showMyRegionsToggle,
+  canSeeRemoved,
   chips,
   total,
   clearHref,
@@ -254,6 +260,11 @@ export function ObjectFilters({
                 {c.short}
               </option>
             ))}
+            {/* Haqiqiy kategoriya emas — `Property.removedFromBalance` bayrog'i bo'yicha
+                filtr. Faqat adminga ko'rsatiladi (server tomonda ham tekshiriladi). */}
+            {canSeeRemoved ? (
+              <option value={CAT_REMOVED_FROM_BALANCE}>{REMOVED_FROM_BALANCE_LABEL}</option>
+            ) : null}
           </select>
         </div>
 

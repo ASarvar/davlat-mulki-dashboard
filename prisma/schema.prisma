@@ -209,6 +209,22 @@ model Property {
   // dashboard jadvalida ko'rsatiladi, lekin hisoblanishi barcha obyektlar uchun bir xil.
   isLand Boolean @default(false)
 
+  // ── Balansdan chiqarilgan (2026-08-06) ──
+  // API 1 tashkilotning JORIY kadastr ro'yxatini qaytaradi. Ilgari sinxronizatsiya
+  // faqat qo'shar/yangilar edi — ro'yxatdan TUSHIB QOLGAN obyekt bazada abadiy qolib,
+  // dashboard sonini API'dagidan katta qilib ko'rsatardi (Andijon: API 157, baza 159).
+  // Endi `syncSource.ts` har sinxronizatsiyada solishtiradi va bunday obyektni SHU
+  // bayroq bilan belgilaydi — O'CHIRMAYDI (foydalanuvchi qarori: tarix saqlanishi kerak).
+  //
+  // ⚠️ Bunday obyekt dashboard hisoblariga UMUMAN kirmaydi (`stats.ts` → sourceCond/
+  // sourceWhere) va obyektlar ro'yxatida ham standart holatda ko'rinmaydi — faqat ADMIN
+  // "Balansdan chiqarilgan" kategoriyasini tanlaganda chiqadi (`properties.ts`).
+  removedFromBalance Boolean   @default(false)
+  removedAt          DateTime?
+  /** Yangi egasi — API 2 `subjects[0]` dan (aniqlanmasa null: API javob bermagan bo'lishi mumkin). */
+  removedToStir      String?
+  removedToName      String?
+
   // Hisoblangan holat (materialized — dashboard tezligi uchun)
   integrationCategoryCode Int? // 1–4 (integratsiyadan)
   integrationCategory     Category? @relation("IntegrationCategory", fields: [integrationCategoryCode], references: [code])
@@ -273,6 +289,9 @@ model Property {
   @@index([integrationCategoryCode])
   @@index([manualCategoryCode])
   @@index([lotNumber])
+  // Balansdan chiqarilganlar HAR BIR ro'yxat/statistika so'roviga shart sifatida
+  // qo'shiladi (deyarli hamma joyda `= false`), shuning uchun indeks kerak.
+  @@index([removedFromBalance])
   // pg_trgm GIN indekslari migratsiyada qo'lda qo'shiladi (prisma/migrations/*_pg_trgm)
 }
 

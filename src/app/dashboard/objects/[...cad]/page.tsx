@@ -19,7 +19,7 @@ import { getPropertyDetail } from "@/server/services/properties";
 import { pathToCad } from "@/lib/cadastre";
 import { totalBuildingAreaWithSource, totalAreaLabel, usefulArea } from "@/lib/area";
 import { CATEGORY_BY_CODE } from "@/lib/categories";
-import { CategoryBadge, InefficientBadge, SyncStatusBadge } from "@/components/badges";
+import { CategoryBadge, InefficientBadge, RemovedFromBalanceBadge, SyncStatusBadge } from "@/components/badges";
 import { AssignCategoryForm } from "./AssignCategoryForm";
 import { RemoveCategoryButton } from "./RemoveCategoryButton";
 import { CadastreRawData } from "./CadastreRawData";
@@ -63,7 +63,10 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
   const inSource = user.sourceId != null && user.sourceId === p.sourceId;
   // IJROCHI → so'rov; ADMIN/SUPER_ADMIN → darhol. MODERATOR'da to'g'ridan-to'g'ri
   // biriktirish huquqi yo'q — u faqat /dashboard/requests'da so'rovlarni ko'rib chiqadi.
-  const canAssign = isVacant && (isAdmin(user.role) || (user.role === "IJROCHI" && inSource));
+  // ⚠️ Balansdan chiqarilgan obyektga kategoriya biriktirilmaydi: u endi tashkilot
+  // balansida emas, ya'ni "Yaroqsiz/Chekka" deb belgilashning ma'nosi yo'q.
+  const canAssign =
+    isVacant && !p.removedFromBalance && (isAdmin(user.role) || (user.role === "IJROCHI" && inSource));
   const isRequest = user.role === "IJROCHI";
   const pendingRequest = p.changeRequests.find(
     (r) => r.status === "PENDING_MODERATOR" || r.status === "PENDING_RAHBARIYAT",
@@ -118,7 +121,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <SyncStatusBadge status={p.syncStatus} />
-          <InefficientBadge value={p.isInefficient} />
+          {p.removedFromBalance ? <RemovedFromBalanceBadge /> : <InefficientBadge value={p.isInefficient} />}
           {canSync ? (
             <form action={syncSingleAction}>
               <input type="hidden" name="cadNumber" value={p.cadNumber} />
@@ -133,6 +136,34 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
           ) : null}
         </div>
       </div>
+
+      {/* Balansdan chiqarilgan — API 1 ro'yxatidan tushib qolgan (odatda boshqa STIRga
+          o'tkazilgan). Bu sahifani faqat admin ocha oladi (`getPropertyDetail`). */}
+      {p.removedFromBalance ? (
+        <div className="mb-4 rounded-xl border border-slate-300 bg-slate-50 p-4 text-sm">
+          <p className="font-semibold" style={{ color: "var(--navy)" }}>
+            Bu obyekt tashkilot balansidan chiqarilgan
+          </p>
+          <p className="mt-1 text-muted-foreground">
+            So&apos;nggi sinxronizatsiyada API 1 ({p.source.name} — STIR {p.source.stir}) kadastr
+            ro&apos;yxatida bu obyekt yo&apos;q edi. Ma&apos;lumot tarix uchun saqlanmoqda, lekin
+            hisobot jadvallariga kirmaydi.
+          </p>
+          <dl className="mt-3 grid grid-cols-2 gap-4 md:grid-cols-3">
+            <Field
+              label="Chiqarilgan sana"
+              value={p.removedAt ? p.removedAt.toLocaleString("uz") : null}
+            />
+            <Field label="Yangi egasi (STIR)" value={p.removedToStir} />
+            <Field label="Yangi egasi" value={p.removedToName} />
+          </dl>
+          {!p.removedToStir ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Yangi egasi hali aniqlanmadi — keyingi sinxronizatsiyada API 2 orqali qayta uriniladi.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Asosiy ma'lumot */}
@@ -154,7 +185,10 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
               <Field label="Foydali maydon" value={objectAreaU != null ? `${objectAreaU.toLocaleString("uz")} m²` : null} />
               <Field label="Kategoriya" value={<CategoryBadge integrationCode={p.integrationCategoryCode} manualCode={p.manualCategoryCode} />} />
             </dl>
-            {p.lastSyncError ? (
+            {/* Xom texnik xato matni (masalan "fetch failed") — faqat admin ko'radi.
+                Boshqa rollar buni tuzata olmaydi va matn ular uchun tushunarsiz/
+                bezovta qiluvchi bo'lishi mumkin (foydalanuvchi talabi, 2026-08-06). */}
+            {p.lastSyncError && canSync ? (
               <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">Sync xatosi: {p.lastSyncError}</p>
             ) : null}
             <CadastreRawData rawApi2={p.rawApi2} />

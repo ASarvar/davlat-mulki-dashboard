@@ -283,7 +283,7 @@ function RentTableRow({
   lead: React.ReactNode;
 }) {
   const num = (v: string) => (
-    <td className={`${ROW_LINE} py-2.5 pr-4 text-right tabular-nums`}>{v}</td>
+    <td className={`${ROW_LINE} py-2.5 pr-4 text-center tabular-nums`}>{v}</td>
   );
 
   return (
@@ -292,13 +292,13 @@ function RentTableRow({
         {lead}
       </td>
       <td className={`${ROW_LINE} py-2.5 pl-1 pr-4`}>{label}</td>
-      <td className={`${ROW_LINE} py-2.5 pr-4 text-right font-semibold tabular-nums text-slate-900`}>
+      <td className={`${ROW_LINE} py-2.5 pr-4 text-center font-semibold tabular-nums text-slate-900`}>
         {nf(row.total)}
       </td>
       {num(nf(row.rentedObjects))}
       {num(nf(row.contractCount))}
       {num(nf(row.rentArea, 1))}
-      <td className={`${ROW_LINE} py-2.5 text-right tabular-nums`}>
+      <td className={`${ROW_LINE} py-2.5 text-center tabular-nums`}>
         {nf(row.rentSum / 1_000_000, 1)}
       </td>
     </tr>
@@ -883,20 +883,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 <td className={`${TOTALS_LINE} whitespace-nowrap py-3 pl-1 pr-4 tracking-wide`}>
                   J A M I:
                 </td>
-                <td className={`${TOTALS_LINE} py-3 pr-4 text-right tabular-nums`}>
+                <td className={`${TOTALS_LINE} py-3 pr-4 text-center tabular-nums`}>
                   {nf(s.totals.total)}
                 </td>
-                <td className={`${TOTALS_LINE} py-3 pr-4 text-right tabular-nums`}>
+                <td className={`${TOTALS_LINE} py-3 pr-4 text-center tabular-nums`}>
                   {nf(s.totals.rentedObjects)}
                 </td>
-                {/* <td className="py-3 pr-4 text-right tabular-nums">{s.totals.rentedPct}</td> */}
-                <td className={`${TOTALS_LINE} py-3 pr-4 text-right tabular-nums`}>
+                {/* <td className="py-3 pr-4 text-center tabular-nums">{s.totals.rentedPct}</td> */}
+                <td className={`${TOTALS_LINE} py-3 pr-4 text-center tabular-nums`}>
                   {nf(s.totals.contractCount)}
                 </td>
-                <td className={`${TOTALS_LINE} py-3 pr-4 text-right tabular-nums`}>
+                <td className={`${TOTALS_LINE} py-3 pr-4 text-center tabular-nums`}>
                   {nf(s.totals.rentArea, 1)}
                 </td>
-                <td className={`${TOTALS_LINE} py-3 pr-4 text-right tabular-nums`}>
+                <td className={`${TOTALS_LINE} py-3 pr-4 text-center tabular-nums`}>
                   {nf(s.totals.rentSum / 1_000_000, 1)}
                 </td>
               </tr>
@@ -958,10 +958,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                             label={
                               <Link
                                 href={objHref(`region=${r.regionId}&district=${d.regionId}`)}
-                                className="pl-4 text-[13px] hover:underline"
+                                className="text-center text-[13px] hover:underline"
                                 style={{ color: "var(--cobalt)" }}
                               >
-                                {d.name}
+                                {d.name} 
                               </Link>
                             }
                           />

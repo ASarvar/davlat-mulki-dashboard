@@ -76,6 +76,12 @@ export async function GET(req: Request) {
     { header: "Samaradorlik", key: "efficiency", width: 14 },
     { header: "Sync holati", key: "sync", width: 14 },
     { header: "Oxirgi sync", key: "lastSync", width: 20 },
+    // Balansdan chiqarilganlar — odatda bo'sh. Admin "Balansdan chiqarilgan"
+    // kategoriyasini tanlab eksport qilganda shu uch ustun to'ladi.
+    { header: "Balansdan chiqarilgan", key: "removed", width: 20 },
+    { header: "Chiqarilgan sana", key: "removedAt", width: 20 },
+    { header: "Yangi egasi (STIR)", key: "removedToStir", width: 18 },
+    { header: "Yangi egasi", key: "removedToName", width: 34 },
   ];
 
   const header = sheet.getRow(1);
@@ -115,6 +121,10 @@ export async function GET(req: Request) {
               rentArea: r.rentTotalArea ?? "",
               rentOldCad: r.rentMatchedByOldCad ? "Ha" : "",
               lastSync: r.lastSyncedAt ? r.lastSyncedAt.toLocaleString("uz") : "",
+              removed: r.removedFromBalance ? "Ha" : "",
+              removedAt: r.removedAt ? r.removedAt.toLocaleString("uz") : "",
+              removedToStir: r.removedToStir ?? "",
+              removedToName: r.removedToName ?? "",
             })
             .commit();
         }

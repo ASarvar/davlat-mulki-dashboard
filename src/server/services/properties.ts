@@ -8,7 +8,8 @@ import {
   CAT_ON_AUCTION_RENT,
   CAT_VACANT,
 } from "./classification";
-import { userSourceScope, type SessionUser } from "@/lib/authz";
+import { userSourceScope, isAdmin, type SessionUser } from "@/lib/authz";
+import { CAT_REMOVED_FROM_BALANCE } from "@/lib/categories";
 
 export interface PropertyFilters {
   q?: string; // kadastr (yangi/eski) bo'yicha qidiruv
@@ -41,6 +42,21 @@ export const PROPERTY_PAGE_SIZE = PAGE_SIZE;
 // EKSPORT ham shu funksiyani ishlatadi — hudud doirasi bir joyda, takrorlanmaydi.
 export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise<Prisma.PropertyWhereInput> {
   const and: Prisma.PropertyWhereInput[] = [];
+
+  // ── Balansdan chiqarilganlar ──
+  // Standart holatda ular ro'yxatda UMUMAN ko'rinmaydi (dashboard hisoblariga ham
+  // kirmaydi — `stats.ts` → sourceCond/sourceWhere). Faqat ADMIN "Balansdan chiqarilgan"
+  // kategoriyasini ataylab tanlaganda chiqadi (foydalanuvchi talabi, 2026-08-06).
+  // ⚠️ Admin bo'lmagan foydalanuvchi bu kodni qo'lda URLga yozsa ham natija BO'SH
+  // bo'ladi (filtr e'tiborsiz qoldirilmaydi) — aks holda u oddiy ro'yxatni ko'rib,
+  // filtr ishlagan deb o'ylardi.
+  const wantsRemoved = f.categoryCode === CAT_REMOVED_FROM_BALANCE;
+  if (wantsRemoved) {
+    if (!isAdmin(user.role)) return { id: "__forbidden__" };
+    and.push({ removedFromBalance: true });
+  } else {
+    and.push({ removedFromBalance: false });
+  }
 
   // TASHKILOT doirasi: IJROCHI faqat o'z tashkilotining obyektlarini ko'radi
   // (biriktirilmagan bo'lsa — hech narsa). Boshqa rollar (admin/moderator/kuzatuvchi)
@@ -79,7 +95,10 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
   // dashboard'da XUSUSIYAT bo'yicha hisoblanadi (obyekt sotilgan bo'lsa ham ijarasi bo'lishi
   // mumkin), shuning uchun filtr ham shu mantiqni takrorlashi shart. Aks holda jadvaldagi
   // raqamni bosganda ro'yxat bo'sh chiqadi.
-  if (f.categoryCode) {
+  // ⚠️ `wantsRemoved` bu yerga TUSHMASLIGI kerak: 13 haqiqiy kategoriya kodi emas,
+  // pastdagi `else` shoxi uni `integrationCategoryCode = 13` deb qidirib, natijani
+  // doim bo'sh qaytarardi (holbuki shart yuqorida allaqachon qo'yilgan).
+  if (f.categoryCode && !wantsRemoved) {
     const c = f.categoryCode;
     if (c === CAT_ON_AUCTION) {
       // Xususiylashtirish savdosida — obyekt bir vaqtda ijara savdosida ham bo'lishi mumkin.
@@ -153,6 +172,11 @@ export interface PropertyListItem {
   lotStatus: string | null;
   /** Bo'sh maydon (foydali − ijarada). "Bo'sh maydoni bor" filtri uchun ko'rsatiladi. */
   vacantArea: string | null;
+  /** Balansdan chiqarilgan — faqat admin "Balansdan chiqarilgan" filtrida ko'radi. */
+  removedFromBalance: boolean;
+  removedAt: Date | null;
+  removedToStir: string | null;
+  removedToName: string | null;
 }
 
 export interface PropertyListResult {
@@ -194,6 +218,10 @@ export async function listProperties(
       lotNumber: true,
       lotStatus: true,
       vacantArea: true,
+      removedFromBalance: true,
+      removedAt: true,
+      removedToStir: true,
+      removedToName: true,
       region: { select: { name: true } },
       district: { select: { name: true } },
     },
@@ -218,6 +246,10 @@ export async function listProperties(
       lotNumber: r.lotNumber,
       lotStatus: r.lotStatus,
       vacantArea: r.vacantArea ? r.vacantArea.toString() : null,
+      removedFromBalance: r.removedFromBalance,
+      removedAt: r.removedAt,
+      removedToStir: r.removedToStir,
+      removedToName: r.removedToName,
     })),
   };
 }
@@ -245,6 +277,10 @@ export interface PropertyExportRow {
   rentTotalSum: number | null;
   rentTotalArea: number | null;
   rentMatchedByOldCad: boolean;
+  removedFromBalance: boolean;
+  removedAt: Date | null;
+  removedToStir: string | null;
+  removedToName: string | null;
 }
 
 // Eksport uchun keyset bo'yicha bo'lak-bo'lak o'qish — 80k qatorni
@@ -284,6 +320,10 @@ export async function* iteratePropertiesForExport(
         rentTotalSum: true,
         rentTotalArea: true,
         rentMatchedByOldCad: true,
+        removedFromBalance: true,
+        removedAt: true,
+        removedToStir: true,
+        removedToName: true,
         region: { select: { name: true } },
         district: { select: { name: true } },
         source: { select: { name: true } },
@@ -314,6 +354,10 @@ export async function* iteratePropertiesForExport(
       rentTotalSum: r.rentTotalSum ? Number(r.rentTotalSum) : null,
       rentTotalArea: r.rentTotalArea ? Number(r.rentTotalArea) : null,
       rentMatchedByOldCad: r.rentMatchedByOldCad,
+      removedFromBalance: r.removedFromBalance,
+      removedAt: r.removedAt,
+      removedToStir: r.removedToStir,
+      removedToName: r.removedToName,
     }));
 
     if (rows.length < batchSize) return;
@@ -354,5 +398,9 @@ export async function getPropertyDetail(user: SessionUser, cadNumber: string) {
   if (!property) return null;
   // Obyekt sahifasi: ijrochi faqat o'z tashkilotining obyektini ocha oladi.
   if (user.role === "IJROCHI" && property.sourceId !== user.sourceId) return null;
+  // Balansdan chiqarilgan obyekt — faqat admin uchun. ⚠️ Ro'yxatda ko'rinmasligi
+  // yetarli emas: havolani bilgan/saqlab qo'ygan foydalanuvchi sahifani to'g'ridan-to'g'ri
+  // ocha olardi (`buildWhere` faqat ro'yxatga ta'sir qiladi).
+  if (property.removedFromBalance && !isAdmin(user.role)) return null;
   return property;
 }

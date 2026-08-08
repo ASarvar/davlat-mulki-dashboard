@@ -111,6 +111,9 @@ export async function triggerStatusRefresh(input: StatusRefreshInput) {
     where: {
       ...(regionId ? { regionId } : {}),
       ...(sourceName ? { source: { name: sourceName } } : {}),
+      // Balansdan chiqarilganlarni yangilashning ma'nosi yo'q — ular hisobotga
+      // kirmaydi va tashqi API'larga behuda so'rov bo'lardi.
+      removedFromBalance: false,
     },
     select: { id: true, cadNumber: true, cadNumberOld: true },
   });
