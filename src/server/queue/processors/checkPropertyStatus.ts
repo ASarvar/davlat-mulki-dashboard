@@ -249,7 +249,10 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
       : current.hasPrivatizationLot;
     // Tarixiy yozuv uchun: lot mavjudligining o'zi yetarli — sotilgan-sotilmaganidan qat'i nazar.
     const auctionLotExists = refreshAuction ? Boolean(auction!.found && auction!.lotNumber) : false;
-    const hasRentLot = refreshAuction ? rentLot!.found : current.hasRentLot;
+    // ⚠️ `hasPrivatizationLot` bilan bir xil qoida: sotilgan obyekt endi "ijara savdosida"
+    // hisoblanmasin (aks holda "Savdoda ijara"/"Auksion savdolarida" ustunlari sotilganlarni
+    // ham qo'shib shishib ketadi — 2026-08-11 jonli ma'lumotda 8 ta shunday holat topildi).
+    const hasRentLot = refreshAuction ? Boolean(rentLot!.found && !auction!.isSold) : current.hasRentLot;
     const auctionTotalAreaNum = refreshAuction
       ? rentLot!.totalArea
       : Number(current.auctionTotalArea ?? 0);
