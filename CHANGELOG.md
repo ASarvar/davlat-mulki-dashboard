@@ -32,6 +32,19 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 - **Bug fix: sinxronizatsiya xatosi matni** (masalan "fetch failed") endi
   faqat adminlarga ko'rinadi — boshqa rollar uchun tushunarsiz va foydasiz edi.
 
+## 1.2.0
+
+- **Foydalanuvchi doirasi — hudud emas, tashkilot** — userlar endi hududga emas,
+  bitta yoki bir nechta tashkilotga (`OrganizationSource`) biriktiriladi;
+  respublika darajasidagi tashkilotlar (Agentlik, Direksiya) shu bilan bir
+  nechta hududdagi obyektni to'g'ri ko'rsatadi.
+- **Hududiy tashkilotga biriktirilgan foydalanuvchi uchun dashboard statistikasi**
+  yangilandi — o'z tashkiloti doirasida to'g'ri hisoblanadi.
+- **Docker** — pgAdmin uchun port qo'shildi (lokal DB ko'rish qulayligi uchun).
+- Bir martalik tuzatish: eski manba nomlari soha nomiga moslashtirildi.
+
+## 1.1.0
+
 - **Tuman kesimi** — API 2 dagi `district_id` asosida `District` jadvali (205 tuman,
   mavjud 5441 obyekt backfill qilindi). Dashboard'da hudud qatorini ochib tumanlar
   statistikasini ko'rish, obyektlar ro'yxatida tuman filtri va ustuni, obyekt
@@ -40,7 +53,6 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
   guruhlangan holda, "Hududlar" varag'i bilan bir xil ustunlarda.
 - **"Hududlar kesimi — ijara shartnomalari" jadvalida ham tumanlar** — hudud qatorini
   ochish ikkala jadvalda ham bir vaqtda ishlaydi (bitta `?tuman=` parametri).
-
 - **Sidebar'da versiya belgisi** — `package.json` → `version`dan avtomatik o'qiladi.
 - **Tasdiqlash so'rovlari sahifasida filtr** — kategoriya, holat (faqat tarixda),
   hudud va so'rovchi (ism/login) bo'yicha. Ikkala jadval (kutilayotgan + tarix)
@@ -50,8 +62,6 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
   tekislangan, `justify-between` orqali siljimaydi.
 - Dashboard manba tugmalari tartibi: **Ijara markazi** har doim birinchi,
   **Hammasi** oxirida.
-
-## 1.1.0
 
 - **Rollar va tasdiqlash workflow** — `RAHBARIYAT` roli qo'shildi, ikki bosqichli
   zanjir (Ijrochi → Moderator qabul qiladi → Rahbariyat tasdiqlaydi/rad etadi).
