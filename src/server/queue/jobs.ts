@@ -33,13 +33,14 @@ export interface StatusCheckJob {
   propertyId: string;
   cadNumber: string;
   cadNumberOld: string | null;
-  // Uchalasi ham berilmasa (FULL_ALL/REGION/SINGLE zanjiri) — hammasi true,
+  // Hech biri berilmasa (FULL_ALL/REGION/SINGLE zanjiri) — hammasi true,
   // xulq-atvor o'zgarmaydi. STATUS_REFRESH ulardan faqat kerakligini false qiladi:
   // false bo'lgan modul uchun tashqi API UMUMAN chaqirilmaydi, uning oldingi
   // hissasi bazadagi joriy qiymatlardan tiklanadi (`checkPropertyStatus.ts`).
   refreshBase?: boolean; // API2 — asosiy ma'lumot
   refreshAuction?: boolean; // API3/4 + API6 — auksion va ijara loti (birga)
   refreshRent?: boolean; // API5 — ijara shartnomalari
+  refreshUtility?: boolean; // suv/gaz/elektr — kommunal abonent tekshiruvi
 }
 
 // Job natijasi — worker SyncRun hisoblagichlarini shunga qarab yangilaydi.

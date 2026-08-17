@@ -13,6 +13,12 @@ import {
   type RentLotInfo,
 } from "@/server/integrations/rentAuction";
 import {
+  checkAllUtilities,
+  isUtilityConfigured,
+  UTILITY_ENDPOINTS,
+  type UtilityResults,
+} from "@/server/integrations/utilities";
+import {
   deriveIntegrationCategory,
   deriveAuctionCategory,
   deriveRentCategory,
@@ -83,14 +89,21 @@ const toDec = (v: unknown): Prisma.Decimal | null => {
   return Number.isFinite(n) ? new Prisma.Decimal(n) : null;
 };
 
-// Job C: asosiy ma'lumot (API 2, ixtiyoriy), auksion (API 3+4+6, ixtiyoriy) va ijara
-// shartnomalari (API 5, ixtiyoriy) — har biri mustaqil yoqilishi/o'chirilishi mumkin
-// (`STATUS_REFRESH` sinxronizatsiyasi uchun). Uchalasi ham berilmasa — FULL_ALL/REGION/
-// SINGIL zanjiridagi kabi hammasi ishlaydi, xulq-atvor o'zgarmaydi.
+// Job C: asosiy ma'lumot (API 2, ixtiyoriy), auksion (API 3+4+6, ixtiyoriy), ijara
+// shartnomalari (API 5, ixtiyoriy) va kommunal xizmatlar (suv/gaz/elektr, ixtiyoriy) —
+// har biri mustaqil yoqilishi/o'chirilishi mumkin (`STATUS_REFRESH` sinxronizatsiyasi
+// uchun). Hech biri berilmasa — FULL_ALL/REGION/SINGLE zanjiridagi kabi hammasi
+// ishlaydi, xulq-atvor o'zgarmaydi.
 //
 // ⚠️ Auksion (API3/4) va ijara loti (API6) BITTA guruh: ikkalasi ham bitta
 // `deriveAuctionCategory()` chaqiruviga kiradi va `AuctionLot` jadvalida birga
 // saqlanadi (PRIVATIZATION + RENT turlari), shuning uchun alohida yoqib bo'lmaydi.
+//
+// ⚠️ Kommunal modul KATEGORIYAGA UMUMAN TA'SIR QILMAYDI — u mustaqil kuzatuv o'lchovi
+// (obyekt bo'sh turgani holda suv/gaz/elektr sarflayaptimi). Shu sababli u
+// `integrationCategoryCode` hisobiga kirmaydi va `AUCTION_RANGE`/`RENT_RANGE` kabi
+// "yangilanmagan modul hissasini tiklash" mantig'i ham kerak emas: yangilanmasa,
+// tegishli ustunlar oddiygina `update` ga qo'shilmaydi va bazadagi qiymat qoladi.
 export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutcome> {
   const {
     propertyId,
@@ -99,6 +112,7 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
     refreshBase = true,
     refreshAuction = true,
     refreshRent = true,
+    refreshUtility = true,
   } = data;
 
   const current = await prisma.property.findUniqueOrThrow({
@@ -157,10 +171,14 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
 
   // ── 1) Auksion zanjiri (API 3+4) va ijara loti (API 6) — parallel, ixtiyoriy ──
   // ── 2) Ijara shartnomalari (API 5) — parallel, mustaqil ravishda ixtiyoriy ──
-  const [auction, rentLot, rent] = await Promise.all([
+  // ── 3) Kommunal (suv/gaz/elektr) — parallel, mustaqil ravishda ixtiyoriy ──
+  const [auction, rentLot, rent, utilities] = await Promise.all([
     refreshAuction ? runAuctionCheck(cadNumber, cadNumberOld) : Promise.resolve(null),
     refreshAuction ? runRentLotCheck(cadNumber, cadNumberOld) : Promise.resolve(null),
     refreshRent ? runRentCheck(cadNumber, cadNumberOld) : Promise.resolve(null),
+    refreshUtility && isUtilityConfigured()
+      ? checkAllUtilities(cadNumber, cadNumberOld)
+      : Promise.resolve(null as UtilityResults | null),
   ]);
 
   // 3) Qolgan holat-API'lar (sozlanganlari, har biri fallback bilan) — hech qanday
@@ -233,6 +251,35 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
           checkedAt: new Date(),
         },
       });
+    }
+
+    // ── Kommunal xizmatlar ──
+    // Xom javob shu yerda saqlanadi (`rawApi2`/`ObjectStatusCheck.rawResponse` bilan bir
+    // xil printsip): mezon o'zgarsa — masalan "sarflayapti" oyi — tashqi API'ni qayta
+    // chaqirmasdan qayta hisoblash mumkin. Faqat SOZLANGAN endpoint'lar yoziladi,
+    // aks holda sozlanmagan xizmat har bir obyektga soxta "topilmadi" yozuvini qoldirardi.
+    if (refreshUtility && utilities) {
+      for (const ep of UTILITY_ENDPOINTS) {
+        const u = utilities[ep.kind];
+        await tx.objectStatusCheck.upsert({
+          where: { propertyId_apiSource: { propertyId, apiSource: ep.kind } },
+          create: {
+            propertyId,
+            apiSource: ep.kind,
+            found: u.found,
+            matchedByOldCad: u.matchedByOldCad,
+            status: u.summary,
+            rawResponse: (u.raw ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+          },
+          update: {
+            found: u.found,
+            matchedByOldCad: u.matchedByOldCad,
+            status: u.summary,
+            rawResponse: (u.raw ?? Prisma.JsonNull) as Prisma.InputJsonValue,
+            checkedAt: new Date(),
+          },
+        });
+      }
     }
 
     // Kategoriya ustuvorligi: auksion (sotilgan/savdoda) > ijara shartnomasi > boshqa API'lar.
@@ -364,6 +411,28 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
               rentTotalArea: rent!.found ? new Prisma.Decimal(rent!.totalArea) : null,
               rentMatchedByOldCad: rent!.matchedByOldCad,
               rentCheckedAt: isRentApiConfigured() ? new Date() : null,
+            }
+          : {}),
+        ...(refreshUtility && utilities
+          ? {
+              // Kommunal bayroqlar — dashboard agregati uchun materiallashtirilgan.
+              // ⚠️ Uch daraja ATAYIN alohida saqlanadi, chunki ular boshqa-boshqa
+              // narsani bildiradi:
+              //   hasGas       — abonent hisobi mavjud (ochiq bo'lsa ham, jim bo'lsa ham)
+              //   gasBilled    — hisob faol, to'lov hisoblanmoqda (hisoblagichsiz ham)
+              //   gasConsuming — HISOBLAGICH haqiqiy sarfni ko'rsatgan (eng qat'iy)
+              hasWater: utilities.WATER.found,
+              hasGas: utilities.GAS.found,
+              hasElectric: utilities.ELECTRIC.found,
+              gasConsuming: utilities.GAS.consuming,
+              gasBilled: utilities.GAS.billed,
+              // Oxirgi to'lov sanasi — "yaqinda faol" mezoni uchun (gasBilled dan
+              // kuchliroq dalil: hisob-kitob to'lovsiz ham davom etadi).
+              gasLastPaymentAt: utilities.GAS.lastPaymentAt,
+              // ⚠️ Bu "tekshirildi" belgisi — topilgan/topilmaganidan QAT'I NAZAR
+              // qo'yiladi. Dashboardda "tekshirilmagan" (null) alohida ustun, chunki
+              // API "abonent yo'q" va "hudud qamralmagan" holatini farqlay olmaydi.
+              utilityCheckedAt: new Date(),
             }
           : {}),
         vacantArea: new Prisma.Decimal(vacantArea),

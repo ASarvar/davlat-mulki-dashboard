@@ -7,6 +7,36 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.4.0
+
+- **Kommunal xizmatlar (suv / gaz / elektr)** — uchta yangi tashqi API orqali obyektning
+  suv, gaz va elektr abonenti bor-yo'qligi tekshiriladi. Sinxronizatsiyaning **4-moduli**
+  sifatida qo'shildi ("Faqat holat yangilash" bo'limida alohida belgi bilan yoqiladi va
+  kunlik avtomatik sinxronizatsiyaga ham kiradi). Kategoriyaga ta'sir qilmaydi —
+  mustaqil kuzatuv o'lchovi.
+- **Boshqaruv panelida yangi jadval — "Bo'sh turgan obyektlarda kommunal xizmatlar"**.
+  Barcha sonlar faqat "Bo'sh turgan" (11-kategoriya) obyektlar bo'yicha: soni va foydali
+  maydoni, so'ng suv/gaz/elektr abonenti topilganlar, kamida bittasi, **yaqinda to'lov
+  bo'lganlar** va tekshirilmaganlar. Hududlar tumanlar kesimida ochiladi, har bir son
+  ro'yxatga havola, Excelga eksport qilinadi (Hududlar + Tumanlar varaqlari).
+- **"Yaqinda to'lov" ko'rsatkichi** — gazning oxirgi to'lovi belgilangan oy ichida
+  (standart 3 oy) bo'lgan obyektlar. "Abonenti bor" bayrog'i ancha oldin yopilgan
+  hisobni ham ko'rsatardi; to'lov sanasi esa obyekt **hozir** foydalanilayotganini
+  bildiradi.
+- **Kommunal ro'yxat ko'rinishi** — jadvaldagi raqam bosilganda obyektlar ro'yxati
+  ixcham ko'rinishga o'tadi (Kadastr · Suv · Gaz · Elektr). Xizmat katakchasi bosilganda
+  o'sha xizmatning asosiy ma'lumotlari qator ostida ochiladi; obyekt sahifasiga faqat
+  kadastr raqami orqali o'tiladi.
+- **Obyekt sahifasida "Kommunal xizmatlar" bo'limi** — asosiy ma'lumotlardan keyin uchta
+  karta (abonent, balans, oxirgi to'lov, sarf). "Bo'sh turgan" obyektda abonent topilsa
+  sahifa tepasida ogohlantirish chiqadi.
+- **So'rovlar oqimida kommunal ogohlantirish** — ijrochi obyektni Yaroqsiz/Chekka'ga
+  o'tkazish so'rovini yuborganda, moderator va rahbariyat qaror qabul qilishdan oldin
+  o'sha obyektda kommunal abonent borligini ko'radi (yaqinda to'lov bo'lsa qizil belgi).
+  Ilgari bu ma'lumot faqat obyekt sahifasida bo'lgan.
+- Obyektlar ro'yxatiga `?utility=` filtri qo'shildi (suv / gaz / elektr / kamida bittasi /
+  yaqinda to'lov / hech biri / tekshirilmagan).
+
 ## 1.3.0
 
 - **Balansdan chiqarilgan obyektlar** — sinxronizatsiyada obyekt manba (STIR) API 1

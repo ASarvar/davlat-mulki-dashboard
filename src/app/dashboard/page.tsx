@@ -17,6 +17,7 @@ import {
   Layers,
   ChevronRight,
   ChevronDown,
+  Droplets,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireUser, isAdmin, userSourceScope } from "@/lib/authz";
@@ -27,13 +28,17 @@ import {
   buildJamiColumn,
   buildOnlyFreeOrPaidColumn,
   computeDistrictRentStats,
+  computeUtilityStats,
+  computeDistrictUtilityStats,
   type DashboardColumnSub,
   type RegionCategoryRow,
   type RegionStat,
+  type RegionUtilityRow,
   type StatsScope,
 } from "@/server/services/stats";
 import { listSourceNames } from "@/server/services/sources";
 import { isLandSplitSoha } from "@/lib/sourceLabel";
+import { env } from "@/lib/env";
 import { SyncRunStatusBadge } from "@/components/badges";
 import { SourceFilter, ALL_SOHA, OWN_SOHA } from "./SourceFilter";
 
@@ -81,6 +86,8 @@ const CARD =
   "mt-6 rounded-2xl bg-card p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/70";
 const EXPORT_BTN =
   "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-900 hover:ring-slate-300";
+/** "Yaqinda to'lov" oynasi (oy) — sarlavhada ko'rsatiladi, `.env` dan sozlanadi. */
+const RECENT_MONTHS = env.UTILITY_RECENT_PAYMENT_MONTHS;
 
 function StatCard({
   label,
@@ -305,6 +312,76 @@ function RentTableRow({
   );
 }
 
+/**
+ * "Bo'sh turgan obyektlarda kommunal xizmatlar" jadvalining bitta qatori.
+ * Hudud va TUMAN qatorlari uchun bir xil — ikkalasi ham `RegionUtilityRow` shaklida keladi.
+ *
+ * ⚠️ Qatordagi BARCHA sonlar faqat "Bo'sh turgan" (kat 11) obyektlar bo'yicha, shuning
+ * uchun har bir havolaga `category=11` qo'shiladi — usiz ro'yxatdagi son jadvaldagidan
+ * katta chiqardi.
+ */
+function UtilityTableRow({
+  row,
+  zebra,
+  nf,
+  km,
+  label,
+  lead,
+  scopeQs,
+  objHref,
+  vacantSuffix,
+}: {
+  row: RegionUtilityRow;
+  zebra: string;
+  nf: (n: number, digits?: number) => string;
+  km: (m2: number) => string;
+  label: React.ReactNode;
+  lead: React.ReactNode;
+  /** Qator doirasi — `region=<id>` / `tashkilot=<id>` / `region=..&district=..` */
+  scopeQs: string;
+  objHref: (qs?: string) => string;
+  /** `&category=11` dan keyingi qo'shimcha shart (landSplit sohada `&isLand=0`). */
+  vacantSuffix: string;
+}) {
+  const vacantQs = `${scopeQs}&category=11${vacantSuffix}`;
+  // Nol qiymatlar havola bo'lmaydi — bo'sh ro'yxatga olib borardi.
+  const cell = (value: number, utility?: string, extra = "", strong = false) => (
+    <td className={`${ROW_LINE} ${CELL} ${extra}`}>
+      {value > 0 ? (
+        <Link
+          href={objHref(utility ? `${vacantQs}&utility=${utility}` : vacantQs)}
+          className={`${NUM_LINK}${strong ? " font-semibold" : ""}`}
+        >
+          {nf(value)}
+        </Link>
+      ) : (
+        <span className={ZERO}>0</span>
+      )}
+    </td>
+  );
+
+  return (
+    <tr className={`${zebra} ${ROW_HOVER}`}>
+      <td className={`${ROW_LINE} ${LEAD_W} px-2 py-2.5 text-center tabular-nums text-slate-400`}>
+        {lead}
+      </td>
+      <td className={`${ROW_LINE} py-2.5 pl-1 pr-4`}>{label}</td>
+      {/* ── Bo'sh turgan obyektlarning asosiy ma'lumoti ── */}
+      {cell(row.count, undefined, "font-semibold text-slate-900")}
+      <td className={`${ROW_LINE} ${CELL}`}>
+        {row.usefulArea > 0 ? km(row.usefulArea) : <span className={ZERO}>0</span>}
+      </td>
+      {/* ── Shundan kommunal abonenti topilganlar ── */}
+      {cell(row.water, "water", GROUP_LINE)}
+      {cell(row.gas, "gas")}
+      {cell(row.electric, "electric")}
+      {cell(row.anyUtility, "any", GROUP_LINE, true)}
+      {cell(row.recentlyPaid, "recentlyPaid", "", true)}
+      {cell(row.unchecked, "unchecked")}
+    </tr>
+  );
+}
+
 type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
@@ -407,11 +484,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // Aggregatlar keshlangan (tag: dashboard, TTL 60s; kesh kaliti doiraga bog'liq).
   // Oxirgi run — jonli. Tuman kesimi faqat ochilgan hudud uchun so'raladi (keshlanmaydi:
   // arzon va kamdan-kam chaqiriladi).
-  const [s, latestRun, districts, districtRent] = await Promise.all([
+  const [s, latestRun, districts, districtRent, utilityRows, districtUtility] = await Promise.all([
     getDashboardStats(scope),
     prisma.syncRun.findFirst({ orderBy: { createdAt: "desc" } }),
     tuman ? computeDistrictStats(tuman, scope) : Promise.resolve([] as RegionCategoryRow[]),
     tuman ? computeDistrictRentStats(tuman, scope) : Promise.resolve([] as RegionStat[]),
+    // Kommunal jamlanma keshlanmaydi — u `getDashboardStats()` ichida emas, alohida
+    // (o'z ustunlari bo'yicha mustaqil so'rov; boshqa jadvallarga ta'sir qilmaydi).
+    computeUtilityStats(scope),
+    tuman ? computeDistrictUtilityStats(tuman, scope) : Promise.resolve([] as RegionUtilityRow[]),
   ]);
 
   // Drill-down havolalari manba filtrini olib yuradi.
@@ -459,6 +540,23 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // Bitta hudud qolganda JAMI qatori shu qatorning aynan nusxasi bo'lardi — ko'rsatmaymiz.
   const showCatTotals = catRows.length > 1;
   const showRentTotals = rentRows.length > 1;
+  // Kommunal jadval — boshqa ikkitasi bilan bir xil qoida (bo'sh hududlar yashiriladi,
+  // bitta qator qolganda JAMI ko'rsatilmaydi — u o'sha qatorning nusxasi bo'lardi).
+  // ⚠️ Bu yerda `count` — bo'sh turgan obyektlar soni (jadvalning butun mazmuni shu),
+  // shuning uchun filtr ham o'shanga qarab: bo'sh turgan obyekti yo'q hudud qatori
+  // butunlay nol bo'lardi.
+  const utilRows = hideZeroRows ? utilityRows.filter((r) => r.count > 0) : utilityRows;
+  const showUtilTotals = utilRows.length > 1;
+  const utilTotal = (f: (r: RegionUtilityRow) => number) => utilRows.reduce((a, r) => a + f(r), 0);
+  // Kommunal modul hali umuman ishga tushirilmagan bo'lsa jadval o'rniga tushuntirish
+  // ko'rsatiladi — 14 qator nol foydalanuvchini chalg'itardi. Mezon: bo'sh turgan
+  // obyektlarning hammasi "tekshirilmagan" bo'lsa, demak modul hech qachon ishlamagan.
+  const utilCheckedTotal = utilTotal((r) => r.count) - utilTotal((r) => r.unchecked);
+  // ⚠️ landSplit sohada (Davlat aktivlari/Direksiya) kommunal jadval FAQAT binolarni
+  // sanaydi (stats.ts → utilityRows), shuning uchun ro'yxat havolasi ham `isLand=0`
+  // bilan cheklanishi SHART — aks holda bosilganda ro'yxatda yer uchastkalari ham
+  // chiqib, son jadvaldagidan katta bo'lardi.
+  const vacantSuffix = variant === "landSplit" ? "&isLand=0" : "";
 
   // Respublika darajasidagi qatorlar (masalan "Markaziy apparat") — `regionId` maydonida
   // haqiqiy hudud EMAS, `OrganizationSource.id` turadi: tuman ochish o'chiriladi va
@@ -983,6 +1081,222 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         <p className="mt-3 text-xs text-muted-foreground">
           Yillik ijara summasi — <strong>mln so'm</strong>da. Maydon — kv.m.
         </p>
+      </section>
+
+      {/* Bo'sh turgan obyektlar × kommunal xizmatlar */}
+      <section className={CARD}>
+        <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
+          <SectionTitle icon={Droplets}>
+            Bo&apos;sh turgan obyektlarda kommunal xizmatlar
+          </SectionTitle>
+          <a href="/api/export/dashboard-utility" className={EXPORT_BTN}>
+            <Download className="h-3.5 w-3.5" />
+            Excelga eksport
+          </a>
+        </div>
+        <p className="mb-4 text-xs text-muted-foreground">
+          Jadvaldagi barcha sonlar faqat <strong>&quot;Bo&apos;sh turgan&quot;</strong> (11-kategoriya)
+          obyektlar bo&apos;yicha. Abonent topilishi — obyekt aslida foydalanilayotgan bo&apos;lishi
+          mumkinligining belgisi.
+        </p>
+
+        {utilCheckedTotal === 0 ? (
+          <div className="rounded-xl bg-slate-50 px-5 py-8 text-center text-sm text-muted-foreground ring-1 ring-slate-200">
+            Kommunal tekshiruv hali o'tkazilmagan. Sinxronizatsiya sahifasidagi{" "}
+            <strong>&quot;Faqat holat yangilash&quot;</strong> bo'limida{" "}
+            <strong>&quot;Kommunal: suv/gaz/elektr&quot;</strong> belgisini tanlab ishga tushiring.
+          </div>
+        ) : (
+          <div className="overflow-x-auto rounded-xl ring-1 ring-slate-200">
+            <table className="w-full border-separate border-spacing-0 text-sm">
+              <thead className="bg-[var(--navy-mid)] text-white">
+                <tr className="text-xs tracking-wide">
+                  <th rowSpan={2} className={`${LEAD_W} px-2 py-2.5 text-center align-middle font-semibold`}>
+                    №
+                  </th>
+                  <th rowSpan={2} className="py-2.5 pl-1 pr-4 text-left align-middle font-semibold">
+                    Hududlar nomi
+                  </th>
+                  <th colSpan={2} className="px-3 py-2 text-center font-semibold">
+                    Bo&apos;sh turgan obyektlar
+                  </th>
+                  <th colSpan={3} className={`px-3 py-2 text-center font-semibold ${GROUP_LINE}`}>
+                    Shundan kommunal abonenti bor
+                  </th>
+                  <th colSpan={3} className={`px-3 py-2 text-center font-semibold ${GROUP_LINE}`}>
+                    Jamlanma
+                  </th>
+                </tr>
+                <tr className="text-[11px] font-normal">
+                  <th className="px-3 py-2 text-center font-medium">Soni</th>
+                  <th className="px-3 py-2 text-center font-medium">
+                    Foydali maydoni
+                    <span className="block text-[10px] text-white/60">ming m²</span>
+                  </th>
+                  <th className={`px-3 py-2 text-center font-medium ${GROUP_LINE}`}>Suv</th>
+                  <th className="px-3 py-2 text-center font-medium">Gaz</th>
+                  <th className="px-3 py-2 text-center font-medium">Elektr</th>
+                  <th className={`px-3 py-2 text-center font-medium ${GROUP_LINE}`}>
+                    Kamida
+                    <span className="block text-[10px] text-white/60">bittasi</span>
+                  </th>
+                  <th className="px-3 py-2 text-center font-medium">
+                    Yaqinda
+                    <span className="block text-[10px] text-white/60">to&apos;lov ({RECENT_MONTHS} oy)</span>
+                  </th>
+                  <th className="px-3 py-2 text-center font-medium">
+                    Tekshiril-
+                    <span className="block text-[10px] text-white/60">magan</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {showUtilTotals ? (
+                  // JAMI qatoridagi sonlar ham havola — hududsiz, ya'ni butun doira
+                  // bo'yicha ro'yxatni ochadi (foydalanuvchi talabi, 2026-08-17).
+                  (() => {
+                    const tCell = (value: number, utility?: string, extra = "") => (
+                      <td className={`${TOTALS_LINE} ${CELL} ${extra}`}>
+                        {value > 0 ? (
+                          <Link
+                            href={objHref(`category=11${vacantSuffix}${utility ? `&utility=${utility}` : ""}`)}
+                            className="underline-offset-2 hover:underline"
+                          >
+                            {nf(value)}
+                          </Link>
+                        ) : (
+                          nf(value)
+                        )}
+                      </td>
+                    );
+                    return (
+                      <tr className={TOTALS_ROW}>
+                        <td className={`${TOTALS_LINE} ${LEAD_W} px-2 py-3`} />
+                        <td className={`${TOTALS_LINE} whitespace-nowrap py-3 pl-1 pr-4 tracking-wide`}>
+                          J A M I:
+                        </td>
+                        {tCell(utilTotal((r) => r.count))}
+                        <td className={`${TOTALS_LINE} ${CELL}`}>{km(utilTotal((r) => r.usefulArea))}</td>
+                        {tCell(utilTotal((r) => r.water), "water", GROUP_LINE)}
+                        {tCell(utilTotal((r) => r.gas), "gas")}
+                        {tCell(utilTotal((r) => r.electric), "electric")}
+                        {tCell(utilTotal((r) => r.anyUtility), "any", GROUP_LINE)}
+                        {tCell(utilTotal((r) => r.recentlyPaid), "recentlyPaid")}
+                        {tCell(utilTotal((r) => r.unchecked), "unchecked")}
+                      </tr>
+                    );
+                  })()
+                ) : null}
+
+                {utilRows.map((r, i) => {
+                  const zebra = i % 2 === 1 ? "bg-slate-50" : "bg-white";
+                  const national = isNational(r.regionId);
+                  const expanded = !national && tuman === r.regionId;
+                  const rowScope = national ? `tashkilot=${r.regionId}` : `region=${r.regionId}`;
+                  return (
+                    <Fragment key={r.regionId}>
+                      <UtilityTableRow
+                        row={r}
+                        zebra={zebra}
+                        nf={nf}
+                        km={km}
+                        scopeQs={rowScope}
+                        objHref={objHref}
+                        vacantSuffix={vacantSuffix}
+                        label={
+                          // ⚠️ `category=11` SHART: bu jadvalda hamma son bo'sh turganlar
+                          // bo'yicha, shuning uchun hudud nomi ham faqat o'shalarni ochadi
+                          // (aks holda umumiy ro'yxat chiqib, jadval bilan mos kelmasdi).
+                          <Link
+                            href={objHref(`${rowScope}&category=11${vacantSuffix}`)}
+                            className="font-medium hover:underline"
+                            style={{ color: "var(--cobalt)" }}
+                          >
+                            {r.name}
+                          </Link>
+                        }
+                        lead={
+                          national ? (
+                            <span className="tabular-nums">{i + 1}</span>
+                          ) : (
+                            // Boshqa ikkala jadval bilan BIR XIL `?tuman=` parametri —
+                            // bittasini ochsangiz uchalasi ham o'sha tumanlarni ko'rsatadi.
+                            <Link
+                              href={expanded ? dashHref() : dashHref(r.regionId)}
+                              scroll={false}
+                              title={expanded ? "Tumanlarni yopish" : "Tumanlar bo'yicha"}
+                              className="inline-flex items-center gap-1 tabular-nums text-muted-foreground hover:text-slate-700"
+                            >
+                              {expanded ? (
+                                <ChevronDown className="h-3.5 w-3.5" />
+                              ) : (
+                                <ChevronRight className="h-3.5 w-3.5" />
+                              )}
+                              {i + 1}
+                            </Link>
+                          )
+                        }
+                      />
+                      {expanded
+                        ? districtUtility.map((d) => (
+                            <UtilityTableRow
+                              key={d.regionId}
+                              row={d}
+                              zebra={DISTRICT_BG}
+                              nf={nf}
+                              km={km}
+                              scopeQs={`region=${r.regionId}&district=${d.regionId}`}
+                              objHref={objHref}
+                              vacantSuffix={vacantSuffix}
+                              lead={<span className="text-slate-300">·</span>}
+                              label={
+                                <Link
+                                  href={objHref(`region=${r.regionId}&district=${d.regionId}&category=11${vacantSuffix}`)}
+                                  className="text-[13px] hover:underline"
+                                  style={{ color: "var(--cobalt)" }}
+                                >
+                                  {d.name}
+                                </Link>
+                              }
+                            />
+                          ))
+                        : null}
+                    </Fragment>
+                  );
+                })}
+                {utilRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={99} className="py-10 text-center text-sm text-muted-foreground">
+                      Sizning tashkilotingiz bo&apos;yicha obyekt topilmadi.
+                    </td>
+                  </tr>
+                ) : null}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* ⚠️ Bu izoh MAJBURIY — usiz jadval xato o'qiladi. */}
+        <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
+          <p>
+            <strong>&quot;Tekshirilmagan&quot;</strong> — kommunal so&apos;rov hali
+            yuborilmagan. Bu <strong>&quot;abonent yo&apos;q&quot; degani EMAS</strong>: tashqi
+            API abonentning yo&apos;qligi va obyektning qamrovga kirmasligini farqlamaydi,
+            shuning uchun ikki holat alohida ko&apos;rsatiladi.
+          </p>
+          <p>
+            <strong>&quot;Gaz — hisobi faol&quot;</strong> — har oy to&apos;lov hisoblanmoqda,
+            ya&apos;ni obyekt haqiqatan foydalanilayotganining eng ishonchli belgisi. Suv va
+            elektr API&apos;lari sarf haqida hech narsa bermaydi — ular uchun faqat abonent
+            hisobining mavjudligi ma&apos;lum.
+          </p>
+          <p>
+            Qamrov umuman past (barcha obyektlarning ~4% ida abonent topiladi) va abonent nomi
+            ko&apos;pincha jismoniy shaxs yoki ijarachi bo&apos;lib chiqadi — API&apos;lar
+            turar-joy abonentlari bazasiga ulangan. Shuning uchun bu jadval{" "}
+            <strong>tekshirish uchun ro&apos;yxat beradi, yakuniy xulosa emas</strong>.
+          </p>
+        </div>
       </section>
     </div>
   );

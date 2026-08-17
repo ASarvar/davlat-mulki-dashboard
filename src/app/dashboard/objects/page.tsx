@@ -5,7 +5,24 @@ import { SyncStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser, isAdmin } from "@/lib/authz";
 import { CAT_REMOVED_FROM_BALANCE, REMOVED_FROM_BALANCE_LABEL } from "@/lib/categories";
-import { listProperties, PROPERTY_PAGE_SIZE, type PropertyFilters } from "@/server/services/properties";
+import {
+  listProperties,
+  listUtilityCells,
+  PROPERTY_PAGE_SIZE,
+  UTILITY_FILTERS,
+  UTILITY_FILTER_LABEL,
+  type PropertyFilters,
+  type PropertyUtilityCells,
+  type UtilityFilter,
+} from "@/server/services/properties";
+import { UtilityObjectsTable } from "./UtilityObjectsTable";
+
+/** Kommunal yozuvi umuman yo'q obyekt uchun (masalan hali tekshirilmagan). */
+const EMPTY_UTILITY_CELLS: PropertyUtilityCells = {
+  WATER: { found: false, short: "—", hint: null, rows: [], matchedByOldCad: false },
+  GAS: { found: false, short: "—", hint: null, rows: [], matchedByOldCad: false },
+  ELECTRIC: { found: false, short: "—", hint: null, rows: [], matchedByOldCad: false },
+};
 import { listSourceNames, listSources } from "@/server/services/sources";
 import { listDistricts } from "@/server/services/districts";
 import { CAT_HAS_VACANT_AREA } from "@/server/services/classification";
@@ -36,6 +53,10 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   const hasRentContractStr = str(sp.hasRentContract);
   const onAnyAuctionStr = str(sp.onAnyAuction);
   const isLandStr = str(sp.isLand);
+  const utilityRaw = str(sp.utility);
+  const utility = UTILITY_FILTERS.includes(utilityRaw as UtilityFilter)
+    ? (utilityRaw as UtilityFilter)
+    : undefined;
   const requestedPage = Number(str(sp.page) ?? 1);
   const statusRaw = str(sp.status);
   const syncStatus = statusRaw && statusRaw in SyncStatus ? (statusRaw as SyncStatus) : undefined;
@@ -54,6 +75,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     onAnyAuction: onAnyAuctionStr === "1" ? true : undefined,
     isLand: isLandStr === "1" ? true : isLandStr === "0" ? false : undefined,
     myRegionsOnly: myRegionsOnly || undefined,
+    utility,
   };
 
   // "Bo'sh maydoni bor" (kat 12) filtri tanlansa, maydon ustunida bo'sh maydon ko'rsatiladi.
@@ -82,6 +104,12 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     listProperties(user, filters, requestedPage),
   ]);
 
+  // Kommunal ma'lumot FAQAT ixcham ko'rinishda so'raladi — `rawResponse` og'ir JSON,
+  // uni har bir ro'yxat so'rovida yuklash keraksiz.
+  const utilityCells = utility
+    ? await listUtilityCells(result.items.map((p) => p.id))
+    : new Map<string, PropertyUtilityCells>();
+
   const orgs = sohaSources.map((s) => ({
     id: s.id,
     label: sourceScopeLabel(s.name, s.region?.name),
@@ -102,6 +130,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   if (hasRentContractStr) baseParams.set("hasRentContract", hasRentContractStr);
   if (onAnyAuctionStr) baseParams.set("onAnyAuction", onAnyAuctionStr);
   if (isLandStr) baseParams.set("isLand", isLandStr);
+  if (utility) baseParams.set("utility", utility);
   if (syncStatus) baseParams.set("status", syncStatus);
 
   const exportHref = `/api/export/objects?${baseParams.toString()}`;
@@ -121,6 +150,13 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     chips.push({ key: "hasRentContract", value: "1", label: "Ijaraga berilgan", removeHref: hrefWithout("hasRentContract") });
   if (fullyRentedStr === "1")
     chips.push({ key: "fullyRented", value: "1", label: "To'liq ijara berilgan", removeHref: hrefWithout("fullyRented") });
+  if (utility)
+    chips.push({
+      key: "utility",
+      value: utility,
+      label: UTILITY_FILTER_LABEL[utility],
+      removeHref: hrefWithout("utility"),
+    });
   if (isLandStr === "1") chips.push({ key: "isLand", value: "1", label: "Yer", removeHref: hrefWithout("isLand") });
   if (isLandStr === "0") chips.push({ key: "isLand", value: "0", label: "Bino", removeHref: hrefWithout("isLand") });
   if (syncStatus)
@@ -167,6 +203,22 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
         current={{ q, region: regionRaw, district, soha, tashkilot, category: categoryStr, inefficient: inefficientStr }}
       />
 
+      {/* ── Kommunal ko'rinish ──
+          `?utility=` filtri qo'llanganda (ya'ni dashboarddagi kommunal jadvaldan
+          kelinganda) ro'yxat IXCHAM ko'rinishga o'tadi: faqat kadastr + suv/gaz/elektr.
+          Boshqa hollarda odatdagi to'liq jadval (foydalanuvchi tanlovi, 2026-08-17). */}
+      {utility ? (
+        <UtilityObjectsTable
+          rows={result.items.map((p) => ({
+            id: p.id,
+            cadNumber: p.cadNumber,
+            cadNumberOld: p.cadNumberOld,
+            href: objectHref(p.cadNumber),
+            regionName: p.districtName ? `${p.regionName} — ${p.districtName}` : p.regionName,
+            cells: utilityCells.get(p.id) ?? EMPTY_UTILITY_CELLS,
+          }))}
+        />
+      ) : (
       <div className="overflow-x-auto rounded-xl border border-border bg-card shadow-sm">
         <table className="w-full text-sm">
           <thead>
@@ -262,6 +314,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
           </tbody>
         </table>
       </div>
+      )}
 
       <Pagination
         page={result.page}

@@ -5,7 +5,28 @@ import { requireUser } from "@/lib/authz";
 import { listPendingRequests, listRequestHistory, reviewableStages, type RequestFilters } from "@/server/services/assignment";
 import { ASSIGNABLE_CATEGORIES, CATEGORY_BY_CODE } from "@/lib/categories";
 import { objectHref } from "@/lib/cadastre";
-import { RequestRow } from "./RequestRow";
+import { RequestRow, UtilityWarning, type RequestUtility } from "./RequestRow";
+import { recentPaymentCutoff } from "@/server/services/stats";
+
+/**
+ * Obyektning kommunal bayroqlarini ko'rsatish uchun tayyorlaydi.
+ * ⚠️ "Yaqinda to'lov" chegarasi  →  dan — dashboard
+ * ustuni va ro'yxat filtri bilan AYNAN bir xil mezon.
+ */
+function utilityOf(p: {
+  hasWater: boolean;
+  hasGas: boolean;
+  hasElectric: boolean;
+  gasLastPaymentAt: Date | null;
+}): RequestUtility {
+  return {
+    water: p.hasWater,
+    gas: p.hasGas,
+    electric: p.hasElectric,
+    gasLastPayment: p.gasLastPaymentAt ? p.gasLastPaymentAt.toLocaleDateString("uz") : null,
+    recentlyPaid: p.gasLastPaymentAt != null && p.gasLastPaymentAt >= recentPaymentCutoff(),
+  };
+}
 
 const STATUS_STYLE: Record<ChangeRequestStatus, { label: string; cls: string }> = {
   PENDING_MODERATOR: { label: "Moderatorda", cls: "bg-amber-100 text-amber-800" },
@@ -200,6 +221,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                         stage: r.status as "PENDING_MODERATOR" | "PENDING_RAHBARIYAT",
                         cadNumber: r.property.cadNumber,
                         regionName: r.property.region.name,
+                        utility: utilityOf(r.property),
                         requestedBy: r.requestedBy.fullName,
                         moderatorName: r.moderator?.fullName ?? null,
                         toCategoryName: CATEGORY_BY_CODE.get(r.toCategory)?.nameUz ?? String(r.toCategory),
@@ -258,6 +280,9 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                           {r.property.cadNumber}
                         </a>
                         <p className="text-xs text-muted-foreground">{r.property.region.name}</p>
+                        {/* Tarixda ham ko'rsatiladi: qaror to'g'ri bo'lganini keyin
+                            tekshirish uchun ham shu ma'lumot kerak. */}
+                        <UtilityWarning utility={utilityOf(r.property)} />
                       </td>
                       <td className="px-4 py-3">
                         <p className="font-medium">

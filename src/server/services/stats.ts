@@ -3,6 +3,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { CATEGORIES } from "@/lib/categories";
 import { sourceScopeLabel, isLandSplitSoha } from "@/lib/sourceLabel";
+import { env } from "@/lib/env";
 
 export interface RegionStat {
   regionId: string;
@@ -482,6 +483,221 @@ function toRegionStat(r: TotalsRow): RegionStat {
     rentArea: Number(r.area ?? 0),
     rentSum: Number(r.sum ?? 0),
   };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// KOMMUNAL XIZMATLAR (suv / gaz / elektr) kesimi
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Hudud (yoki tuman / respublika tashkiloti) × kommunal xizmat —
+ * ⚠️ **BARCHA ustunlar FAQAT "Bo'sh turgan" (effektiv kategoriya 11) obyektlar bo'yicha.**
+ *
+ * Jadvalning maqsadi bitta aniq savol: *bo'sh deb hisoblanayotgan obyekt aslida
+ * suv/gaz/elektr ishlatyaptimi?* Shuning uchun bu yerda umumiy obyektlar soni YO'Q —
+ * u ikkinchi jadvalda (kategoriyalar) allaqachon bor va ikkalasini bitta jadvalga
+ * qo'shish jadvalni o'qib bo'lmas holga keltirgan edi.
+ *
+ * ⚠️ `unchecked` ("Tekshirilmagan") ALOHIDA ustun bo'lishi SHART. Tashqi API'lar
+ * "bu kadastrda abonent yo'q" va "bu obyekt umuman qamralmagan" holatini FARQLAY
+ * OLMAYDI — ikkalasiga ham bir xil javob qaytadi. Tekshirilmagan obyektni "abonent
+ * yo'q" ichiga qo'shish "bu obyekt haqiqatan bo'sh" degan XATO xulosaga olib kelardi.
+ *
+ * ⚠️ Gaz ustuni — `hasGas`, ya'ni ABONENT HISOBI bor obyektlar. Hisoblagich ko'rsatkichi
+ * 0 bo'lgan (norma bo'yicha to'lanadigan) abonentlar ham SHU songa kiradi — foydalanuvchi
+ * qarori (2026-08-17): "gaz hisobi faol" alohida ustuni olib tashlandi, chunki to'liq
+ * ma'lumotda u `gasConsuming` bilan deyarli aynan bir xil chiqdi (21 abonentdan 19 tasida)
+ * va jadvalni behuda kengaytirardi. `gasBilled`/`gasConsuming` bayroqlari bazada va
+ * `?utility=` filtrida saqlanib qoladi.
+ */
+export interface RegionUtilityRow {
+  /** Guruh identifikatori — hudud, tuman yoki respublika tashkiloti id'si. */
+  regionId: string;
+  name: string;
+  sortOrder: number;
+  /** Bo'sh turgan obyektlar soni (kat 11). */
+  count: number;
+  /** Ularning foydali maydoni (kv.m) — kategoriyalar jadvalidagi 11-ustun bilan bir xil. */
+  usefulArea: number;
+  water: number;
+  gas: number;
+  electric: number;
+  /** Kamida bitta xizmatda abonent topilgan (birlashma — takror sanalmaydi). */
+  anyUtility: number;
+  /**
+   * Gazning oxirgi to'lovi `UTILITY_RECENT_PAYMENT_MONTHS` oy ichida bo'lgan.
+   * ⚠️ Eng KUCHLI signal: "abonent bor" yopilgan eski hisobni ham qamrab oladi,
+   * to'lov esa kimdir obyektdan hozir foydalanayotganini bildiradi.
+   */
+  recentlyPaid: number;
+  /** Kommunal so'rov hali yuborilmagan (abonent yo'q degani EMAS). */
+  unchecked: number;
+}
+
+/** "Yaqinda to'lov" chegarasi — SQL va `buildWhere()` uchun BIR joydan. */
+export function recentPaymentCutoff(): Date {
+  const d = new Date();
+  d.setMonth(d.getMonth() - env.UTILITY_RECENT_PAYMENT_MONTHS);
+  return d;
+}
+
+type UtilRawRow = {
+  id: string;
+  name: string;
+  sortOrder: number | string;
+  count: bigint | number;
+  usefulArea: string | number | null;
+  water: bigint | number;
+  gas: bigint | number;
+  electric: bigint | number;
+  anyUtility: bigint | number;
+  recentlyPaid: bigint | number;
+  unchecked: bigint | number;
+};
+
+/**
+ * Kommunal jamlanma — `groupTotalsRows()` bilan bir xil naqsh: guruh jadvali (`Region`/
+ * `District`/`OrganizationSource`) LEFT JOIN qilinadi va doira sharti **JOIN ichida**
+ * turadi, `WHERE`da emas — aks holda o'sha doirada obyekti yo'q hudud jadvaldan
+ * butunlay tushib qolardi (0 o'rniga yo'qoladi).
+ */
+function utilityRows(opts: {
+  table: Prisma.Sql;
+  joinOn: Prisma.Sql;
+  sortExpr: Prisma.Sql;
+  groupExtra: Prisma.Sql;
+  order: Prisma.Sql;
+  where: Prisma.Sql;
+  srcCond: Prisma.Sql;
+  /** Yer/Bino ajratiladigan soha (Davlat aktivlari/Direksiya) — faqat BINO sanaladi. */
+  landSplit: boolean;
+}) {
+  const { table, joinOn, sortExpr, groupExtra, order, where, srcCond, landSplit } = opts;
+  // ⚠️ Doira sharti JOIN ichida, "bo'sh turgan" sharti esa HAR BIR FILTER ichida.
+  // Uni JOIN'ga qo'shib bo'lmaydi: u holda kategoriyasi 11 bo'lmagan obyekti bor
+  // hudud qatori umuman yo'qolardi (LEFT JOIN'ning butun maqsadi shu — 0 li qatorlar
+  // jadvalda qolishi kerak).
+  //
+  // ⚠️ `landSplit` sohalarda (Davlat aktivlari agentligi / Direksiya) FAQAT BINO
+  // sanaladi — kategoriyalar jadvalidagi 11-ustun va "Bo'sh turgan" kartasi bilan
+  // AYNAN bir xil mezon (`rentBreakdown.vacant.buildingCount`). Busiz kartada 606,
+  // bu jadvalda 2994 chiqib, ikkalasi bir-biriga mos kelmasdi (foydalanuvchi topdi,
+  // 2026-08-17 — kategoriyalar jadvalida bir marta AYNAN shu xato bo'lgan edi).
+  //
+  // ⚠️ Maydon yig'indisi bu xatoni YASHIRADI: yer uchastkasida `buildingArea = 0`,
+  // shuning uchun SUM ikkala holatda ham bir xil chiqadi va faqat SONI farq qiladi.
+  // Ya'ni "maydon mos kelyapti" — to'g'riligining dalili EMAS.
+  const vacant = landSplit
+    ? Prisma.sql`COALESCE(p."integrationCategoryCode", p."manualCategoryCode", 11) = 11 AND NOT p."isLand"`
+    : Prisma.sql`COALESCE(p."integrationCategoryCode", p."manualCategoryCode", 11) = 11`;
+  const any = Prisma.sql`(p."hasWater" OR p."hasGas" OR p."hasElectric")`;
+  const cutoff = recentPaymentCutoff();
+  return prisma.$queryRaw<UtilRawRow[]>(Prisma.sql`
+    SELECT g.id, g.name, ${sortExpr} AS "sortOrder",
+           COUNT(p.id) FILTER (WHERE ${vacant})                    AS count,
+           COALESCE(SUM(p."buildingArea") FILTER (WHERE ${vacant}), 0) AS "usefulArea",
+           COUNT(p.id) FILTER (WHERE ${vacant} AND p."hasWater")    AS water,
+           COUNT(p.id) FILTER (WHERE ${vacant} AND p."hasGas")      AS gas,
+           COUNT(p.id) FILTER (WHERE ${vacant} AND p."hasElectric") AS electric,
+           COUNT(p.id) FILTER (WHERE ${vacant} AND ${any})          AS "anyUtility",
+           COUNT(p.id) FILTER (WHERE ${vacant}
+                                 AND p."gasLastPaymentAt" >= ${cutoff}) AS "recentlyPaid",
+           COUNT(p.id) FILTER (WHERE ${vacant}
+                                 AND p."utilityCheckedAt" IS NULL)  AS unchecked
+    FROM ${table} g
+    LEFT JOIN "Property" p ON ${joinOn} AND ${srcCond}
+    WHERE ${where}
+    GROUP BY g.id, g.name${groupExtra}
+    ORDER BY ${order}
+  `);
+}
+
+function toUtilityRow(r: UtilRawRow): RegionUtilityRow {
+  return {
+    regionId: r.id,
+    name: r.name,
+    sortOrder: Number(r.sortOrder),
+    count: Number(r.count),
+    usefulArea: Number(r.usefulArea ?? 0),
+    water: Number(r.water),
+    gas: Number(r.gas),
+    electric: Number(r.electric),
+    anyUtility: Number(r.anyUtility),
+    recentlyPaid: Number(r.recentlyPaid),
+    unchecked: Number(r.unchecked),
+  };
+}
+
+/**
+ * Hududlar kesimi + respublika darajasidagi tashkilotlar alohida qatorlar bilan —
+ * `computeDashboardStats()` dagi bilan bir xil printsip (natIds hudud qatorlaridan
+ * chiqarilib, o'z qatorida ko'rsatiladi).
+ */
+export async function computeUtilityStats(scope: StatsScope = {}): Promise<RegionUtilityRow[]> {
+  const srcCond = sourceCond(scope, Prisma.sql`p.`);
+  // Yer/Bino ajratiladigan soha — kategoriyalar jadvali va kartalar bilan bir xil mezon.
+  const landSplit = isLandSplitSoha(scope.sourceName);
+  const natOrgs = await nationalOrgRows(scope);
+  const natIds = natOrgs.map((o) => o.id);
+  const regionSrcCond = natIds.length
+    ? Prisma.sql`${srcCond} AND p."sourceId" NOT IN (${Prisma.join(natIds)})`
+    : srcCond;
+
+  const [regionRaw, natRaw] = await Promise.all([
+    utilityRows({
+      table: Prisma.sql`"Region"`,
+      joinOn: Prisma.sql`p."regionId" = g.id`,
+      sortExpr: Prisma.sql`g."sortOrder"`,
+      groupExtra: Prisma.sql`, g."sortOrder"`,
+      order: Prisma.sql`g."sortOrder", g.name`,
+      where: Prisma.sql`TRUE`,
+      srcCond: regionSrcCond,
+      landSplit,
+    }),
+    natIds.length
+      ? utilityRows({
+          table: Prisma.sql`"OrganizationSource"`,
+          joinOn: Prisma.sql`p."sourceId" = g.id`,
+          sortExpr: Prisma.sql`0`,
+          groupExtra: Prisma.empty,
+          order: Prisma.sql`g.name`,
+          where: Prisma.sql`g.id IN (${Prisma.join(natIds)})`,
+          srcCond,
+          landSplit,
+        })
+      : Promise.resolve([] as UtilRawRow[]),
+  ]);
+
+  const labelById = new Map(natOrgs.map((o) => [o.id, sourceScopeLabel(o.name, null)]));
+  return [
+    ...regionRaw.map(toUtilityRow),
+    ...natRaw.map((r) => ({ ...toUtilityRow(r), name: labelById.get(r.id) ?? r.name })),
+  ];
+}
+
+/** Bitta hududning tumanlari — kommunal jadvalda hudud qatori ochilganda. */
+export async function computeDistrictUtilityStats(
+  regionId: string,
+  scope: StatsScope = {},
+): Promise<RegionUtilityRow[]> {
+  const baseCond = sourceCond(scope, Prisma.sql`p.`);
+  // Respublika darajasidagilar tuman kesimidan chiqariladi — `computeDistrictRentStats`
+  // bilan bir xil printsip (ular o'z alohida qatorida hisoblangan).
+  const natIds = (await nationalOrgRows(scope)).map((o) => o.id);
+  const srcCond = natIds.length
+    ? Prisma.sql`${baseCond} AND p."sourceId" NOT IN (${Prisma.join(natIds)})`
+    : baseCond;
+  const rows = await utilityRows({
+    table: Prisma.sql`"District"`,
+    joinOn: Prisma.sql`p."districtId" = g.id`,
+    sortExpr: Prisma.sql`0`,
+    groupExtra: Prisma.empty,
+    order: Prisma.sql`g.name`,
+    where: Prisma.sql`g."regionId" = ${regionId}`,
+    srcCond,
+    landSplit: isLandSplitSoha(scope.sourceName),
+  });
+  return rows.map(toUtilityRow);
 }
 
 /**

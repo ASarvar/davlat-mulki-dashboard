@@ -10,6 +10,8 @@ import {
 } from "./classification";
 import { userSourceScope, isAdmin, type SessionUser } from "@/lib/authz";
 import { CAT_REMOVED_FROM_BALANCE } from "@/lib/categories";
+import { parseUtilityRaw, type UtilityInfo, type UtilityKind } from "@/server/integrations/utilities";
+import { recentPaymentCutoff } from "./stats";
 
 export interface PropertyFilters {
   q?: string; // kadastr (yangi/eski) bo'yicha qidiruv
@@ -33,7 +35,43 @@ export interface PropertyFilters {
   isLand?: boolean;
   /** MODERATOR uchun: faqat o'ziga biriktirilgan hudud(lar) bo'yicha saralash (ko'rish cheklovi emas). */
   myRegionsOnly?: boolean;
+  /** Kommunal xizmat kesimi — dashboard'dagi kommunal jadval ustunlaridan drill-down. */
+  utility?: UtilityFilter;
 }
+
+/**
+ * Kommunal jadval ustunlariga MOS keladigan filtr qiymatlari. Har biri
+ * `stats.ts` → `utilityRows()` dagi AYNAN o'sha shart bilan juftlashtirilgan —
+ * jadvaldagi raqamni bosganda ro'yxatda shuncha obyekt chiqishi uchun.
+ *
+ * ⚠️ `none` ("Hech biri") va `unchecked` ("Tekshirilmagan") — IKKI BOSHQA narsa:
+ * birinchisi tekshirilgan va abonent topilmagan, ikkinchisi umuman tekshirilmagan.
+ * Ularni birlashtirish "foydalanmayapti" degan xato xulosani keltirib chiqarardi.
+ */
+export const UTILITY_FILTERS = [
+  "water",
+  "gas",
+  "gasBilled",
+  "gasConsuming",
+  "electric",
+  "any",
+  "recentlyPaid",
+  "none",
+  "unchecked",
+] as const;
+export type UtilityFilter = (typeof UTILITY_FILTERS)[number];
+
+export const UTILITY_FILTER_LABEL: Record<UtilityFilter, string> = {
+  water: "Suv abonenti bor",
+  gas: "Gaz abonenti bor",
+  gasBilled: "Gaz hisobi faol (to'lov hisoblanmoqda)",
+  gasConsuming: "Gaz hisoblagichi bo'yicha sarf bor",
+  electric: "Elektr abonenti bor",
+  any: "Kamida bitta kommunal xizmat",
+  recentlyPaid: "Gaz uchun yaqinda to'lov bo'lgan",
+  none: "Hech qaysi kommunal xizmat yo'q",
+  unchecked: "Kommunal tekshirilmagan",
+};
 
 const PAGE_SIZE = 20;
 export const PROPERTY_PAGE_SIZE = PAGE_SIZE;
@@ -149,6 +187,55 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
   // "Auksion savdolarida (Xususiy. va Ijara)" ustuni — xususiylashtirish YOKI ijara savdosida.
   if (f.onAnyAuction) and.push({ OR: [{ hasPrivatizationLot: true }, { hasRentLot: true }] });
 
+  // ── Kommunal xizmatlar ──
+  // ⚠️ Shartlar `stats.ts` → `utilityRows()` dagi FILTER (...) ifodalari bilan
+  // bir xil bo'lishi SHART, aks holda jadvaldagi raqamni bosganda ro'yxatdagi
+  // son boshqacha chiqadi (CLAUDE.md dagi buildWhere qoidasi).
+  if (f.utility) {
+    const anyUtility: Prisma.PropertyWhereInput[] = [
+      { hasWater: true },
+      { hasGas: true },
+      { hasElectric: true },
+    ];
+    switch (f.utility) {
+      case "water":
+        and.push({ hasWater: true });
+        break;
+      case "gas":
+        and.push({ hasGas: true });
+        break;
+      case "gasBilled":
+        and.push({ gasBilled: true });
+        break;
+      case "gasConsuming":
+        and.push({ gasConsuming: true });
+        break;
+      case "electric":
+        and.push({ hasElectric: true });
+        break;
+      case "any":
+        and.push({ OR: anyUtility });
+        break;
+      case "recentlyPaid":
+        // ⚠️ Chegara `stats.ts` → `recentPaymentCutoff()` dan — jadvaldagi SQL bilan
+        // bir xil funksiya, aks holda ustundagi son va ro'yxatdagi son ajralib ketardi.
+        and.push({ gasLastPaymentAt: { gte: recentPaymentCutoff() } });
+        break;
+      case "none":
+        // Tekshirilgan, lekin hech qaysi xizmatda abonent topilmagan.
+        and.push({
+          utilityCheckedAt: { not: null },
+          hasWater: false,
+          hasGas: false,
+          hasElectric: false,
+        });
+        break;
+      case "unchecked":
+        and.push({ utilityCheckedAt: null });
+        break;
+    }
+  }
+
   if (typeof f.isLand === "boolean") and.push({ isLand: f.isLand });
   if (typeof f.inefficient === "boolean") and.push({ isInefficient: f.inefficient });
   if (f.syncStatus) and.push({ syncStatus: f.syncStatus });
@@ -184,6 +271,111 @@ export interface PropertyListResult {
   page: number; // 1 dan boshlanadi
   pageCount: number;
   total: number;
+}
+
+/**
+ * Ro'yxatdagi bitta kommunal katakcha — client komponentga uzatiladigan TAYYOR ko'rinish.
+ *
+ * ⚠️ Formatlash SERVER tomonda qilinadi va client'ga faqat oddiy tiplar boradi.
+ * Sabab: `integrations/utilities.ts` → `@/lib/env` ni import qiladi (server-only, zod
+ * validatsiyasi bilan) — uni client bundle'ga tortib kiritish mumkin emas.
+ */
+export interface UtilityCell {
+  found: boolean;
+  /** Katakda ko'rinadigan qisqa matn ("Bor" / "—"). */
+  short: string;
+  /** Katakdagi ikkinchi qator — eng muhim bitta ko'rsatkich. */
+  hint: string | null;
+  /** Ochilganda ko'rinadigan "nomi → qiymati" juftliklari. */
+  rows: { label: string; value: string }[];
+  /** Eski kadastr orqali topilganmi (ro'yxatda belgi sifatida ko'rinadi). */
+  matchedByOldCad: boolean;
+}
+
+export interface PropertyUtilityCells {
+  WATER: UtilityCell;
+  GAS: UtilityCell;
+  ELECTRIC: UtilityCell;
+}
+
+const EMPTY_CELL: UtilityCell = { found: false, short: "—", hint: null, rows: [], matchedByOldCad: false };
+
+const sum = (n: number | null) => (n == null ? "—" : `${n.toLocaleString("uz-UZ")} so'm`);
+
+/** `UtilityInfo` → ro'yxatda ko'rsatiladigan katakcha (xizmat turiga qarab boshqa maydonlar). */
+function toCell(kind: UtilityKind, u: UtilityInfo): UtilityCell {
+  if (!u.found) return EMPTY_CELL;
+  const rows: { label: string; value: string }[] = [];
+
+  if (kind === "WATER") {
+    if (u.subscriberName) rows.push({ label: "Abonent", value: u.subscriberName });
+    if (u.subscriberCode) rows.push({ label: "Abonent kodi", value: u.subscriberCode });
+    rows.push({ label: "Balans", value: sum(u.balance) });
+    if (u.balanceStatus) rows.push({ label: "Holati", value: u.balanceStatus });
+    return { found: true, short: "Bor", hint: u.balance != null ? sum(u.balance) : null, rows, matchedByOldCad: u.matchedByOldCad };
+  }
+
+  if (kind === "GAS") {
+    if (u.subscriberName) rows.push({ label: "Abonent", value: u.subscriberName });
+    if (u.subscriberCode) rows.push({ label: "Abonent kodi", value: u.subscriberCode });
+    if (u.address) rows.push({ label: "Manzil", value: u.address });
+    rows.push({ label: "Joriy balans", value: sum(u.balance) });
+    rows.push({
+      label: "Oxirgi to'lov",
+      value: u.lastPaymentDate ? `${u.lastPaymentDate} — ${sum(u.lastPaymentSum)}` : "—",
+    });
+    rows.push({
+      label: "12 oylik sarf",
+      // ⚠️ 0 "sarf yo'q" degani EMAS — hisoblagichi yo'q abonentda gaz norma bo'yicha
+      // hisoblanadi, shuning uchun izoh bilan ko'rsatiladi.
+      value:
+        u.consumedTotal && u.consumedTotal > 0
+          ? `${u.consumedTotal.toLocaleString("uz-UZ")} m³`
+          : "0 m³ (hisoblagich yo'q yoki sarf qayd etilmagan)",
+    });
+    rows.push({ label: "Hisob holati", value: u.billed ? "Faol — to'lov hisoblanmoqda" : "Harakat yo'q" });
+    return { found: true, short: "Bor", hint: u.lastPaymentDate ? `to'lov: ${u.lastPaymentDate}` : null, rows, matchedByOldCad: u.matchedByOldCad };
+  }
+
+  // ELECTRIC — API faqat abonent kodlarini beradi (nom ham, sarf ham yo'q).
+  rows.push({ label: "Abonent kodlari", value: u.codes.join(", ") || "—" });
+  rows.push({ label: "Kodlar soni", value: String(u.codes.length) });
+  return {
+    found: true,
+    short: "Bor",
+    hint: `${u.codes.length} ta kod`,
+    rows,
+    matchedByOldCad: u.matchedByOldCad,
+  };
+}
+
+/**
+ * Ro'yxatdagi obyektlar uchun kommunal ma'lumot — SAQLANGAN xom javoblardan
+ * (`ObjectStatusCheck.rawResponse`), tashqi API'ga chaqirmasdan.
+ *
+ * ⚠️ Faqat ixcham ("kommunal") ko'rinishda chaqiriladi: `rawResponse` og'ir JSON, uni
+ * har bir ro'yxat so'rovida yuklash keraksiz.
+ */
+export async function listUtilityCells(propertyIds: string[]): Promise<Map<string, PropertyUtilityCells>> {
+  const out = new Map<string, PropertyUtilityCells>();
+  if (propertyIds.length === 0) return out;
+
+  const checks = await prisma.objectStatusCheck.findMany({
+    where: { propertyId: { in: propertyIds }, apiSource: { in: ["WATER", "GAS", "ELECTRIC"] } },
+    select: { propertyId: true, apiSource: true, rawResponse: true, matchedByOldCad: true },
+  });
+
+  for (const id of propertyIds) {
+    out.set(id, { WATER: EMPTY_CELL, GAS: EMPTY_CELL, ELECTRIC: EMPTY_CELL });
+  }
+  for (const c of checks) {
+    const kind = c.apiSource as UtilityKind;
+    const info = parseUtilityRaw(kind, c.rawResponse);
+    const cell = toCell(kind, { ...info, matchedByOldCad: c.matchedByOldCad });
+    const entry = out.get(c.propertyId);
+    if (entry) entry[kind] = cell;
+  }
+  return out;
 }
 
 // Sahifa raqamli (offset) pagination — foydalanuvchi sahifalar bo'ylab yura olishi uchun.

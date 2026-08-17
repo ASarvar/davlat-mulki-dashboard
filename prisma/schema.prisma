@@ -267,6 +267,50 @@ model Property {
   rentCheckedAt      DateTime?
   rentContracts      RentContract[]
 
+  // ── Kommunal xizmatlar (suv/gaz/elektr API'lari) ──
+  // Xom javoblar `ObjectStatusCheck` da (apiSource = "WATER"/"GAS"/"ELECTRIC"), bu yerda
+  // esa dashboard agregati uchun materiallashtirilgan bayroqlar (rentContractCount bilan
+  // bir xil printsip: tafsilot alohida jadvalda, hisob-kitob ustunda).
+  //
+  // ⚠️ "Abonent bor" va "sarflayapti" — IKKI BOSHQA narsa. Jonli o'lchovda 8 ta gaz
+  // abonentidan 7 tasida `gas_consume` 12 oy davomida 0 edi (hisob ochiq, sarf yo'q).
+  // Shuning uchun `hasGas` va `gasConsuming` alohida ustun.
+  //
+  // ⚠️ `utilityCheckedAt = null` — "TEKSHIRILMAGAN", "abonent yo'q" EMAS. Bu farq
+  // dashboardda alohida ustun bo'lib ko'rsatiladi: API "abonent yo'q" va "bu hudud
+  // umuman qamralmagan" holatini farqlay olmaydi (ikkalasi bir xil javob qaytaradi),
+  // shuning uchun tekshirilmaganni "foydalanmayapti" deb ko'rsatish xato xulosa bo'lardi.
+  hasWater         Boolean   @default(false)
+  hasGas           Boolean   @default(false)
+  hasElectric      Boolean   @default(false)
+  /**
+   * Faqat gaz: oxirgi oylarda `gas_consume > 0` — HISOBLAGICH ko'rsatgan haqiqiy sarf.
+   * ⚠️ Qat'iy mezon: hisoblagichi yo'q abonentda hamisha `false`.
+   */
+  gasConsuming     Boolean   @default(false)
+  /**
+   * Faqat gaz: oxirgi oylarda `accrual > 0` — hisob FAOL, to'lov hisoblanmoqda.
+   * Hisoblagichi yo'q abonentda (`meter_number` NULL) `gas_consume` doim 0 bo'ladi, lekin
+   * gaz norma bo'yicha hisoblanib to'lov yuritiladi — shu holat uchun alohida bayroq.
+   * ⚠️ Amalda kam uchraydi: to'liq ma'lumotda 21 ta gaz abonentidan 19 tasida bu bayroq
+   * `gasConsuming` bilan bir xil qiymatda.
+   */
+  gasBilled        Boolean   @default(false)
+  /**
+   * Gaz abonentining OXIRGI TO'LOV sanasi (API `abonent.last_payment_date`).
+   *
+   * ⚠️ Bu `gasBilled` dan KUCHLIROQ dalil: hisob-kitob (`accrual`) abonent to'lamasa ham
+   * davom etaveradi va qarz to'planadi, TO'LOV esa kimdir obyektdan foydalanayotganini
+   * bildiradi. Jonli ma'lumotda sanalar 2024-yildan 2026-yilgacha tarqalgan — ya'ni
+   * "abonenti bor" degan bayroq yopilgan eski hisobni ham, faol hisobni ham bir xil
+   * ko'rsatardi (foydalanuvchi shu farqni so'radi, 2026-08-17).
+   *
+   * Faqat GAZ uchun mavjud: suv API'si `saldo` beradi lekin sana bermaydi, elektr esa
+   * umuman hech narsa bermaydi.
+   */
+  gasLastPaymentAt DateTime?
+  utilityCheckedAt DateTime?
+
   // Sinxronizatsiya holati
   syncStatus    SyncStatus @default(PENDING)
   lastSyncedAt  DateTime?
@@ -289,6 +333,10 @@ model Property {
   @@index([integrationCategoryCode])
   @@index([manualCategoryCode])
   @@index([lotNumber])
+  // Kommunal jadvali hudud kesimida "tekshirilgan/tekshirilmagan" bo'yicha ajratadi.
+  @@index([utilityCheckedAt])
+  // "Oxirgi N oyda to'lov" ustuni/filtri shu bo'yicha oraliq qidiradi.
+  @@index([gasLastPaymentAt])
   // Balansdan chiqarilganlar HAR BIR ro'yxat/statistika so'roviga shart sifatida
   // qo'shiladi (deyarli hamma joyda `= false`), shuning uchun indeks kerak.
   @@index([removedFromBalance])
@@ -355,7 +403,7 @@ model ObjectStatusCheck {
   id              String   @id @default(cuid())
   propertyId      String
   property        Property @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  apiSource       String // "API3".."API8"
+  apiSource       String // "API3".."API8", "AUCTION", "WATER" | "GAS" | "ELECTRIC"
   found           Boolean  @default(false)
   matchedByOldCad Boolean  @default(false) // fallback ishga tushdimi
   status          String? // API qaytargan holat
@@ -499,6 +547,7 @@ model SyncRun {
   refreshBase    Boolean @default(true) // API2 — asosiy ma'lumot
   refreshAuction Boolean @default(true) // API3/4 + API6 — auksion va ijara loti (birga, AuctionLot bitta jadval)
   refreshRent    Boolean @default(true) // API5 — ijara shartnomalari
+  refreshUtility Boolean @default(true) // suv/gaz/elektr — kommunal abonent tekshiruvi
   totalCount    Int           @default(0)
   successCount  Int           @default(0)
   failCount     Int           @default(0)

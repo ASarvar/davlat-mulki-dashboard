@@ -54,6 +54,30 @@ const schema = z.object({
   API8_BASE_URL: z.string().url().optional(),
   API_STATUS_TOKEN: z.string().optional(),
 
+  // ── Kommunal xizmatlar: suv / gaz / elektr ──
+  // Uchalasi ham GET `?cad_number=...` + Basic auth (API 3/4 bilan bir xil server va
+  // odatda bir xil login/parol, lekin alohida sozlanadi — kelajakda ajralishi mumkin).
+  //
+  // ⚠️ Uchalasi ham "topilmadi"ni HTTP 404 emas, **HTTP 200 + body ichida** qaytaradi,
+  // va uchalasining javob tuzilmasi BUTUNLAY BOSHQACHA (uch xil vendor):
+  //   suv    -> topildi: {pid, fio, saldo}       | topilmadi: {err_code: -425}
+  //   gaz    -> topildi: {abonent: {...}}        | topilmadi: {abonent: null, result_code: 73}
+  //   elektr -> topildi: {abonent:{customerCode:[...]}} | topilmadi: o'sha, massivlar bo'sh
+  // Har biriga alohida "topildi" prediktati kerak — `integrations/utilities.ts` ga qarang.
+  WATER_API_BASE_URL: z.string().url().optional(),
+  GAS_API_BASE_URL: z.string().url().optional(),
+  ELECTRIC_API_BASE_URL: z.string().url().optional(),
+  UTILITY_API_USER: z.string().optional(),
+  UTILITY_API_PASSWORD: z.string().optional(),
+  // Jonli tasdiqlangan: uchalasida ham query parametri `cad_number`.
+  UTILITY_API_PARAM: z.string().default("cad_number"),
+  // Gaz uchun "sarflayapti" mezoni: oxirgi shuncha oyda `gas_consume > 0` bo'lsa.
+  GAS_CONSUMING_MONTHS: z.coerce.number().int().positive().default(6),
+  // "Yaqinda to'lov bo'lgan" mezoni (dashboard ustuni va `?utility=recentlyPaid` filtri):
+  // gazning oxirgi to'lovi shuncha oy ichida bo'lsa. Hisob-kitob (`gasBilled`) abonent
+  // to'lamasa ham davom etadi, TO'LOV esa obyekt haqiqatan ishlatilayotganini bildiradi.
+  UTILITY_RECENT_PAYMENT_MONTHS: z.coerce.number().int().positive().default(3),
+
   // Rate-limit / retry
   API_RATE_MAX: z.coerce.number().int().positive().default(10),
   API_RATE_DURATION_MS: z.coerce.number().int().positive().default(1000),

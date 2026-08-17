@@ -325,7 +325,21 @@ export async function listPendingRequests(user: SessionUser, filters: RequestFil
     where: { AND: and },
     orderBy: { createdAt: "asc" },
     include: {
-      property: { select: { cadNumber: true, region: { select: { name: true } } } },
+      // ⚠️ Kommunal bayroqlari — moderator/rahbariyat QAROR QABUL QILISHDAN OLDIN
+      // ko'rishi uchun. Ilgari bu ma'lumot faqat obyekt sahifasida bo'lgan va
+      // tasdiqlash oqimida umuman ko'rinmagan (foydalanuvchi talabi, 2026-08-17):
+      // "Bo'sh turgan" obyektni Yaroqsiz/Chekka'ga o'tkazish so'raladi, lekin
+      // o'sha obyektda kommunal abonent faol bo'lishi mumkin.
+      property: {
+        select: {
+          cadNumber: true,
+          region: { select: { name: true } },
+          hasWater: true,
+          hasGas: true,
+          hasElectric: true,
+          gasLastPaymentAt: true,
+        },
+      },
       requestedBy: { select: { fullName: true, username: true } },
       moderator: { select: { fullName: true } },
       document: {
@@ -374,7 +388,16 @@ export async function listRequestHistory(
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {
-      property: { select: { cadNumber: true, region: { select: { name: true } } } },
+      property: {
+        select: {
+          cadNumber: true,
+          region: { select: { name: true } },
+          hasWater: true,
+          hasGas: true,
+          hasElectric: true,
+          gasLastPaymentAt: true,
+        },
+      },
       requestedBy: { select: { fullName: true } },
       moderator: { select: { fullName: true } },
       rahbar: { select: { fullName: true } },

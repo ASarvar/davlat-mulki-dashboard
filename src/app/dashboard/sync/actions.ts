@@ -64,6 +64,7 @@ export async function runStatusRefreshAction(_prev: SyncState, formData: FormDat
     const refreshBase = formData.get("refreshBase") === "on";
     const refreshAuction = formData.get("refreshAuction") === "on";
     const refreshRent = formData.get("refreshRent") === "on";
+    const refreshUtility = formData.get("refreshUtility") === "on";
 
     const run = await triggerStatusRefresh({
       regionId,
@@ -71,6 +72,7 @@ export async function runStatusRefreshAction(_prev: SyncState, formData: FormDat
       refreshBase,
       refreshAuction,
       refreshRent,
+      refreshUtility,
       userId: user.id,
     });
     revalidatePath("/dashboard/sync");

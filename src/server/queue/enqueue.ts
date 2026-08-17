@@ -94,6 +94,7 @@ export interface StatusRefreshInput {
   refreshBase: boolean;
   refreshAuction: boolean;
   refreshRent: boolean;
+  refreshUtility: boolean;
   userId?: string;
 }
 
@@ -101,8 +102,8 @@ export interface StatusRefreshInput {
 // MAVJUD obyektlarga to'g'ridan-to'g'ri holat-API tekshiruvini qo'yadi. Yangi kadastr
 // QIDIRILMAYDI — faqat bazada bor obyektlar (hudud/soha doirasida) yangilanadi.
 export async function triggerStatusRefresh(input: StatusRefreshInput) {
-  const { regionId, sourceName, refreshBase, refreshAuction, refreshRent, userId } = input;
-  if (!refreshBase && !refreshAuction && !refreshRent) {
+  const { regionId, sourceName, refreshBase, refreshAuction, refreshRent, refreshUtility, userId } = input;
+  if (!refreshBase && !refreshAuction && !refreshRent && !refreshUtility) {
     throw new Error("Kamida bitta modul tanlanishi kerak");
   }
   await assertNoActiveRun();
@@ -130,6 +131,7 @@ export async function triggerStatusRefresh(input: StatusRefreshInput) {
       refreshBase,
       refreshAuction,
       refreshRent,
+      refreshUtility,
       totalCount: properties.length,
       triggeredById: userId ?? null,
     },
@@ -144,6 +146,7 @@ export async function triggerStatusRefresh(input: StatusRefreshInput) {
       refreshBase,
       refreshAuction,
       refreshRent,
+      refreshUtility,
     })),
   );
 

@@ -1,14 +1,32 @@
 "use client";
 
 import { useActionState, useState } from "react";
-import { Check, X, ExternalLink, ImageIcon } from "lucide-react";
+import { Check, X, ExternalLink, ImageIcon, AlertTriangle } from "lucide-react";
 import { reviewRequestAction, type ReviewState } from "./actions";
+
+/**
+ * So'rovdagi obyektning kommunal holati — moderator/rahbariyat qaror qabul qilishdan
+ * OLDIN ko'rishi uchun.
+ *
+ * ⚠️ Bu ATAYIN ogohlantirish, taqiq emas: abonent ijarachi yoki qo'shni bo'lishi mumkin,
+ * ya'ni "Yaroqsiz deb belgilash noto'g'ri" degani emas — faqat tekshirishga asos.
+ */
+export interface RequestUtility {
+  water: boolean;
+  gas: boolean;
+  electric: boolean;
+  /** Gazning oxirgi to'lovi (ko'rsatish uchun formatlangan) — `null` bo'lsa noma'lum. */
+  gasLastPayment: string | null;
+  /** To'lov yaqinda bo'lganmi (server tomonda hisoblanadi — chegara `.env` dan). */
+  recentlyPaid: boolean;
+}
 
 export interface RequestRowData {
   id: string;
   stage: "PENDING_MODERATOR" | "PENDING_RAHBARIYAT";
   cadNumber: string;
   regionName: string;
+  utility: RequestUtility | null;
   requestedBy: string;
   moderatorName: string | null;
   toCategoryName: string;
@@ -18,6 +36,42 @@ export interface RequestRowData {
   images: { id: string; fileName: string }[];
   createdAt: string;
   objectHref: string;
+}
+
+/**
+ * Kommunal ogohlantirish yorlig'i. Hech qanday xizmat topilmasa UMUMAN ko'rsatilmaydi —
+ * ro'yxatning aksariyat qatorlarida abonent yo'q (jonli ma'lumotda ~4%), shuning uchun
+ * "topilmadi" yozuvi shovqin bo'lardi.
+ */
+export function UtilityWarning({ utility }: { utility: RequestUtility | null }) {
+  if (!utility) return null;
+  const found = [
+    utility.water ? "suv" : null,
+    utility.gas ? "gaz" : null,
+    utility.electric ? "elektr" : null,
+  ].filter(Boolean) as string[];
+  if (found.length === 0) return null;
+
+  // To'lov yaqinda bo'lsa signal kuchliroq — rang ham to'qroq.
+  const strong = utility.recentlyPaid;
+  return (
+    <div
+      className={`mt-1.5 rounded-md px-2 py-1 text-[11px] leading-snug ${
+        strong ? "bg-red-50 text-red-800 ring-1 ring-red-200" : "bg-amber-50 text-amber-800"
+      }`}
+    >
+      <span className="inline-flex items-center gap-1 font-semibold">
+        <AlertTriangle className="h-3 w-3" />
+        Kommunal: {found.join(", ")}
+      </span>
+      {utility.gasLastPayment ? (
+        <span className="block">
+          Gaz to&apos;lovi: {utility.gasLastPayment}
+          {strong ? " — yaqinda" : ""}
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 export function RequestRow({ req }: { req: RequestRowData }) {
@@ -35,6 +89,7 @@ export function RequestRow({ req }: { req: RequestRowData }) {
           {req.cadNumber}
         </a>
         <p className="text-xs text-muted-foreground">{req.regionName}</p>
+        <UtilityWarning utility={req.utility} />
       </td>
       <td className="px-4 py-3">
         <span

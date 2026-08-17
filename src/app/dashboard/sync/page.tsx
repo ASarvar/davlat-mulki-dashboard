@@ -15,11 +15,17 @@ const RUN_TYPE_LABEL: Record<string, string> = {
 };
 
 // STATUS_REFRESH run'ida qaysi modullar yangilangani (tarix jadvalida ko'rsatish uchun).
-function refreshedModules(r: { refreshBase: boolean; refreshAuction: boolean; refreshRent: boolean }): string {
+function refreshedModules(r: {
+  refreshBase: boolean;
+  refreshAuction: boolean;
+  refreshRent: boolean;
+  refreshUtility: boolean;
+}): string {
   const parts: string[] = [];
   if (r.refreshBase) parts.push("Asosiy ma'lumot");
   if (r.refreshAuction) parts.push("Auksion");
   if (r.refreshRent) parts.push("Ijara");
+  if (r.refreshUtility) parts.push("Kommunal");
   return parts.join(" + ") || "—";
 }
 

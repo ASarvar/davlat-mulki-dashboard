@@ -155,6 +155,10 @@ export function SyncControls({
               <input type="checkbox" name="refreshRent" defaultChecked className="h-4 w-4" />
               Ijara shartnomalari (API5)
             </label>
+            <label className="flex items-center gap-1.5">
+              <input type="checkbox" name="refreshUtility" defaultChecked className="h-4 w-4" />
+              Kommunal: suv/gaz/elektr
+            </label>
           </div>
 
           <button

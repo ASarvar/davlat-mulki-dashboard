@@ -11,9 +11,19 @@ import {
   ExternalLink,
   Gavel,
   KeyRound,
+  Droplets,
+  Flame,
+  Zap,
+  AlertTriangle,
   type LucideIcon,
 } from "lucide-react";
 import { lotUrl } from "@/server/integrations/auction";
+import {
+  parseUtilityRaw,
+  UTILITY_LABEL,
+  type UtilityInfo,
+  type UtilityKind,
+} from "@/server/integrations/utilities";
 import { requireUser, isAdmin } from "@/lib/authz";
 import { getPropertyDetail } from "@/server/services/properties";
 import { pathToCad } from "@/lib/cadastre";
@@ -30,6 +40,102 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
     <div>
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="mt-0.5 text-sm">{value ?? "—"}</dd>
+    </div>
+  );
+}
+
+/**
+ * Bitta kommunal xizmat kartasi. Ko'rsatiladigan maydonlar xizmatga qarab farq qiladi —
+ * chunki uchala API uch xil narsani beradi (`integrations/utilities.ts` izohiga qarang):
+ * suv → balans, gaz → hisob-kitob va sarf, elektr → faqat abonent kodlari.
+ */
+const UTILITY_ICON: Record<UtilityKind, { icon: LucideIcon; tone: string }> = {
+  WATER: { icon: Droplets, tone: "text-sky-600" },
+  GAS: { icon: Flame, tone: "text-orange-600" },
+  ELECTRIC: { icon: Zap, tone: "text-amber-600" },
+};
+
+function UtilityCard({
+  kind,
+  info,
+  matchedByOldCad,
+}: {
+  kind: UtilityKind;
+  info: UtilityInfo | null;
+  matchedByOldCad: boolean;
+}) {
+  const { icon: Icon, tone } = UTILITY_ICON[kind];
+  const money = (n: number | null) => (n == null ? "—" : `${n.toLocaleString("uz-UZ")} so'm`);
+
+  const rows: { label: string; value: React.ReactNode }[] = [];
+  if (info?.found) {
+    if (kind === "WATER") {
+      rows.push({ label: "Abonent", value: info.subscriberName ?? "—" });
+      rows.push({ label: "Abonent kodi", value: info.subscriberCode ?? "—" });
+      rows.push({ label: "Balans", value: money(info.balance) });
+      if (info.balanceStatus) rows.push({ label: "Holati", value: info.balanceStatus });
+    } else if (kind === "GAS") {
+      rows.push({ label: "Abonent", value: info.subscriberName ?? "—" });
+      rows.push({ label: "Abonent kodi", value: info.subscriberCode ?? "—" });
+      if (info.address) rows.push({ label: "Manzil", value: info.address });
+      rows.push({ label: "Joriy balans", value: money(info.balance) });
+      rows.push({
+        label: "Oxirgi to'lov",
+        value: info.lastPaymentDate ? `${info.lastPaymentDate} — ${money(info.lastPaymentSum)}` : "—",
+      });
+      rows.push({
+        label: "12 oylik sarf",
+        // ⚠️ 0 — "sarf yo'q" degani emas: hisoblagichi yo'q abonentda gaz norma bo'yicha
+        // hisoblanadi va `gas_consume` doim 0 keladi.
+        value:
+          info.consumedTotal && info.consumedTotal > 0 ? (
+            `${info.consumedTotal.toLocaleString("uz-UZ")} m³`
+          ) : (
+            <span className="text-muted-foreground">0 m³ (hisoblagich yo&apos;q bo&apos;lishi mumkin)</span>
+          ),
+      });
+      rows.push({
+        label: "Hisob holati",
+        value: info.billed ? "Faol — to'lov hisoblanmoqda" : "Harakat yo'q",
+      });
+    } else {
+      rows.push({ label: "Abonent kodlari", value: info.codes.join(", ") || "—" });
+      rows.push({ label: "Kodlar soni", value: String(info.codes.length) });
+    }
+  }
+
+  return (
+    <div className="rounded-lg border border-border p-4">
+      <div className="mb-2 flex items-center gap-2">
+        <Icon className={`h-4 w-4 ${tone}`} />
+        <span className="text-sm font-semibold" style={{ color: "var(--navy)" }}>
+          {UTILITY_LABEL[kind]}
+        </span>
+        {info?.found ? (
+          <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+            Abonent bor
+          </span>
+        ) : (
+          <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
+            Topilmadi
+          </span>
+        )}
+      </div>
+      {matchedByOldCad ? (
+        <p className="mb-2 text-[11px] text-amber-700">Eski kadastr raqami orqali topilgan</p>
+      ) : null}
+      {rows.length > 0 ? (
+        <dl className="space-y-1 text-xs">
+          {rows.map((r) => (
+            <div key={r.label} className="flex gap-2">
+              <dt className="shrink-0 text-muted-foreground">{r.label}:</dt>
+              <dd className="break-words font-medium text-slate-800">{r.value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="text-xs text-muted-foreground">Bu kadastr bo&apos;yicha abonent topilmadi.</p>
+      )}
     </div>
   );
 }
@@ -104,6 +210,23 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
     | undefined;
   const dmId = auctionRaw?.api3?.id ?? null;
 
+  // ── Kommunal xizmatlar ──
+  // Saqlangan xom javoblardan qayta o'qiladi (`parseUtilityRaw` — ro'yxat bilan BIR XIL
+  // parser, ya'ni sahifada va ro'yxatda ko'rsatilgan qiymatlar hech qachon ajralmaydi).
+  const utilityChecks = (["WATER", "GAS", "ELECTRIC"] as UtilityKind[]).map((kind) => {
+    const check = p.statusChecks.find((s) => s.apiSource === kind);
+    return {
+      kind,
+      checked: Boolean(check),
+      matchedByOldCad: check?.matchedByOldCad ?? false,
+      info: check ? parseUtilityRaw(kind, check.rawResponse) : null,
+    };
+  });
+  const anyUtilityFound = utilityChecks.some((u) => u.info?.found);
+  const utilityChecked = utilityChecks.some((u) => u.checked);
+  // `isVacant` — yuqorida hisoblangan effektiv kategoriya 11 (dashboard bilan bir xil mezon).
+  const vacantButUsed = isVacant && anyUtilityFound;
+
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -165,6 +288,32 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
         </div>
       ) : null}
 
+      {/* ⚠️ "Bo'sh turgan" deb belgilangan, lekin kommunal abonenti bor obyekt —
+          tekshirishga arziydigan ziddiyat. Ogohlantirish ATAYIN yumshoq tilda:
+          abonent nomi ijarachi yoki qo'shni bo'lishi ham mumkin, ya'ni bu dalil emas,
+          faqat tekshirish uchun signal. */}
+      {vacantButUsed ? (
+        <div className="mb-6 flex gap-3 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div>
+            <p className="font-semibold text-amber-900">
+              Bo&apos;sh turgan obyektda kommunal abonent topildi
+            </p>
+            <p className="mt-1 text-amber-800">
+              Obyekt &quot;Bo&apos;sh turgan&quot; kategoriyasida, lekin{" "}
+              <strong>
+                {utilityChecks
+                  .filter((u) => u.info?.found)
+                  .map((u) => UTILITY_LABEL[u.kind].toLowerCase())
+                  .join(", ")}
+              </strong>{" "}
+              bo&apos;yicha abonent hisobi mavjud. Pastdagi &quot;Kommunal xizmatlar&quot;
+              bo&apos;limiga qarang — obyekt aslida foydalanilayotgan bo&apos;lishi mumkin.
+            </p>
+          </div>
+        </div>
+      ) : null}
+
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Asosiy ma'lumot */}
         <section className="space-y-4 lg:col-span-2">
@@ -193,6 +342,28 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
             ) : null}
             <CadastreRawData rawApi2={p.rawApi2} />
           </div>
+
+          {/* ── Kommunal xizmatlar ──
+              Asosiy ma'lumotlardan DARHOL keyin turadi (foydalanuvchi talabi, 2026-08-17):
+              obyekt bo'sh deb belgilangan bo'lsa ham suv/gaz/elektr abonenti borligi
+              uni qayta ko'rib chiqishga asos bo'ladi. */}
+          {utilityChecked ? (
+            <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+              <div className="mb-4">
+                <SectionTitle icon={Droplets}>Kommunal xizmatlar</SectionTitle>
+              </div>
+              <div className="grid gap-3 md:grid-cols-3">
+                {utilityChecks.map((u) => (
+                  <UtilityCard key={u.kind} kind={u.kind} info={u.info} matchedByOldCad={u.matchedByOldCad} />
+                ))}
+              </div>
+              <p className="mt-3 text-xs text-muted-foreground">
+                ⚠️ Abonent topilmasligi obyekt bo&apos;sh degani EMAS — tashqi API abonentning
+                yo&apos;qligi va obyektning qamrovga kirmasligini farqlamaydi. Abonent nomi
+                ko&apos;pincha jismoniy shaxs yoki ijarachi bo&apos;lib chiqadi.
+              </p>
+            </div>
+          ) : null}
 
           {/* Auksion lotlari — obyekt bir vaqtda ham xususiylashtirish, ham ijara
               savdosida bo'lishi va har biri bir nechta lotga bo'linishi mumkin. */}
@@ -408,7 +579,11 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
                   <tbody>
                     {p.statusChecks.map((s) => (
                       <tr key={s.id} className="border-b border-border last:border-0">
-                        <td className="py-2 pr-4 font-medium">{s.apiSource}</td>
+                        {/* Kommunal manbalar o'zbekcha ko'rsatiladi — kodda "WATER"/"GAS"/
+                            "ELECTRIC" qoladi (API bilan mos), UI'da esa Suv/Gaz/Elektr. */}
+                        <td className="py-2 pr-4 font-medium">
+                          {UTILITY_LABEL[s.apiSource as UtilityKind] ?? s.apiSource}
+                        </td>
                         <td className="py-2 pr-4">{s.found ? "Ha" : "Yo'q"}</td>
                         <td className="py-2 pr-4 text-muted-foreground">{s.status ?? "—"}</td>
                         <td className="py-2 pr-4">
