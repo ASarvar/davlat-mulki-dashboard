@@ -18,7 +18,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const actor = await requireRole("SUPER_ADMIN", "ADMIN");
   const sp = await searchParams;
 
-  const sourceId = str(sp.source) || undefined;
+  // Filtr SOHA bo'yicha (`OrganizationSource.name`), aynan tashkilot bo'yicha emas —
+  // dashboard va obyektlar sahifasidagi `?soha=` bilan bir xil mezon.
+  const soha = str(sp.soha) || undefined;
   const roleRaw = str(sp.role);
   const role = roleRaw && roleRaw in Role ? (roleRaw as Role) : undefined;
 
@@ -28,7 +30,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const roleFilterOptions = (Object.keys(ROLE_LABEL) as Role[]).filter((r) => !(hideSuperAdmin && r === "SUPER_ADMIN"));
 
   const [users, sourceRows, activeAdmins] = await Promise.all([
-    listUsers({ sourceId, role, hideSuperAdmin }),
+    listUsers({ soha, role, hideSuperAdmin }),
     // Tashkilotlar — soha bo'yicha, keyin hudud tartibida (respublika darajasidagilar oxirida).
     prisma.organizationSource.findMany({
       orderBy: [{ name: "asc" }, { region: { sortOrder: "asc" } }],
@@ -42,6 +44,9 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
     orgName: s.orgName,
     regionName: s.region?.name ?? null,
   }));
+  // Soha ro'yxati — takrorlanmas `name` qiymatlari (bitta sohaga 14 hududning
+  // tashkilotlari kiradi, shuning uchun tashkilotlar ro'yxatidan siqib olinadi).
+  const sohaOptions = [...new Set(sources.map((s) => s.name))].sort((a, b) => a.localeCompare(b, "uz"));
 
   return (
     <div>
@@ -68,12 +73,12 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
         className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
       >
         <div className="flex flex-col">
-          <label className="mb-1 text-xs font-medium text-muted-foreground">Tashkilot</label>
-          <select name="source" defaultValue={sourceId ?? ""} className={`${selectCls} w-64`}>
+          <label className="mb-1 text-xs font-medium text-muted-foreground">Soha</label>
+          <select name="soha" defaultValue={soha ?? ""} className={`${selectCls} w-64`}>
             <option value="">Barchasi</option>
-            {sources.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.name} — {sourceScopeLabel(s.name, s.regionName)}
+            {sohaOptions.map((s) => (
+              <option key={s} value={s}>
+                {s}
               </option>
             ))}
           </select>

@@ -45,7 +45,14 @@ function resolveSources(input: {
 }
 
 export interface UserFilters {
-  sourceId?: string;
+  /**
+   * SOHA (`OrganizationSource.name`) — "Ijara markazi", "Direksiya", ...
+   * ⚠️ Aynan tashkilot (`OrganizationSource.id`) EMAS: bir sohaga 14 hududning
+   * tashkilotlari kiradi va foydalanuvchilar ro'yxatida soha kesimi amaliyroq
+   * (foydalanuvchi talabi, 2026-08-19). Dashboard va obyektlardagi `soha` filtri
+   * bilan bir xil mezon.
+   */
+  soha?: string;
   role?: Role;
   /** ADMIN uchun: SUPER_ADMIN foydalanuvchilarni ko'rsatmaymiz. */
   hideSuperAdmin?: boolean;
@@ -54,8 +61,15 @@ export interface UserFilters {
 export async function listUsers(f: UserFilters = {}) {
   return prisma.user.findMany({
     where: {
-      ...(f.sourceId
-        ? { OR: [{ sourceId: f.sourceId }, { moderatorSources: { some: { sourceId: f.sourceId } } }] }
+      // Ijrochi bitta tashkilotga (`sourceId`), moderator bir nechtasiga
+      // (`moderatorSources`) biriktiriladi — ikkalasi ham shu soha ichida qidiriladi.
+      ...(f.soha
+        ? {
+            OR: [
+              { source: { name: f.soha } },
+              { moderatorSources: { some: { source: { name: f.soha } } } },
+            ],
+          }
         : {}),
       ...(f.role ? { role: f.role } : {}),
       ...(f.hideSuperAdmin ? { role: { not: "SUPER_ADMIN" } } : {}),

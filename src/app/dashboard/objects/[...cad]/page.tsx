@@ -2,7 +2,6 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
-  RefreshCw,
   Info,
   ListChecks,
   FileText,
@@ -34,7 +33,7 @@ import { CategoryBadge, InefficientBadge, RemovedFromBalanceBadge, SyncStatusBad
 import { AssignCategoryForm } from "./AssignCategoryForm";
 import { RemoveCategoryButton } from "./RemoveCategoryButton";
 import { CadastreRawData } from "./CadastreRawData";
-import { syncSingleAction } from "../actions";
+import { SyncButton } from "./SyncButton";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -311,20 +310,19 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
           </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <SyncStatusBadge status={p.syncStatus} />
+          {/* ⚠️ "Sinxron" so'zi o'rniga OXIRGI SINXRONIZATSIYA VAQTI ko'rsatiladi
+              (foydalanuvchi talabi, 2026-08-19): holat baribir deyarli har doim
+              "Sinxron" bo'lardi, vaqt esa haqiqiy foydali ma'lumot. Xato/kutilmoqda
+              holatlari muhim bo'lgani uchun ular avvalgidek yorliq bilan chiqadi. */}
+          {p.syncStatus === "SYNCED" && p.lastSyncedAt ? (
+            <span className="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              Oxirgi sinxronizatsiya: {p.lastSyncedAt.toLocaleString("uz")}
+            </span>
+          ) : (
+            <SyncStatusBadge status={p.syncStatus} />
+          )}
           {p.removedFromBalance ? <RemovedFromBalanceBadge /> : <InefficientBadge value={p.isInefficient} />}
-          {canSync ? (
-            <form action={syncSingleAction}>
-              <input type="hidden" name="cadNumber" value={p.cadNumber} />
-              <button
-                className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
-                style={{ background: "var(--cobalt)" }}
-              >
-                <RefreshCw className="h-4 w-4" />
-                API orqali yangilash
-              </button>
-            </form>
-          ) : null}
+          {canSync ? <SyncButton cadNumber={p.cadNumber} /> : null}
         </div>
       </div>
 

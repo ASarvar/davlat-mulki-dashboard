@@ -63,15 +63,26 @@ export async function removeCategoryAction(_prev: AssignState, formData: FormDat
 }
 
 // Bitta kadastrni API orqali yangilash (admin yoki o'z tashkilotidagi foydalanuvchi).
-export async function syncSingleAction(formData: FormData): Promise<void> {
-  const user = await requireUser();
-  const cadNumber = String(formData.get("cadNumber") ?? "");
-  if (!cadNumber) return;
+//
+// ⚠️ Bu amal faqat NAVBATGA QO'YADI — haqiqiy yangilashni worker alohida jarayonda
+// bajaradi. Shuning uchun natija "yangilandi" emas, "navbatga qo'yildi" deb qaytariladi
+// va tugma bosilgach sahifa darhol yangi ma'lumot ko'rsatmaydi (SyncButton buni
+// kutish/qayta yuklash bilan hal qiladi).
+export async function syncSingleAction(_prev: AssignState, formData: FormData): Promise<AssignState> {
+  try {
+    const user = await requireUser();
+    const cadNumber = String(formData.get("cadNumber") ?? "");
+    if (!cadNumber) return { error: "Kadastr ko'rsatilmagan" };
 
-  const property = await prisma.property.findUnique({ where: { cadNumber }, select: { sourceId: true } });
-  if (!property) return;
-  await assertSourceWriteAccess(user, property.sourceId); // VIEWER/boshqa tashkilot => xato
+    const property = await prisma.property.findUnique({ where: { cadNumber }, select: { sourceId: true } });
+    if (!property) return { error: "Obyekt topilmadi" };
+    await assertSourceWriteAccess(user, property.sourceId); // VIEWER/boshqa tashkilot => xato
 
-  await triggerSingleSync(cadNumber, user.id);
-  revalidatePath(objectHref(cadNumber));
+    await triggerSingleSync(cadNumber, user.id);
+    revalidatePath(objectHref(cadNumber));
+    return { ok: true };
+  } catch (err) {
+    // Eng ko'p uchraydigan xato — `assertNoActiveRun()`: boshqa sinxronizatsiya ketmoqda.
+    return { error: err instanceof Error ? err.message : "Xatolik yuz berdi" };
+  }
 }

@@ -1087,18 +1087,13 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <section className={CARD}>
         <div className="mb-1 flex flex-wrap items-center justify-between gap-3">
           <SectionTitle icon={Droplets}>
-            Bo&apos;sh turgan obyektlarda kommunal xizmatlar
+            Bo&apos;sh turgan obyektlarda kommunal xizmatlar mavjudligi
           </SectionTitle>
           <a href="/api/export/dashboard-utility" className={EXPORT_BTN}>
             <Download className="h-3.5 w-3.5" />
             Excelga eksport
           </a>
         </div>
-        <p className="mb-4 text-xs text-muted-foreground">
-          Jadvaldagi barcha sonlar faqat <strong>&quot;Bo&apos;sh turgan&quot;</strong> (11-kategoriya)
-          obyektlar bo&apos;yicha. Abonent topilishi — obyekt aslida foydalanilayotgan bo&apos;lishi
-          mumkinligining belgisi.
-        </p>
 
         {utilCheckedTotal === 0 ? (
           <div className="rounded-xl bg-slate-50 px-5 py-8 text-center text-sm text-muted-foreground ring-1 ring-slate-200">
@@ -1275,28 +1270,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             </table>
           </div>
         )}
-
-        {/* ⚠️ Bu izoh MAJBURIY — usiz jadval xato o'qiladi. */}
-        <div className="mt-3 space-y-1.5 text-xs text-muted-foreground">
-          <p>
-            <strong>&quot;Tekshirilmagan&quot;</strong> — kommunal so&apos;rov hali
-            yuborilmagan. Bu <strong>&quot;abonent yo&apos;q&quot; degani EMAS</strong>: tashqi
-            API abonentning yo&apos;qligi va obyektning qamrovga kirmasligini farqlamaydi,
-            shuning uchun ikki holat alohida ko&apos;rsatiladi.
-          </p>
-          <p>
-            <strong>&quot;Gaz — hisobi faol&quot;</strong> — har oy to&apos;lov hisoblanmoqda,
-            ya&apos;ni obyekt haqiqatan foydalanilayotganining eng ishonchli belgisi. Suv va
-            elektr API&apos;lari sarf haqida hech narsa bermaydi — ular uchun faqat abonent
-            hisobining mavjudligi ma&apos;lum.
-          </p>
-          <p>
-            Qamrov umuman past (barcha obyektlarning ~4% ida abonent topiladi) va abonent nomi
-            ko&apos;pincha jismoniy shaxs yoki ijarachi bo&apos;lib chiqadi — API&apos;lar
-            turar-joy abonentlari bazasiga ulangan. Shuning uchun bu jadval{" "}
-            <strong>tekshirish uchun ro&apos;yxat beradi, yakuniy xulosa emas</strong>.
-          </p>
-        </div>
       </section>
     </div>
   );

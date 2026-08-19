@@ -117,8 +117,8 @@ export function SyncControls({
             Faqat holat yangilash
           </h2>
           <p className="mt-1 mb-3 text-sm text-muted-foreground">
-            Yangi kadastr QIDIRILMAYDI — faqat bazadagi mavjud obyektlarga tanlangan modul(lar)
-            qayta ishga tushiriladi. Kashfiyot (API1/2) o'tkazib yuborilgani uchun ancha tezroq.
+            Yangi kadastr qidirilmaydi — faqat bazadagi mavjud obyektlarga tanlangan modul(lar)
+            qayta ishga tushiriladi. API1/2 o'tkazib yuborilgani uchun ancha tezroq.
           </p>
 
           <div className="mb-3 grid gap-3 sm:grid-cols-2">
