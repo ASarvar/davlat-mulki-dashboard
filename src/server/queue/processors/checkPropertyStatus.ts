@@ -429,6 +429,15 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
               // Oxirgi to'lov sanasi — "yaqinda faol" mezoni uchun (gasBilled dan
               // kuchliroq dalil: hisob-kitob to'lovsiz ham davom etadi).
               gasLastPaymentAt: utilities.GAS.lastPaymentAt,
+              // Elektr 2-bosqichi (`het_data_detail`). ⚠️ Bularning hammasi TAFSILOT
+              // chaqiruvidan keladi — 1-bosqichning o'zi faqat abonent kodini beradi,
+              // shuning uchun `ELECTRIC_DETAIL_API_BASE_URL` sozlanmagan bo'lsa
+              // uchalasi ham `false`/`null` bo'lib qoladi (`hasElectric` esa ishlayveradi).
+              electricConsuming: utilities.ELECTRIC.consuming,
+              electricLastPaymentAt: utilities.ELECTRIC.lastPaymentAt,
+              // Abonentning o'z kadastri obyektnikiga mos keldimi — elektr qamrovining
+              // sifat o'lchovi (API kadastrni taxminan moslashtiradi, utilities.ts'ga qarang).
+              electricCadastreMatch: utilities.ELECTRIC.cadastreMatch,
               // ⚠️ Bu "tekshirildi" belgisi — topilgan/topilmaganidan QAT'I NAZAR
               // qo'yiladi. Dashboardda "tekshirilmagan" (null) alohida ustun, chunki
               // API "abonent yo'q" va "hudud qamralmagan" holatini farqlay olmaydi.

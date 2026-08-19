@@ -305,10 +305,35 @@ model Property {
    * "abonenti bor" degan bayroq yopilgan eski hisobni ham, faol hisobni ham bir xil
    * ko'rsatardi (foydalanuvchi shu farqni so'radi, 2026-08-17).
    *
-   * Faqat GAZ uchun mavjud: suv API'si `saldo` beradi lekin sana bermaydi, elektr esa
-   * umuman hech narsa bermaydi.
+   * Suv API'si `saldo` beradi lekin sana bermaydi. Elektr uchun ayni shu ma'no
+   * `electricLastPaymentAt` da (2-bosqich `het_data_detail` dan).
    */
   gasLastPaymentAt DateTime?
+
+  // ── Elektr, 2-bosqich (`het_data_detail`) ──
+  // 1-bosqich (`het_data`) faqat abonent kodini beradi, shuning uchun `hasElectric`
+  // "shu kadastr bo'yicha kod topildi"dan boshqa hech narsani bildirmasdi. Tafsilot
+  // chaqiruvi ism, manzil, balans, oylik sarf va to'lov tarixini beradi.
+  /**
+   * Oxirgi `ELECTRIC_CONSUMING_MONTHS` oyda `SALDO_PERIOD.CURRENT_EE_KWH > 0` —
+   * ya'ni hisoblagich bo'yicha HAQIQIY elektr sarfi qayd etilgan. Gazdagi
+   * `gasConsuming` ning elektr muqobili, lekin ishonchliroq: elektrda hisoblagichsiz
+   * abonent deyarli uchramaydi.
+   */
+  electricConsuming Boolean @default(false)
+  /** Elektr abonentining oxirgi to'lov sanasi (`LAST_PAYMENT_DATE`). */
+  electricLastPaymentAt DateTime?
+  /**
+   * Tafsilotdagi `KADASTR_CODE` obyektning o'z kadastri bilan MOS kelganmi.
+   *
+   * ⚠️ Bu — qamrov sifatining asosiy o'lchovi. Elektr API'si turar-joy abonentlari
+   * bazasiga ulangan va 1-bosqich kadastrni TAXMINAN moslashtiradi: jonli sinovda
+   * `20:08:41:01:01:0019` so'rovi `KADASTR_CODE = 20:08:09:01:01:0024` bo'lgan
+   * JISMONIY SHAXS abonentini qaytardi. Ya'ni "abonent bor" degan bayroq ko'pincha
+   * BOSHQA obyektning uy xo'jaligini ko'rsatadi. Shu ustun bilan haqiqiy moslik
+   * soxta moslikdan ajratiladi.
+   */
+  electricCadastreMatch Boolean @default(false)
   utilityCheckedAt DateTime?
 
   // Sinxronizatsiya holati

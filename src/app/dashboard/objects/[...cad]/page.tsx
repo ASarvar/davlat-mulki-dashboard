@@ -20,6 +20,7 @@ import {
 import { lotUrl } from "@/server/integrations/auction";
 import {
   parseUtilityRaw,
+  formatLastPayment,
   UTILITY_LABEL,
   type UtilityInfo,
   type UtilityKind,
@@ -81,7 +82,7 @@ function UtilityCard({
       rows.push({ label: "Joriy balans", value: money(info.balance) });
       rows.push({
         label: "Oxirgi to'lov",
-        value: info.lastPaymentDate ? `${info.lastPaymentDate} — ${money(info.lastPaymentSum)}` : "—",
+        value: formatLastPayment(info) ? `${formatLastPayment(info)} — ${money(info.lastPaymentSum)}` : "—",
       });
       rows.push({
         label: "12 oylik sarf",
@@ -98,9 +99,68 @@ function UtilityCard({
         label: "Hisob holati",
         value: info.billed ? "Faol — to'lov hisoblanmoqda" : "Harakat yo'q",
       });
-    } else {
+    } else if (info.subscribers.length === 0) {
+      // Tafsilot (2-bosqich `het_data_detail`) hali olinmagan — eski yozuv yoki
+      // `ELECTRIC_DETAIL_API_BASE_URL` sozlanmagan.
       rows.push({ label: "Abonent kodlari", value: info.codes.join(", ") || "—" });
       rows.push({ label: "Kodlar soni", value: String(info.codes.length) });
+      rows.push({
+        label: "Tafsilot",
+        value: (
+          <span className="text-muted-foreground">
+            Olinmagan — kommunal sinxronizatsiyani qayta ishga tushiring
+          </span>
+        ),
+      });
+    } else {
+      // Har bir abonent alohida ko'rsatiladi: bitta kadastrda bir nechtasi bo'lishi
+      // mumkin va ular turli kadastrlarga tegishli bo'lib chiqishi mumkin.
+      info.subscribers.forEach((s, i) => {
+        const prefix = info.subscribers.length > 1 ? `${i + 1}. ` : "";
+        rows.push({ label: `${prefix}Abonent`, value: s.name ?? "—" });
+        rows.push({ label: `${prefix}Abonent kodi`, value: s.code ?? "—" });
+        if (s.address) rows.push({ label: `${prefix}Manzil`, value: s.address });
+        rows.push({
+          // ⚠️ Elektr API'si kadastrni taxminan moslashtiradi — abonent BOSHQA
+          // obyektning uy xo'jaligi bo'lishi mumkin (integrations/utilities.ts, TUZOQ 6).
+          label: `${prefix}Kadastri`,
+          value: s.cadastreMatch ? (
+            <span className="text-emerald-700">{s.cadastreCode} — mos</span>
+          ) : (
+            <span className="text-amber-700">{s.cadastreCode ?? "—"} — mos emas</span>
+          ),
+        });
+        if (s.customerType) rows.push({ label: `${prefix}Turi`, value: s.customerType });
+        if (s.inn) rows.push({ label: `${prefix}STIR`, value: s.inn });
+        rows.push({ label: `${prefix}Joriy balans`, value: money(s.balance) });
+        rows.push({
+          label: `${prefix}Oxirgi to'lov`,
+          value: formatLastPayment(s) ? `${formatLastPayment(s)} — ${money(s.lastPaymentSum)}` : "—",
+        });
+        rows.push({
+          label: `${prefix}Sarf (${s.months} oy)`,
+          // ⚠️ Birlik kVt·soat — gazdagi m³ EMAS.
+          value:
+            s.consumedKwh > 0 ? (
+              `${s.consumedKwh.toLocaleString("uz-UZ")} kVt·soat`
+            ) : (
+              <span className="text-muted-foreground">0 — sarf qayd etilmagan</span>
+            ),
+        });
+        if (s.meterNo) {
+          rows.push({
+            label: `${prefix}Hisoblagich`,
+            value: `${s.meterNo}${s.meterType ? ` (${s.meterType})` : ""}`,
+          });
+        }
+        if (s.lastReading != null) {
+          rows.push({
+            label: `${prefix}Oxirgi ko'rsatkich`,
+            value: `${s.lastReading.toLocaleString("uz-UZ")}${s.lastReadingDate ? ` — ${s.lastReadingDate}` : ""}`,
+          });
+        }
+        if (s.tariffPrice != null) rows.push({ label: `${prefix}Tarif`, value: money(s.tariffPrice) });
+      });
     }
   }
 
@@ -112,9 +172,17 @@ function UtilityCard({
           {UTILITY_LABEL[kind]}
         </span>
         {info?.found ? (
-          <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
-            Abonent bor
-          </span>
+          // Elektrda tafsilot bor, lekin kadastr mos kelmasa — sariq: abonent
+          // topilgan, ammo u boshqa obyektga tegishli bo'lishi mumkin.
+          kind === "ELECTRIC" && info.subscribers.length > 0 && !info.cadastreMatch ? (
+            <span className="ml-auto rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+              Kadastr mos emas
+            </span>
+          ) : (
+            <span className="ml-auto rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+              Abonent bor
+            </span>
+          )
         ) : (
           <span className="ml-auto rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500">
             Topilmadi

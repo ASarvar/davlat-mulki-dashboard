@@ -525,9 +525,13 @@ export interface RegionUtilityRow {
   /** Kamida bitta xizmatda abonent topilgan (birlashma — takror sanalmaydi). */
   anyUtility: number;
   /**
-   * Gazning oxirgi to'lovi `UTILITY_RECENT_PAYMENT_MONTHS` oy ichida bo'lgan.
+   * GAZ YOKI ELEKTRning oxirgi to'lovi `UTILITY_RECENT_PAYMENT_MONTHS` oy ichida bo'lgan.
    * ⚠️ Eng KUCHLI signal: "abonent bor" yopilgan eski hisobni ham qamrab oladi,
    * to'lov esa kimdir obyektdan hozir foydalanayotganini bildiradi.
+   *
+   * ⚠️ 2026-08-19 dan boshlab ELEKTR ham kiradi (`het_data_detail` 2-bosqichi to'lov
+   * sanasini bergandan keyin) — ilgari faqat gaz edi. Elektr qamrovi gazdan ~3 barobar
+   * keng, shuning uchun bu ustundagi son sezilarli oshadi.
    */
   recentlyPaid: number;
   /** Kommunal so'rov hali yuborilmagan (abonent yo'q degani EMAS). */
@@ -601,7 +605,8 @@ function utilityRows(opts: {
            COUNT(p.id) FILTER (WHERE ${vacant} AND p."hasElectric") AS electric,
            COUNT(p.id) FILTER (WHERE ${vacant} AND ${any})          AS "anyUtility",
            COUNT(p.id) FILTER (WHERE ${vacant}
-                                 AND p."gasLastPaymentAt" >= ${cutoff}) AS "recentlyPaid",
+                                 AND (p."gasLastPaymentAt" >= ${cutoff}
+                                   OR p."electricLastPaymentAt" >= ${cutoff})) AS "recentlyPaid",
            COUNT(p.id) FILTER (WHERE ${vacant}
                                  AND p."utilityCheckedAt" IS NULL)  AS unchecked
     FROM ${table} g

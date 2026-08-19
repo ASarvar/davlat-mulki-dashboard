@@ -67,15 +67,35 @@ const schema = z.object({
   WATER_API_BASE_URL: z.string().url().optional(),
   GAS_API_BASE_URL: z.string().url().optional(),
   ELECTRIC_API_BASE_URL: z.string().url().optional(),
+  /**
+   * Elektr — 2-BOSQICH (`het_data_detail`). 1-bosqich (`het_data`) faqat abonent
+   * KODLARINI beradi, ism/sarf/to'lov bermaydi; tafsilot shu ikkinchi chaqiruvdan
+   * keladi (API 3 -> API 4 auksion zanjiri bilan bir xil naqsh).
+   *
+   * ⚠️ Parametrlari `cad_number` EMAS — jonli tasdiqlangan (2026-08-19):
+   *   `?customer_type={customerType[i]}&soato={soato[i]}&licshet={customerCode[i]}`
+   * ya'ni 1-bosqichdagi UCH massiv INDEKS BO'YICHA tekislangan va har bir indeks
+   * bitta abonentni bildiradi. Shuning uchun `UTILITY_API_PARAM` bu yerga TEGISHLI EMAS.
+   * Auth — 1-bosqich bilan bir xil Basic (`UTILITY_API_USER/PASSWORD`).
+   */
+  ELECTRIC_DETAIL_API_BASE_URL: z.string().url().optional(),
   UTILITY_API_USER: z.string().optional(),
   UTILITY_API_PASSWORD: z.string().optional(),
   // Jonli tasdiqlangan: uchalasida ham query parametri `cad_number`.
   UTILITY_API_PARAM: z.string().default("cad_number"),
   // Gaz uchun "sarflayapti" mezoni: oxirgi shuncha oyda `gas_consume > 0` bo'lsa.
   GAS_CONSUMING_MONTHS: z.coerce.number().int().positive().default(6),
+  /**
+   * Elektr uchun "sarflayapti" mezoni: oxirgi shuncha oyda `CURRENT_EE_KWH > 0`.
+   * Gazdan ALOHIDA sozlanadi, chunki elektr javobi ~11 oylik `SALDO_PERIOD` beradi va
+   * elektrda hisoblagichsiz abonent deyarli uchramaydi (gazdagi "norma bo'yicha
+   * hisoblash" muammosi elektrda yo'q) — ya'ni mezon qat'iyroq bo'lishi mumkin.
+   */
+  ELECTRIC_CONSUMING_MONTHS: z.coerce.number().int().positive().default(6),
   // "Yaqinda to'lov bo'lgan" mezoni (dashboard ustuni va `?utility=recentlyPaid` filtri):
-  // gazning oxirgi to'lovi shuncha oy ichida bo'lsa. Hisob-kitob (`gasBilled`) abonent
-  // to'lamasa ham davom etadi, TO'LOV esa obyekt haqiqatan ishlatilayotganini bildiradi.
+  // gaz YOKI elektrning oxirgi to'lovi shuncha oy ichida bo'lsa. Hisob-kitob
+  // (`gasBilled`) abonent to'lamasa ham davom etadi, TO'LOV esa obyekt haqiqatan
+  // ishlatilayotganini bildiradi.
   UTILITY_RECENT_PAYMENT_MONTHS: z.coerce.number().int().positive().default(3),
 
   // Rate-limit / retry

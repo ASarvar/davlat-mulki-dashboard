@@ -7,6 +7,24 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.5.0
+
+- **Elektr — 2-bosqichli tafsilot (`het_data_detail`)** — 1-bosqich faqat abonent
+  kodini berardi (nom, sarf, to'lov yo'q). Endi API 3→4 auksion zanjiri naqshida
+  har bir abonent kodi uchun alohida so'rov yuboriladi va abonent ismi, manzili,
+  balans, oylik sarf (kVt·soat), oxirgi to'lov sanasi, hisoblagich va tarif olinadi.
+- **Elektr abonentining kadastr mosligi tekshiriladi** — tashqi API kadastrni
+  taxminan moslashtiradi, ya'ni topilgan abonent ko'pincha BOSHQA obyektning uy
+  xo'jaligi bo'lib chiqadi. Yangi `electricCadastreMatch` bayrog'i haqiqiy moslikni
+  soxtasidan ajratadi; obyekt sahifasida va ro'yxatda alohida ko'rsatiladi.
+- **"Yaqinda to'lov bo'lgan" mezoni endi gaz YOKI elektr** — ilgari faqat gaz edi.
+  Ikkita yangi filtr ham qo'shildi: "Elektr sarfi bor", "Elektr abonenti kadastri mos".
+- Shaxsiy ma'lumotlar (passport, PINFL, telefon) saqlashdan oldin olib tashlanadi —
+  bu maydonlar hisob-kitobga kirmaydi.
+- **Bug fix: gaz/elektr to'lov sanasi ro'yxatda ikki xil formatda chiqishi** —
+  vendorlar sanani boshqa-boshqa formatda beradi (`DD.MM.YYYY` / `YYYY-MM-DD`),
+  endi ikkalasi ham bir xil ko'rinishda.
+
 ## 1.4.0
 
 - **Kommunal xizmatlar (suv / gaz / elektr)** — uchta yangi tashqi API orqali obyektning

@@ -10,7 +10,12 @@ import {
 } from "./classification";
 import { userSourceScope, isAdmin, type SessionUser } from "@/lib/authz";
 import { CAT_REMOVED_FROM_BALANCE } from "@/lib/categories";
-import { parseUtilityRaw, type UtilityInfo, type UtilityKind } from "@/server/integrations/utilities";
+import {
+  parseUtilityRaw,
+  formatLastPayment as payDate,
+  type UtilityInfo,
+  type UtilityKind,
+} from "@/server/integrations/utilities";
 import { recentPaymentCutoff } from "./stats";
 
 export interface PropertyFilters {
@@ -54,6 +59,8 @@ export const UTILITY_FILTERS = [
   "gasBilled",
   "gasConsuming",
   "electric",
+  "electricConsuming",
+  "electricMatch",
   "any",
   "recentlyPaid",
   "none",
@@ -67,8 +74,12 @@ export const UTILITY_FILTER_LABEL: Record<UtilityFilter, string> = {
   gasBilled: "Gaz hisobi faol (to'lov hisoblanmoqda)",
   gasConsuming: "Gaz hisoblagichi bo'yicha sarf bor",
   electric: "Elektr abonenti bor",
+  electricConsuming: "Elektr sarfi bor",
+  // ⚠️ Elektr API'si kadastrni taxminan moslashtiradi — bu filtr aynan MOS kelganlarni
+  // beradi, ya'ni "abonent bor" ro'yxatining ishonchli qismini (utilities.ts, TUZOQ 6).
+  electricMatch: "Elektr abonenti kadastri mos",
   any: "Kamida bitta kommunal xizmat",
-  recentlyPaid: "Gaz uchun yaqinda to'lov bo'lgan",
+  recentlyPaid: "Gaz yoki elektr uchun yaqinda to'lov bo'lgan",
   none: "Hech qaysi kommunal xizmat yo'q",
   unchecked: "Kommunal tekshirilmagan",
 };
@@ -213,13 +224,25 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
       case "electric":
         and.push({ hasElectric: true });
         break;
+      case "electricConsuming":
+        and.push({ electricConsuming: true });
+        break;
+      case "electricMatch":
+        and.push({ electricCadastreMatch: true });
+        break;
       case "any":
         and.push({ OR: anyUtility });
         break;
       case "recentlyPaid":
         // ⚠️ Chegara `stats.ts` → `recentPaymentCutoff()` dan — jadvaldagi SQL bilan
         // bir xil funksiya, aks holda ustundagi son va ro'yxatdagi son ajralib ketardi.
-        and.push({ gasLastPaymentAt: { gte: recentPaymentCutoff() } });
+        // ⚠️ Shart ham SQL bilan bir xil bo'lishi SHART: gaz YOKI elektr.
+        and.push({
+          OR: [
+            { gasLastPaymentAt: { gte: recentPaymentCutoff() } },
+            { electricLastPaymentAt: { gte: recentPaymentCutoff() } },
+          ],
+        });
         break;
       case "none":
         // Tekshirilgan, lekin hech qaysi xizmatda abonent topilmagan.
@@ -322,7 +345,7 @@ function toCell(kind: UtilityKind, u: UtilityInfo): UtilityCell {
     rows.push({ label: "Joriy balans", value: sum(u.balance) });
     rows.push({
       label: "Oxirgi to'lov",
-      value: u.lastPaymentDate ? `${u.lastPaymentDate} — ${sum(u.lastPaymentSum)}` : "—",
+      value: payDate(u) ? `${payDate(u)} — ${sum(u.lastPaymentSum)}` : "—",
     });
     rows.push({
       label: "12 oylik sarf",
@@ -334,16 +357,47 @@ function toCell(kind: UtilityKind, u: UtilityInfo): UtilityCell {
           : "0 m³ (hisoblagich yo'q yoki sarf qayd etilmagan)",
     });
     rows.push({ label: "Hisob holati", value: u.billed ? "Faol — to'lov hisoblanmoqda" : "Harakat yo'q" });
-    return { found: true, short: "Bor", hint: u.lastPaymentDate ? `to'lov: ${u.lastPaymentDate}` : null, rows, matchedByOldCad: u.matchedByOldCad };
+    return { found: true, short: "Bor", hint: payDate(u) ? `to'lov: ${payDate(u)}` : null, rows, matchedByOldCad: u.matchedByOldCad };
   }
 
-  // ELECTRIC — API faqat abonent kodlarini beradi (nom ham, sarf ham yo'q).
-  rows.push({ label: "Abonent kodlari", value: u.codes.join(", ") || "—" });
-  rows.push({ label: "Kodlar soni", value: String(u.codes.length) });
+  // ELECTRIC — 2 bosqichli: tafsilot bo'lmasa (eski yozuv yoki 2-bosqich sozlanmagan)
+  // faqat kodlar ko'rinadi, avvalgidek.
+  if (u.subscribers.length === 0) {
+    rows.push({ label: "Abonent kodlari", value: u.codes.join(", ") || "—" });
+    rows.push({ label: "Kodlar soni", value: String(u.codes.length) });
+    rows.push({ label: "Tafsilot", value: "Olinmagan — kommunal sinxronizatsiyani qayta ishga tushiring" });
+    return { found: true, short: "Bor", hint: `${u.codes.length} ta kod`, rows, matchedByOldCad: u.matchedByOldCad };
+  }
+
+  if (u.subscriberName) rows.push({ label: "Abonent", value: u.subscriberName });
+  if (u.subscriberCode) rows.push({ label: "Abonent kodi", value: u.subscriberCode });
+  if (u.codes.length > 1) rows.push({ label: "Abonentlar soni", value: String(u.subscribers.length) });
+  if (u.address) rows.push({ label: "Manzil", value: u.address });
+  // ⚠️ Eng muhim qator: API kadastrni taxminan moslashtiradi, shuning uchun abonent
+  // BOSHQA obyektniki bo'lishi mumkin (utilities.ts, TUZOQ 6).
+  rows.push({
+    label: "Kadastr mosligi",
+    value: u.cadastreMatch
+      ? "Mos"
+      : `Mos emas${u.subscribers[0]?.cadastreCode ? ` (${u.subscribers[0].cadastreCode})` : ""}`,
+  });
+  rows.push({ label: "Joriy balans", value: sum(u.balance) });
+  rows.push({
+    label: "Oxirgi to'lov",
+    value: payDate(u) ? `${payDate(u)} — ${sum(u.lastPaymentSum)}` : "—",
+  });
+  rows.push({
+    label: "Sarf",
+    // ⚠️ Gazdan farqli — birlik kVt·soat, m³ EMAS.
+    value:
+      u.consumedTotal && u.consumedTotal > 0
+        ? `${u.consumedTotal.toLocaleString("uz-UZ")} kVt·soat`
+        : "0 (sarf qayd etilmagan)",
+  });
   return {
     found: true,
-    short: "Bor",
-    hint: `${u.codes.length} ta kod`,
+    short: u.cadastreMatch ? "Bor" : "Bor (kadastr mos emas)",
+    hint: payDate(u) ? `to'lov: ${payDate(u)}` : `${u.codes.length} ta kod`,
     rows,
     matchedByOldCad: u.matchedByOldCad,
   };
