@@ -92,8 +92,7 @@ const toDec = (v: unknown): Prisma.Decimal | null => {
 // Job C: asosiy ma'lumot (API 2, ixtiyoriy), auksion (API 3+4+6, ixtiyoriy), ijara
 // shartnomalari (API 5, ixtiyoriy) va kommunal xizmatlar (suv/gaz/elektr, ixtiyoriy) —
 // har biri mustaqil yoqilishi/o'chirilishi mumkin (`STATUS_REFRESH` sinxronizatsiyasi
-// uchun). Hech biri berilmasa — FULL_ALL/REGION/SINGLE zanjiridagi kabi hammasi
-// ishlaydi, xulq-atvor o'zgarmaydi.
+// uchun).
 //
 // ⚠️ Auksion (API3/4) va ijara loti (API6) BITTA guruh: ikkalasi ham bitta
 // `deriveAuctionCategory()` chaqiruviga kiradi va `AuctionLot` jadvalida birga
@@ -104,6 +103,18 @@ const toDec = (v: unknown): Prisma.Decimal | null => {
 // `integrationCategoryCode` hisobiga kirmaydi va `AUCTION_RANGE`/`RENT_RANGE` kabi
 // "yangilanmagan modul hissasini tiklash" mantig'i ham kerak emas: yangilanmasa,
 // tegishli ustunlar oddiygina `update` ga qo'shilmaydi va bazadagi qiymat qoladi.
+//
+// ⚠️ KOMMUNAL UMUMIY SINXRONIZATSIYAGA KIRMAYDI (`refreshUtility` standarti `false`,
+// qolganlaridan FARQLI). Ya'ni FULL_ALL/REGION/SINGLE va kunlik avtomatik sync uni
+// o'tkazib yuboradi — u FAQAT "Faqat holat yangilash"da "Kommunal" belgisi qo'lda
+// tanlanganda ishlaydi (foydalanuvchi talabi, 2026-08-24).
+//
+// Sabab: kommunal API'lar (suv/gaz/elektr) barqaror emas — jonli o'lchovda ular
+// HTTP 500 qaytarib, BUTUN obyekt tekshiruvini yiqitardi. Ular auksion/ijara bilan
+// bitta `Promise.all` ichida bo'lgani uchun bitta kommunal xato butun jobni
+// tashlab yuborardi va obyektning auksion/ijara ma'lumoti ham yangilanmay qolardi
+// (bir run'da 35 xatodan 34 tasi aynan shundan edi). Endi asosiy sinxronizatsiya
+// ulardan mustaqil.
 export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutcome> {
   const {
     propertyId,
@@ -112,7 +123,7 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
     refreshBase = true,
     refreshAuction = true,
     refreshRent = true,
-    refreshUtility = true,
+    refreshUtility = false,
   } = data;
 
   const current = await prisma.property.findUniqueOrThrow({

@@ -7,6 +7,35 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.6.0
+
+- **Kommunal (suv/gaz/elektr) umumiy sinxronizatsiyadan uzildi** — endi u
+  `FULL_ALL`/`REGION`/`SINGLE` va kunlik avtomatik sinxronizatsiyaga **kirmaydi**,
+  faqat "Faqat holat yangilash"da "Kommunal" belgisi qo'lda tanlanganda ishlaydi
+  (belgi ham standart holatda yoqilmagan). Sabab: bu API'lar barqaror emas va ular
+  boshqa modullar bilan bitta so'rovlar to'plamiga kirgani uchun bitta HTTP 500
+  BUTUN obyekt tekshiruvini yiqitardi — obyektning auksion/ijara ma'lumoti ham
+  yangilanmay qolardi (jonli o'lchov: bir run'da 35 xatodan 34 tasi shundan).
+- **Sinxronizatsiya xatolari endi tushunarli** — ilgari faqat "HTTP 500" yoki
+  "fetch failed" ko'rinardi, ya'ni qaysi tashqi API yiqilgani ham, nima bo'lgani ham
+  noma'lum edi. Endi xato uch qismdan iborat: qaysi API (o'zbekcha nomi bilan),
+  nima bo'lgani (server ichki xatosi / ulanmadi / vaqt tugadi / login-parol /
+  rate-limit / kadastr topilmadi) va muammo kim tomonida. Sinxronizatsiya tarixida
+  va obyekt sahifasida ko'rsatiladi (faqat adminlarga).
+- **Xato sababi endi sinxronizatsiya yozuvining o'zida saqlanadi**
+  (`SyncRun.failureSummary`). Ilgari u obyektning oxirgi holatidan hisoblanardi va
+  keyingi sinxronizatsiya obyektni yangilashi bilan yo'qolardi — natijada tarixdagi
+  "xato: 33" soni bilan aniqlangan sabablar soni (8) mos kelmasdi.
+- **Rasm biriktirishda "+" tugmasi** — rasmlar endi birma-bir qo'shiladi (4 tagacha),
+  har birida olib tashlash tugmasi va `2/4` hisoblagichi bilan. Ilgari bitta umumiy
+  maydon edi va ikkinchi marta tanlash birinchi tanlovni butunlay almashtirib yuborardi.
+- **Foydalanuvchilar ro'yxatida filtr tashkilot emas, SOHA bo'yicha** (bitta sohaga
+  14 hududning tashkilotlari kiradi, shuning uchun soha kesimi amaliyroq).
+- **Obyekt sahifasida "Sinxron" o'rniga oxirgi sinxronizatsiya vaqti** ko'rsatiladi;
+  "API orqali yangilash" tugmasi bosilganda holat ko'rinadi ("Yuborilmoqda...",
+  "Navbatga qo'yildi") va 5 soniya qayta bosilmaydi — ilgari hech qanday reaksiya
+  bermasdi, chunki ish fon jarayoniga (worker) o'tib ketardi.
+
 ## 1.5.0
 
 - **Elektr — 2-bosqichli tafsilot (`het_data_detail`)** — 1-bosqich faqat abonent

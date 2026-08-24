@@ -32,7 +32,8 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
       },
       update: { syncStatus: "FAILED", lastSyncError: result.reason, lastSyncedAt: new Date() },
     });
-    return "fail";
+    // Sababni ham qaytaramiz — u run'ning `failureSummary` iga yoziladi.
+    return { outcome: "fail", reason: result.reason };
   }
 
   const base = result.data;

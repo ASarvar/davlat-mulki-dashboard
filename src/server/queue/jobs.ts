@@ -33,16 +33,26 @@ export interface StatusCheckJob {
   propertyId: string;
   cadNumber: string;
   cadNumberOld: string | null;
-  // Hech biri berilmasa (FULL_ALL/REGION/SINGLE zanjiri) — hammasi true,
+  // Berilmasa (FULL_ALL/REGION/SINGLE zanjiri) — base/auction/rent `true`, ya'ni
   // xulq-atvor o'zgarmaydi. STATUS_REFRESH ulardan faqat kerakligini false qiladi:
   // false bo'lgan modul uchun tashqi API UMUMAN chaqirilmaydi, uning oldingi
   // hissasi bazadagi joriy qiymatlardan tiklanadi (`checkPropertyStatus.ts`).
   refreshBase?: boolean; // API2 — asosiy ma'lumot
   refreshAuction?: boolean; // API3/4 + API6 — auksion va ijara loti (birga)
   refreshRent?: boolean; // API5 — ijara shartnomalari
-  refreshUtility?: boolean; // suv/gaz/elektr — kommunal abonent tekshiruvi
+  /**
+   * suv/gaz/elektr — kommunal abonent tekshiruvi.
+   * ⚠️ Qolganlaridan FARQLI: standarti `false`. Umumiy sinxronizatsiyaga kirmaydi,
+   * faqat qo'lda tanlanganda ishlaydi — sababi `checkPropertyStatus.ts` izohida.
+   */
+  refreshUtility?: boolean;
 }
 
 // Job natijasi — worker SyncRun hisoblagichlarini shunga qarab yangilaydi.
 // "pending" = yakuniy emas (fan-out), hisoblanmaydi.
-export type JobOutcome = "success" | "fail" | "pending";
+/**
+ * Job natijasi. `"fail"` ni SABAB bilan qaytarish mumkin — sabab `SyncRun.failureSummary`
+ * ga yoziladi ("qaysi API xato berdi" jadvali shundan quriladi). Sababsiz `"fail"` ham
+ * ishlayveradi (xato "Noma'lum" guruhiga tushadi).
+ */
+export type JobOutcome = "success" | "fail" | "pending" | { outcome: "fail"; reason: string };

@@ -31,7 +31,16 @@ export async function triggerFullSync(userId?: string, sourceName?: string) {
     where: { isActive: true, ...(sourceName ? { name: sourceName } : {}) },
   });
   const run = await prisma.syncRun.create({
-    data: { type: "FULL_ALL", status: "QUEUED", triggeredById: userId ?? null, sourceName: sourceName ?? null },
+    // ⚠️ `refreshUtility: false` — kommunal umumiy sinxronizatsiyaga kirmaydi
+    // (checkPropertyStatus.ts izohiga qarang). Yozuv haqiqatga mos bo'lishi uchun
+    // shu yerda ham aniq `false` qilinadi (sxemadagi standart `true`).
+    data: {
+      type: "FULL_ALL",
+      status: "QUEUED",
+      triggeredById: userId ?? null,
+      sourceName: sourceName ?? null,
+      refreshUtility: false,
+    },
   });
   // ⚠️ `restrictedRegionId` (masalan Direksiya → Toshkent sh.) shu yerda `filterRegionId`
   // sifatida uzatiladi — REGION triggeridan farqli, bu FULL_ALL (va kunlik avtomatik
@@ -74,6 +83,7 @@ export async function triggerRegionSync(regionId: string, userId?: string, sourc
       regionId,
       sourceName: sourceName ?? null,
       triggeredById: userId ?? null,
+      refreshUtility: false, // kommunal — faqat qo'lda (STATUS_REFRESH)
     },
   });
   await enqueueSyncSources(
@@ -166,7 +176,14 @@ export async function triggerSingleSync(cadNumber: string, userId?: string) {
   if (!property) throw new Error(`Obyekt topilmadi: ${cadNumber}`);
 
   const run = await prisma.syncRun.create({
-    data: { type: "SINGLE", status: "QUEUED", regionId: property.regionId, triggeredById: userId ?? null, totalCount: 1 },
+    data: {
+      type: "SINGLE",
+      status: "QUEUED",
+      regionId: property.regionId,
+      triggeredById: userId ?? null,
+      totalCount: 1,
+      refreshUtility: false, // kommunal — faqat qo'lda (STATUS_REFRESH)
+    },
   });
   await enqueuePropertyBase({
     syncRunId: run.id,

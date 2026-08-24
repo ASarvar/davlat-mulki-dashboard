@@ -84,6 +84,18 @@ har biri checkbox):
 - `refreshUtility` — suv/gaz/elektr (kommunal abonent tekshiruvi). **Kategoriyaga ta'sir
   qilmaydi**, shuning uchun quyidagi "diapazondan tiklash" mantig'i unga tegishli emas.
 
+⚠️ **Kommunal UMUMIY sinxronizatsiyaga KIRMAYDI** (2026-08-24). `checkPropertyStatus.ts`da
+`refreshUtility` standarti — qolgan uchtasidan farqli — **`false`**. Ya'ni
+`FULL_ALL`/`REGION`/`SINGLE` va kunlik avtomatik sync uni butunlay o'tkazib yuboradi;
+u FAQAT `/dashboard/sync` → "Faqat holat yangilash"da "Kommunal" belgisi **qo'lda**
+tanlanganda ishlaydi (o'sha belgi ham endi standart holatda yoqilmagan).
+`triggerFullSync/RegionSync/SingleSync` `SyncRun.refreshUtility: false` deb ham yozadi —
+sxemadagi standart `true` bo'lgani uchun buni aniq berish shart.
+**Sabab:** kommunal API'lar barqaror emas va ular auksion/ijara bilan bitta `Promise.all`
+ichida bo'lgani uchun bitta HTTP 500 BUTUN obyekt tekshiruvini yiqitardi — obyektning
+auksion/ijara ma'lumoti ham yangilanmay qolardi (jonli o'lchov: bir run'da 35 xatodan
+34 tasi aynan kommunaldan; `UTIL_GAS`/`UTIL_ELECTRIC` HTTP 500 qaytargan).
+
 ⚠️ **Yangilanmagan modul tashqi API'ga UMUMAN chaqirilmaydi** — uning oldingi hissasi
 `checkPropertyStatus.ts`dagi `AUCTION_RANGE`/`RENT_RANGE` orqali bazadagi joriy
 `integrationCategoryCode`dan tiklanadi (auksion={1,2,3,4,7}, ijara={5,6} — kesishmaydi,

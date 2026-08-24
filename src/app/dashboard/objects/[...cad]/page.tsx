@@ -29,6 +29,7 @@ import { getPropertyDetail } from "@/server/services/properties";
 import { pathToCad } from "@/lib/cadastre";
 import { totalBuildingAreaWithSource, totalAreaLabel, usefulArea } from "@/lib/area";
 import { CATEGORY_BY_CODE } from "@/lib/categories";
+import { describeSyncError, BLAME_LABEL } from "@/lib/syncError";
 import { CategoryBadge, InefficientBadge, RemovedFromBalanceBadge, SyncStatusBadge } from "@/components/badges";
 import { AssignCategoryForm } from "./AssignCategoryForm";
 import { RemoveCategoryButton } from "./RemoveCategoryButton";
@@ -227,6 +228,8 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
 
   // Kim yangilash tugmasini ko'radi (API orqali sync) — admin.
   const canSync = user.role === "SUPER_ADMIN" || user.role === "ADMIN";
+  // Xom xato matnini o'qiladigan ko'rinishga o'giramiz (qaysi API + nima bo'lgani).
+  const syncError = describeSyncError(p.lastSyncError);
 
   // Kategoriya biriktirish/so'rov: faqat "Bo'sh turgan" (11) obyekt uchun.
   // Ikkalasi ham null bo'lsa ham "Bo'sh turgan" (DB'da 11 alohida saqlanmaydi).
@@ -403,8 +406,17 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
             {/* Xom texnik xato matni (masalan "fetch failed") — faqat admin ko'radi.
                 Boshqa rollar buni tuzata olmaydi va matn ular uchun tushunarsiz/
                 bezovta qiluvchi bo'lishi mumkin (foydalanuvchi talabi, 2026-08-06). */}
-            {p.lastSyncError && canSync ? (
-              <p className="mt-4 rounded-md bg-red-50 px-3 py-2 text-xs text-red-700">Sync xatosi: {p.lastSyncError}</p>
+            {syncError && canSync ? (
+              <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs">
+                <p className="flex items-center gap-1.5 font-semibold text-red-800">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                  Sinxronizatsiya xatosi — {syncError.apiLabel}
+                </p>
+                <p className="mt-1 leading-snug text-red-700">{syncError.reason}</p>
+                <p className="mt-1 font-mono text-[10px] text-red-500">
+                  {BLAME_LABEL[syncError.blame]} · {syncError.raw}
+                </p>
+              </div>
             ) : null}
             <CadastreRawData rawApi2={p.rawApi2} />
           </div>

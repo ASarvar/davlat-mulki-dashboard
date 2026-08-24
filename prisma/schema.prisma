@@ -576,6 +576,16 @@ model SyncRun {
   totalCount    Int           @default(0)
   successCount  Int           @default(0)
   failCount     Int           @default(0)
+  /**
+   * Xato xabari -> nechta marta uchragani: `{ "API2: HTTP 500": 12, ... }`.
+   *
+   * ⚠️ Nima uchun shu yerda saqlanadi: `Property.lastSyncError` faqat OXIRGI holatni
+   * saqlaydi, ya'ni keyingi sinxronizatsiya o'sha obyektni yangilasa, avvalgi run'ning
+   * xatosi izsiz yo'qolardi va tarixdagi "xato: 33" soni tushuntirib bo'lmas holga
+   * kelardi (jonli ma'lumotda aynan shunday bo'lgan). Bu ustun run yakunlangandan
+   * keyin ham o'zgarmaydi.
+   */
+  failureSummary Json?
   startedAt     DateTime?
   finishedAt    DateTime?
   createdAt     DateTime      @default(now())

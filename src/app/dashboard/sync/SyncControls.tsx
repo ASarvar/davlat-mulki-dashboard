@@ -57,7 +57,11 @@ export function SyncControls({
           </h2>
           <p className="mt-1 mb-3 text-sm text-muted-foreground">
             API 1 → 2 → 3–8 zanjiri — yangi kadastrlarni ham qidiradi. Kamdan-kam kerak: har kuni
-            03:00 da avtomatik ishlaydi.
+            03:00 da avtomatik ishlaydi.{" "}
+            <span className="text-amber-700">
+              Kommunal (suv/gaz/elektr) bunga KIRMAYDI — uni pastdagi &quot;Faqat holat
+              yangilash&quot;dan qo&apos;lda ishga tushiring.
+            </span>
           </p>
           <SohaSelect sohaList={sohaList} />
           <button
@@ -155,9 +159,14 @@ export function SyncControls({
               <input type="checkbox" name="refreshRent" defaultChecked className="h-4 w-4" />
               Ijara shartnomalari (API5)
             </label>
+            {/* ⚠️ Standart holatda YOQILMAGAN (qolganlaridan farqli): kommunal API'lar
+                barqaror emas va ular boshqa modullar bilan bitta so'rovlar to'plamiga
+                kirgani uchun xato bersa butun tekshiruvni yiqitadi. Shuning uchun
+                faqat ataylab tanlanganda ishlaydi (foydalanuvchi talabi, 2026-08-24). */}
             <label className="flex items-center gap-1.5">
-              <input type="checkbox" name="refreshUtility" defaultChecked className="h-4 w-4" />
+              <input type="checkbox" name="refreshUtility" className="h-4 w-4" />
               Kommunal: suv/gaz/elektr
+              <span className="text-xs text-muted-foreground">(faqat qo&apos;lda)</span>
             </label>
           </div>
 

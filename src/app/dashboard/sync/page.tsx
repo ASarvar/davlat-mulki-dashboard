@@ -1,7 +1,8 @@
 import { RefreshCw, History, AlertTriangle } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/authz";
-import { getPendingJobCounts, getQueueHealth } from "@/server/services/syncAdmin";
+import { getPendingJobCounts, getQueueHealth, syncFailureBreakdown, type SyncFailureBucket } from "@/server/services/syncAdmin";
+import { BLAME_LABEL } from "@/lib/syncError";
 import { listSourceNames } from "@/server/services/sources";
 import { SyncRunStatusBadge } from "@/components/badges";
 import { SyncControls } from "./SyncControls";
@@ -45,6 +46,13 @@ export default async function SyncPage() {
 
   const regionName = new Map(regions.map((r) => [r.id, r.name]));
   const hasActive = runs.some((r) => r.status === "QUEUED" || r.status === "RUNNING");
+
+  // Xato bergan run'lar uchun QAYSI API va NIMA sababdan xato berganini ko'rsatamiz
+  // (foydalanuvchi talabi, 2026-08-24). Ma'lumot run'ning o'zida (`failureSummary`)
+  // saqlangani uchun qo'shimcha so'rov kerak emas.
+  const breakdowns = new Map<string, SyncFailureBucket[]>(
+    runs.filter((r) => r.failCount > 0).map((r) => [r.id, syncFailureBreakdown(r)]),
+  );
 
   // Navbat holati (pg-boss). Redis yo'q — hisob to'g'ridan-to'g'ri Postgres'dan.
   const pending = await getPendingJobCounts().catch(() => ({}) as Record<string, number>);
@@ -145,6 +153,31 @@ export default async function SyncPage() {
                       <span className="text-xs text-muted-foreground">
                         {done} / {r.totalCount} · muvaffaqiyatli {r.successCount}, xato {r.failCount}
                       </span>
+                      {/* Xato sababi — QAYSI API va NIMA bo'lgani.
+                          ⚠️ Bu SyncRun'ning o'zida saqlanmaydi, vaqt oralig'i bo'yicha
+                          taxminan hisoblanadi (syncFailureBreakdown izohiga qarang). */}
+                      {r.failCount > 0 ? (
+                        <div className="mt-2 space-y-1.5">
+                          {(breakdowns.get(r.id) ?? []).map((b, i) => (
+                            <div
+                              key={i}
+                              className="max-w-md rounded-md border border-red-200 bg-red-50 px-2.5 py-1.5"
+                            >
+                              <p className="flex items-center gap-1.5 text-[11px] font-semibold text-red-800">
+                                <AlertTriangle className="h-3 w-3 shrink-0" />
+                                {b.apiLabel}
+                                <span className="ml-auto shrink-0 rounded-full bg-red-100 px-1.5 font-mono">
+                                  {b.count} ta
+                                </span>
+                              </p>
+                              <p className="mt-0.5 text-[11px] leading-snug text-red-700">{b.reason}</p>
+                              <p className="mt-0.5 font-mono text-[10px] text-red-500" title={b.sampleMessage}>
+                                {BLAME_LABEL[b.blame]} · {b.sampleMessage}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">{r.triggeredBy?.fullName ?? "—"}</td>
                     <td className="px-4 py-3 text-xs text-muted-foreground">

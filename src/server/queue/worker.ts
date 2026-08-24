@@ -33,6 +33,8 @@ function leafHandler<T extends { syncRunId?: string }>(
           const outcome = await process(job.data);
           if (outcome === "success") await incrementSuccess(runId);
           else if (outcome === "fail") await incrementFail(runId);
+          // Sabab bilan qaytgan fail — sababni run'ga yozamiz (jobs.ts izohiga qarang).
+          else if (typeof outcome === "object") await incrementFail(runId, outcome.reason);
           if (outcome !== "pending") await finalizeIfComplete(runId);
         } catch (err) {
           console.error(`[${job.name}] xato:`, msg(err));
@@ -41,7 +43,9 @@ function leafHandler<T extends { syncRunId?: string }>(
           } catch (e) {
             console.error("onFatal xato:", msg(e));
           }
-          await incrementFail(runId);
+          // Xato xabari run'ga ham yoziladi — Property.lastSyncError keyingi
+          // sinxronizatsiyada ustidan yozilib ketadi (runProgress.ts izohiga qarang).
+          await incrementFail(runId, msg(err));
           await finalizeIfComplete(runId);
         }
       }),

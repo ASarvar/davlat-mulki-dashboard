@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { getBoss } from "@/server/queue/boss";
 import { QUEUE } from "@/server/queue/jobs";
+import { describeSyncError, type SyncErrorInfo } from "@/lib/syncError";
 
 export interface CleanupResult {
   runsClosed: number;
@@ -78,4 +79,55 @@ export async function cleanupStuckSyncs(actorId: string): Promise<CleanupResult>
   });
 
   return { runsClosed, jobsPurged };
+}
+
+export interface SyncFailureBucket {
+  /** Qaysi API — o'zbekcha to'liq nom (`describeSyncError`dan). */
+  apiLabel: string;
+  /** Xato NIMA ekani — o'zbekcha tushuntirish. */
+  reason: string;
+  blame: SyncErrorInfo["blame"];
+  count: number;
+  /** Xom xabar — admin uchun texnik tafsilot (tooltip'da). */
+  sampleMessage: string;
+}
+
+/**
+ * Bitta sync run'da QAYSI tashqi API va NIMA sababdan xato berganini ko'rsatadi.
+ *
+ * Manba — `SyncRun.failureSummary` (`{ "API2: HTTP 500": 12, ... }`), ya'ni run
+ * yakunlangandan keyin ham o'zgarmaydigan yozuv. ⚠️ Ilgari bu `Property.lastSyncError`
+ * dan vaqt oralig'i bo'yicha hisoblanardi va keyingi sinxronizatsiya obyektni
+ * yangilashi bilan sonlar "kamayib" ketardi (33 ta xato → 8 ta sabab).
+ */
+export function syncFailureBreakdown(run: { failureSummary: unknown }): SyncFailureBucket[] {
+  const summary = run.failureSummary;
+  if (!summary || typeof summary !== "object" || Array.isArray(summary)) return [];
+
+  // Guruhlash kaliti — API + sabab JUFTLIGI: bitta API ikki xil sababdan yiqilishi
+  // mumkin (masalan API2 ba'zi obyektda 500, boshqasida "topilmadi"), va ularni
+  // bitta qatorga qo'shib yuborish aynan "xato nimada?" degan savolni yopib qo'yardi.
+  const buckets = new Map<string, SyncFailureBucket>();
+  for (const [message, rawCount] of Object.entries(summary as Record<string, unknown>)) {
+    const count = Number(rawCount);
+    if (!Number.isFinite(count) || count <= 0) continue;
+    const info = describeSyncError(message);
+    if (!info) continue;
+
+    const key = `${info.key ?? "?"}|${info.reason}`;
+    const existing = buckets.get(key);
+    if (existing) {
+      existing.count += count;
+    } else {
+      buckets.set(key, {
+        apiLabel: info.apiLabel,
+        reason: info.reason,
+        blame: info.blame,
+        count,
+        sampleMessage: info.raw,
+      });
+    }
+  }
+
+  return [...buckets.values()].sort((a, z) => z.count - a.count);
 }
