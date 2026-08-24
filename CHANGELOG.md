@@ -7,6 +7,17 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.6.1
+
+- **Bug fix: rasm biriktirish formasi yuborilgandan keyin noto'g'ri holatda qolishi** —
+  hisoblagich "4/4" deb turar, lekin fayllar tanlanmagan bo'lardi va "+" tugmasi
+  chiqmasdi. Sabab: server action tugagach React formani o'zi tozalaydi, komponent
+  holati esa eski qiymatda qolib ketardi.
+- **Fayl saqlashdagi ruxsat xatosi endi tushunarli** — ilgari xom
+  `EACCES: permission denied, mkdir 'app'` matni foydalanuvchiga shundayligicha
+  ko'rinardi. Endi xabar qaysi katalog va qaysi sozlama (`UPLOAD_DIR`) sabab
+  bo'lganini aytadi.
+
 ## 1.6.0
 
 - **Kommunal (suv/gaz/elektr) umumiy sinxronizatsiyadan uzildi** — endi u

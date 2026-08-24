@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { Save, Send, Plus, X, ImagePlus } from "lucide-react";
 import { ASSIGNABLE_CATEGORIES } from "@/lib/categories";
 import { assignCategoryAction, type AssignState } from "../actions";
@@ -45,6 +45,20 @@ export function AssignCategoryForm({ cadNumber, isRequest }: { cadNumber: string
       return next;
     });
   }
+
+  // ⚠️ Server action tugagach React formani O'ZI tozalaydi (uncontrolled inputlar
+  // bo'shab qoladi) — lekin bizning `picked` holatimiz qolib ketardi. Natijada
+  // hisoblagich "4/4" deb turar, fayllar esa tanlanmagan bo'lardi va "+" ham
+  // chiqmasdi (jonli xatoda ko'rindi). Shuning uchun holatni formaga moslaymiz.
+  const wasPending = useRef(false);
+  useEffect(() => {
+    if (wasPending.current && !pending) {
+      setSlots([0]);
+      setPicked({});
+      setImageError(null);
+    }
+    wasPending.current = pending;
+  }, [pending]);
 
   function removeSlot(id: number) {
     setSlots((prev) => (prev.length === 1 ? prev : prev.filter((s) => s !== id)));

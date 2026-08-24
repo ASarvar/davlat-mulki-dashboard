@@ -54,7 +54,24 @@ export async function saveDocumentFile(
   const diskName = `${randomUUID()}.${ext}`;
 
   const absDir = join(env.UPLOAD_DIR, relDir);
-  await mkdir(absDir, { recursive: true });
+  try {
+    await mkdir(absDir, { recursive: true });
+  } catch (err) {
+    // ⚠️ Xom xato ("EACCES: permission denied, mkdir 'app'") sabab haqida hech nima
+    // aytmasdi va foydalanuvchiga shundayligicha ko'rinardi. Eng ko'p uchraydigan
+    // sabab — `UPLOAD_DIR` NISBIY yo'l bo'lib qolgani (masalan `app/data/uploads`,
+    // boshida `/` tushib qolgan): u holda katalog konteynerning ish katalogi ichida
+    // yaratilmoqchi bo'ladi, u yer esa `node` foydalanuvchisi uchun yopiq.
+    const code = (err as NodeJS.ErrnoException)?.code;
+    if (code === "EACCES" || code === "EPERM" || code === "EROFS") {
+      throw new Error(
+        `Fayl saqlanadigan katalog yaratilmadi (${code}): "${absDir}". ` +
+          `UPLOAD_DIR sozlamasini tekshiring — u ABSOLYUT yo'l bo'lishi kerak ` +
+          `(masalan /app/data/uploads). Joriy qiymat: "${env.UPLOAD_DIR}".`,
+      );
+    }
+    throw err;
+  }
 
   const buffer = Buffer.from(await file.arrayBuffer());
   await writeFile(join(absDir, diskName), buffer);
