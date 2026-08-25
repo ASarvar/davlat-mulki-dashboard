@@ -7,6 +7,15 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.7.0
+
+- **Qo'lda biriktirishga "Sotilgan" qo'shildi** — ilgari faqat "Yaroqsiz holat" va
+  "Chekka hudud" bor edi. ⚠️ Ro'yxatda oddiy **"Sotilgan"** deb ko'rinadi, lekin
+  saqlanganda kategoriya **"Sotilgan (Bo'lib to'lash sharti bilan)"** bo'lib yoziladi:
+  qo'lda biriktiriladigan sotuv har doim bo'lib to'lash sharti bilan hisoblanadi.
+  Avvalgidek — faqat "Bo'sh turgan" obyektga, asoslovchi PDF bilan; ijrochi uchun
+  tasdiqlash zanjiri (Moderator → Rahbariyat) o'zgarmadi.
+
 ## 1.6.1
 
 - **Bug fix: rasm biriktirish formasi yuborilgandan keyin noto'g'ri holatda qolishi** —

@@ -116,7 +116,7 @@ Faol run bor bo'lsa `assertNoActiveRun()` xato tashlaydi — kunlik ishga tushir
 - `SUPER_ADMIN` — hammasi.
 - `ADMIN` — super admin bilan bir xil, lekin super adminni ko'rmaydi/boshqarmaydi.
 - `RAHBARIYAT` — **cheklovsiz**; so'rovni **yakuniy tasdiqlaydi** (2-bosqich);
-  9/10 kategoriyani "Bo'sh turgan"ga qaytara oladi (`removeManualCategory`).
+  qo'lda biriktirilgan kategoriyani "Bo'sh turgan"ga qaytara oladi (`removeManualCategory`).
 - `MODERATOR` — **KO'RISHDA cheklanmaydi** (kuzatuvchi kabi hamma obyekt, so'rovlar tarixi va
   dashboard); biriktirilgan **tashkilot(lar)** (`UserSource` yoki `allSources`) so'rovlarini
   **qabul qiladi** (1-bosqich) yoki rad etadi. To'g'ridan-to'g'ri biriktira **olmaydi**.
@@ -185,7 +185,13 @@ rahbariyat/admin/kuzatuvchi → hammasi). Tarixda har ikki bosqich qarori (kim +
 sahifasidagi "Biriktirishlar tarixi"da nima uchun qaytarilgani ko'rinadi. Ya'ni bu jadval endi
 faqat "biriktirish" emas, **qaytarish**ni ham yozadi.
 
-Biriktirish formasi faqat **9 (Yaroqsiz), 10 (Chekka)** — `ASSIGNABLE_CATEGORY_CODES`, raqamsiz.
+Biriktirish formasi: **1 (Sotilgan), 9 (Yaroqsiz), 10 (Chekka)** — `ASSIGNABLE_CATEGORY_CODES`, raqamsiz.
+⚠️ **Kat 1 formada "Sotilgan" deb ko'rinadi**, lekin saqlanganda kategoriya 1 —
+"Sotilgan (Bo'lib to'lash sharti bilan)" bo'lib yoziladi (foydalanuvchi qarori, 2026-08-25:
+qo'lda biriktiriladigan sotuv har doim bo'lib to'lash sharti bilan hisoblanadi, shuning
+uchun kat 2 formaga qo'shilmadi). Yorliq `lib/categories.ts` → `ASSIGN_FORM_LABEL` /
+`assignFormLabel()` da; kategoriyaning `nameUz` sini O'ZGARTIRMANG — u dashboard
+ustunlarida, yorliqlarda va Excel eksportida ishlatiladi.
 **Fayllar:** PDF majburiy (15MB), **4tagacha ixtiyoriy rasm** (JPG/PNG/WEBP, `MAX_IMAGE_ATTACHMENTS`,
 har biri `MAX_IMAGE_UPLOAD_BYTES` = 5MB — PDF'dan alohida, kichikroq chegara).
 ⚠️ Rasmlar alohida jadval emas — asosiy PDF hujjatning **bolalari** (`Document.parentId`, self-relation,

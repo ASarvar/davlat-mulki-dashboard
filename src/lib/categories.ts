@@ -44,13 +44,33 @@ export const MANUAL_CATEGORIES = CATEGORIES.filter((c) => c.source === "MANUAL")
 export const CAT_REMOVED_FROM_BALANCE = 13;
 export const REMOVED_FROM_BALANCE_LABEL = "Balansdan chiqarilgan";
 
-// Qo'lda biriktirish formasida ko'rsatiladigan kategoriyalar: faqat 9 (Yaroqsiz) va
-// 10 (Chekka). 7/11/12 formadan olib tashlangan (foydalanuvchi talabi). Nazoratchi
-// aynan shu ikkisiga "Bo'sh turgan" obyektni biriktirish so'rovini yuboradi.
-export const ASSIGNABLE_CATEGORY_CODES = [9, 10] as const;
+// Qo'lda biriktirish formasida ko'rsatiladigan kategoriyalar: 1 (Sotilgan),
+// 9 (Yaroqsiz) va 10 (Chekka). 7/11/12 formadan olib tashlangan (foydalanuvchi talabi).
+// Nazoratchi aynan shularga "Bo'sh turgan" obyektni biriktirish so'rovini yuboradi.
+export const ASSIGNABLE_CATEGORY_CODES = [1, 9, 10] as const;
 export const ASSIGNABLE_CATEGORIES = CATEGORIES.filter((c) =>
   (ASSIGNABLE_CATEGORY_CODES as readonly number[]).includes(c.code),
 );
+
+/**
+ * Qo'lda biriktirish formasida ko'rsatiladigan nom — kategoriyaning rasmiy nomidan
+ * FARQ qilishi mumkin.
+ *
+ * ⚠️ Kat 1 uchun: ro'yxatda oddiy **"Sotilgan"** deb turadi, lekin saqlanganda
+ * kategoriya 1 — "Sotilgan (Bo'lib to'lash sharti bilan)" bo'lib yoziladi
+ * (foydalanuvchi qarori, 2026-08-25: qo'lda biriktiriladigan sotuv HAR DOIM bo'lib
+ * to'lash sharti bilan hisoblanadi, shuning uchun ikkita variant ko'rsatilmaydi).
+ * Kategoriyaning `nameUz` sini o'zgartirib bo'lmaydi — u dashboard ustunlarida,
+ * yorliqlarda va Excel eksportida ishlatiladi.
+ */
+export const ASSIGN_FORM_LABEL: Record<number, string> = {
+  1: "Sotilgan",
+};
+
+/** Formada ko'rsatiladigan nom (maxsus nom bo'lmasa — rasmiy nom). */
+export function assignFormLabel(c: CategoryMeta): string {
+  return ASSIGN_FORM_LABEL[c.code] ?? c.nameUz;
+}
 
 // Obyektning effektiv kategoriyasi: integratsiya (1–4) > qo'lda (5–10).
 // Ikkalasi ham null bo'lsa — 11 (Bo'sh turgan), DB'da "kategoriyasiz" holati yo'q

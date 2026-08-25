@@ -737,7 +737,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
             </div>
           ) : !canAssign && (user.role === "IJROCHI" || isAdmin(user.role)) && !pendingRequest ? (
             <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
-              Faqat "Bo'sh turgan" obyektni Yaroqsiz/Chekka kategoriyaga biriktirish mumkin.
+              Faqat "Bo'sh turgan" obyektga qo'lda kategoriya biriktirish mumkin.
             </div>
           ) : null}
 

@@ -2,7 +2,7 @@
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { Save, Send, Plus, X, ImagePlus } from "lucide-react";
-import { ASSIGNABLE_CATEGORIES } from "@/lib/categories";
+import { ASSIGNABLE_CATEGORIES, assignFormLabel } from "@/lib/categories";
 import { assignCategoryAction, type AssignState } from "../actions";
 
 // Server bilan bir xil chegaralar (documents.ts → MAX_IMAGE_ATTACHMENTS/MAX_IMAGE_UPLOAD_BYTES).
@@ -80,7 +80,7 @@ export function AssignCategoryForm({ cadNumber, isRequest }: { cadNumber: string
           <option value="">Tanlang...</option>
           {ASSIGNABLE_CATEGORIES.map((c) => (
             <option key={c.code} value={c.code}>
-              {c.nameUz}
+              {assignFormLabel(c)}
             </option>
           ))}
         </select>

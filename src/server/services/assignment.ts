@@ -10,7 +10,7 @@ import { notify } from "./notifications";
 
 export interface AssignInput {
   cadNumber: string;
-  categoryCode: number; // faqat 9 (Yaroqsiz) yoki 10 (Chekka)
+  categoryCode: number; // faqat ASSIGNABLE_CATEGORY_CODES: 1 (Sotilgan), 9 (Yaroqsiz), 10 (Chekka)
   note?: string;
   file?: File | null; // asoslovchi PDF — majburiy
   images?: File[]; // ixtiyoriy ilova rasmlari, MAX_IMAGE_ATTACHMENTS tagacha
@@ -20,7 +20,7 @@ export interface AssignInput {
 //  - IJROCHI → so'rov (CategoryChangeRequest → PENDING_MODERATOR, darhol qo'llanmaydi)
 //  - ADMIN/SUPER_ADMIN → darhol qo'llaydi
 //  - MODERATOR/RAHBARIYAT → to'g'ridan-to'g'ri biriktirmaydi, faqat so'rovni ko'rib chiqadi
-// Har ikki holatda ham faqat 9/10 kategoriyalari va faqat "Bo'sh turgan" obyektlar uchun.
+// Har ikki holatda ham faqat ASSIGNABLE_CATEGORY_CODES va faqat "Bo'sh turgan" obyektlar uchun.
 export async function assignManualCategory(user: SessionUser, input: AssignInput) {
   if (user.role !== "IJROCHI" && !isAdmin(user.role)) {
     throw new Error("Ruxsat yo'q");
@@ -40,7 +40,7 @@ export async function assignManualCategory(user: SessionUser, input: AssignInput
   // "Bo'sh turgan" hisoblanadi (CAT_VACANT ustunga yozilmaydi, faqat effektiv fallback).
   const effective = property.integrationCategoryCode ?? property.manualCategoryCode ?? CAT_VACANT;
   if (effective !== CAT_VACANT) {
-    throw new Error("Faqat 'Bo'sh turgan' obyektni Yaroqsiz/Chekka kategoriyaga biriktirish mumkin");
+    throw new Error("Faqat 'Bo'sh turgan' obyektga qo'lda kategoriya biriktirish mumkin");
   }
 
   const category = await prisma.category.findUnique({ where: { code: input.categoryCode } });
@@ -193,7 +193,7 @@ export async function removeManualCategory(user: SessionUser, cadNumber: string,
     property.manualCategoryCode == null ||
     !(ASSIGNABLE_CATEGORY_CODES as readonly number[]).includes(property.manualCategoryCode)
   ) {
-    throw new Error("Obyekt Yaroqsiz/Chekka kategoriyasida emas");
+    throw new Error("Obyektga qo'lda kategoriya biriktirilmagan");
   }
 
   await assertSourceWriteAccess(user, property.sourceId);

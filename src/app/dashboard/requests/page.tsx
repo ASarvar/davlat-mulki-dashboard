@@ -3,7 +3,7 @@ import type { ChangeRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUser } from "@/lib/authz";
 import { listPendingRequests, listRequestHistory, reviewableStages, type RequestFilters } from "@/server/services/assignment";
-import { ASSIGNABLE_CATEGORIES, CATEGORY_BY_CODE } from "@/lib/categories";
+import { ASSIGNABLE_CATEGORIES, assignFormLabel, CATEGORY_BY_CODE } from "@/lib/categories";
 import { objectHref } from "@/lib/cadastre";
 import { RequestRow, UtilityWarning, type RequestUtility } from "./RequestRow";
 import { recentPaymentCutoff } from "@/server/services/stats";
@@ -131,7 +131,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
             <option value="">Barchasi</option>
             {ASSIGNABLE_CATEGORIES.map((c) => (
               <option key={c.code} value={c.code}>
-                {c.nameUz}
+                {assignFormLabel(c)}
               </option>
             ))}
           </select>
