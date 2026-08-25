@@ -7,6 +7,15 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.7.1
+
+- **Bug fix: "Sotilgan" biriktirilgan obyektni qaytarib bo'lmasdi** — "Kategoriyani
+  bekor qilish" bloki chiqmasdi. Sabab: shart EFFEKTIV kategoriya bo'yicha edi
+  (`9` yoki `10`), bu esa "9/10 hech qachon integratsiyadan kelmaydi" degan taxminga
+  tayanardi. Kat 1 qo'shilgach taxmin buzildi. Endi shart qo'lda biriktirilgan
+  kategoriya (`manualCategoryCode`) bo'yicha — server tekshiruvi bilan bir xil.
+- **Biriktirishlar tarixida endi sana bilan birga VAQT ham** ko'rsatiladi.
+
 ## 1.7.0
 
 - **Qo'lda biriktirishga "Sotilgan" qo'shildi** — ilgari faqat "Yaroqsiz holat" va

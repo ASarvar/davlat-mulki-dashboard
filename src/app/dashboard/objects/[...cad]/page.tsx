@@ -28,7 +28,7 @@ import { requireUser, isAdmin } from "@/lib/authz";
 import { getPropertyDetail } from "@/server/services/properties";
 import { pathToCad } from "@/lib/cadastre";
 import { totalBuildingAreaWithSource, totalAreaLabel, usefulArea } from "@/lib/area";
-import { CATEGORY_BY_CODE } from "@/lib/categories";
+import { CATEGORY_BY_CODE, ASSIGNABLE_CATEGORY_CODES } from "@/lib/categories";
 import { describeSyncError, BLAME_LABEL } from "@/lib/syncError";
 import { CategoryBadge, InefficientBadge, RemovedFromBalanceBadge, SyncStatusBadge } from "@/components/badges";
 import { AssignCategoryForm } from "./AssignCategoryForm";
@@ -248,12 +248,21 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
     (r) => r.status === "PENDING_MODERATOR" || r.status === "PENDING_RAHBARIYAT",
   );
 
-  // Yaroqsiz/Chekka belgisini olib tashlash: ADMIN/SUPER_ADMIN va RAHBARIYAT
-  // (MODERATOR/IJROCHI'da bekor qilish huquqi yo'q). Olib tashlangach obyekt
-  // yana "Bo'sh turgan"ga qaytadi (integratsiya kategoriyasi 9/10 bo'la olmaydi,
-  // shuning uchun effectiveCode===9/10 har doim manualCategoryCode'dan kelgan bo'ladi).
+  // Qo'lda biriktirilgan kategoriyani olib tashlash: ADMIN/SUPER_ADMIN va RAHBARIYAT
+  // (MODERATOR/IJROCHI'da bekor qilish huquqi yo'q). Olib tashlangach obyekt yana
+  // "Bo'sh turgan"ga qaytadi.
+  //
+  // ⚠️ Shart AYNAN `manualCategoryCode` bo'yicha, EFFEKTIV kategoriya bo'yicha EMAS.
+  // Ilgari `effectiveCode === 9 || effectiveCode === 10` edi va bu 9/10 hech qachon
+  // integratsiyadan kelmasligiga tayanardi. Kat 1 ("Sotilgan") qo'shilgach bu buzildi:
+  // 1 integratsiyadan ham keladi (API 3/4), ya'ni effektiv kod bo'yicha tekshirish
+  // integratsiya bergan "Sotilgan"da ham tugmani ko'rsatib qo'yardi — holbuki u yerda
+  // olib tashlanadigan qo'lda biriktirish YO'Q (server rad etardi).
+  // `assignment.ts` → `removeManualCategory` dagi shart bilan bir xil.
   const canRemoveCategory =
-    (effectiveCode === 9 || effectiveCode === 10) && (isAdmin(user.role) || user.role === "RAHBARIYAT");
+    p.manualCategoryCode != null &&
+    (ASSIGNABLE_CATEGORY_CODES as readonly number[]).includes(p.manualCategoryCode) &&
+    (isAdmin(user.role) || user.role === "RAHBARIYAT");
 
   // "Binoning umumiy maydoni" / "Foydali maydon" — API 2 xom javobidan, `lib/area.ts`
   // dagi AYNAN o'sha mantiq bilan (parser ham shuni ishlatadi, ya'ni ro'yxat va bu
@@ -747,8 +756,9 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
                 <SectionTitle icon={Tag}>Kategoriyani bekor qilish</SectionTitle>
               </div>
               <p className="mb-3 text-sm text-muted-foreground">
-                Obyekt hozir <strong>{CATEGORY_BY_CODE.get(effectiveCode)?.nameUz}</strong> kategoriyasida.
-                Olib tashlansa, obyekt yana "Bo'sh turgan"ga qaytadi.
+                Obyektga qo&apos;lda{" "}
+                <strong>{CATEGORY_BY_CODE.get(p.manualCategoryCode!)?.nameUz}</strong> kategoriyasi
+                biriktirilgan. Olib tashlansa, obyekt yana &quot;Bo&apos;sh turgan&quot;ga qaytadi.
               </p>
               <RemoveCategoryButton cadNumber={p.cadNumber} />
             </div>
@@ -768,7 +778,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
                       {a.categoryCode}. {CATEGORY_BY_CODE.get(a.categoryCode)?.short ?? a.category.nameUz}
                     </p>
                     <p className="text-xs text-muted-foreground">
-                      {a.assignedBy.fullName} · {a.createdAt.toLocaleDateString("uz")}
+                      {a.assignedBy.fullName} · {a.createdAt.toLocaleString("uz")}
                     </p>
                     {a.note ? <p className="mt-1 text-xs">{a.note}</p> : null}
                     {a.document ? (
