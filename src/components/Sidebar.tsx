@@ -17,6 +17,7 @@ import {
   FileSearch,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { withBase } from "@/lib/basePath";
 import { signOutAction } from "@/app/dashboard/actions";
 import packageJson from "../../package.json";
 
@@ -68,7 +69,7 @@ export function Sidebar({ user, unreadCount = 0 }: { user: SidebarUser; unreadCo
       {/* Brend */}
       <div className="grid  place-items-start gap-3 px-5 py-5">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-dm-light.svg" alt="Davlat mulki" className="h-10 w-auto shrink-0" />
+        <img src={withBase("/logo-dm-light.svg")} alt="Davlat mulki" className="h-10 w-auto shrink-0" />
         <div className="min-w-0">
           <p className="truncate text-[16px] font-bold pl-10" style={{ color: "var(--gold)"}}>
             Monitoring <sup className="text-xs font-mono text-white animate-pulse">beta</sup>
@@ -140,7 +141,7 @@ export function Sidebar({ user, unreadCount = 0 }: { user: SidebarUser; unreadCo
       >
         <div className="flex items-center gap-2.5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-short-light.svg" alt="Davlat mulki" className="h-8 w-auto" />
+          <img src={withBase("/logo-short-light.svg")} alt="Davlat mulki" className="h-8 w-auto" />
           <span className="text-sm font-semibold text-white">Monitoring</span>
         </div>
         <button

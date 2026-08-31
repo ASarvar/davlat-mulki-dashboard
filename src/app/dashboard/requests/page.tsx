@@ -5,6 +5,7 @@ import { requireUser } from "@/lib/authz";
 import { listPendingRequests, listRequestHistory, reviewableStages, type RequestFilters } from "@/server/services/assignment";
 import { ASSIGNABLE_CATEGORIES, assignFormLabel, CATEGORY_BY_CODE } from "@/lib/categories";
 import { objectHref } from "@/lib/cadastre";
+import { withBase } from "@/lib/basePath";
 import { RequestRow, UtilityWarning, type RequestUtility } from "./RequestRow";
 import { recentPaymentCutoff } from "@/server/services/stats";
 
@@ -113,7 +114,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
       {/* Filtr: kadastr, kategoriya, holat, hudud, so'rovchi — ikkala jadvalga ham (holat faqat tarixga) qo'llanadi. */}
       <form
         method="get"
-        action="/dashboard/requests"
+        /* action berilmaydi — joriy URL'ga (basePath bilan) yuboriladi */
         className="flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
       >
         <div className="flex flex-col">
@@ -179,7 +180,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
         </button>
         {hasFilters ? (
           <a
-            href="/dashboard/requests"
+            href={withBase("/dashboard/requests")}
             className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition hover:bg-slate-50"
           >
             <RotateCcw className="h-4 w-4" />
@@ -273,7 +274,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                     <tr key={r.id} className="border-b border-border align-top last:border-0">
                       <td className="px-4 py-3">
                         <a
-                          href={objectHref(r.property.cadNumber)}
+                          href={withBase(objectHref(r.property.cadNumber))}
                           className="font-medium hover:underline"
                           style={{ color: "var(--cobalt)" }}
                         >
@@ -309,7 +310,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                         {r.document ? (
                           <>
                             <a
-                              href={`/api/documents/${r.document.id}`}
+                              href={withBase(`/api/documents/${r.document.id}`)}
                               target="_blank"
                               rel="noreferrer"
                               className="inline-flex items-center gap-1 text-xs hover:underline"
@@ -320,7 +321,7 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
                             {r.document.children.map((img, i) => (
                               <a
                                 key={img.id}
-                                href={`/api/documents/${img.id}`}
+                                href={withBase(`/api/documents/${img.id}`)}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="flex items-center gap-1 text-xs hover:underline"

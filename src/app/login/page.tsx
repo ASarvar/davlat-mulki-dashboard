@@ -2,6 +2,7 @@ import { signIn } from "@/auth";
 import { AuthError } from "next-auth";
 import { redirect } from "next/navigation";
 import { Landmark, LogIn } from "lucide-react";
+import { withBase } from "@/lib/basePath";
 
 export default async function LoginPage({
   searchParams,
@@ -16,7 +17,8 @@ export default async function LoginPage({
       await signIn("credentials", {
         username: formData.get("username"),
         password: formData.get("password"),
-        redirectTo: "/dashboard",
+        // Auth.js core `redirectTo` ni mutlaq URL qiladi — basePath'ni qo'lda qo'shamiz.
+        redirectTo: withBase("/dashboard"),
       });
     } catch (err) {
       // Login xatosi => login sahifasiga qaytamiz. Redirect (muvaffaqiyat) uzatiladi.

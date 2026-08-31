@@ -55,11 +55,29 @@ docker compose --profile setup run --rm seed
 
 Keyin `SEED_ADMIN_LOGIN` bilan kiring va **parolni darhol almashtiring**.
 
-### 1.5 nginx
+### 1.5 nginx va sub-path (`/obyektlar`)
 
-`deploy/nginx.example.conf` ni namuna qilib oling. Undagi `client_max_body_size 20m`
-va `X-Forwarded-*` sarlavhalari **shart** — birinchisisiz PDF yuklanmaydi, ikkinchisisiz
-login redirect buziladi.
+Ilova `davijara.uz/obyektlar` ostida ishlaydi — Next.js `basePath: "/obyektlar"` bilan.
+Bu **production build'da avtomatik** yoqiladi (`src/lib/basePath.ts` — `NODE_ENV=production`
+bo'lsa `/obyektlar`, dev'da bo'sh). Ya'ni Docker image o'zi to'g'ri quriladi, qo'shimcha
+sozlash SHART EMAS. Boshqa prefiks kerak bo'lsa — `src/lib/basePath.ts` va `next.config.mjs`
+dagi qiymatni birga o'zgartiring.
+
+`deploy/nginx.example.conf` ni namuna qilib oling. Muhim nuqtalar:
+
+- **`location ^~ /obyektlar` bloki**, `proxy_pass http://127.0.0.1:3000;` — oxirida **path
+  yo'q**, shunda nginx `/obyektlar` prefiksini kesmasdan uzatadi (Next.js basePath'ni
+  shundan topadi).
+- **`X-Forwarded-Proto` / `X-Forwarded-Host` / `Host`** sarlavhalari — busiz login
+  redirect ichki `127.0.0.1:3000` manziliga ketadi (middleware tashqi domenni shu
+  sarlavhalardan oladi).
+- **`client_max_body_size 20m`** — busiz PDF yuklanmaydi (413).
+- **`NEXTAUTH_URL`** — `.env.production` da FAQAT domen (`https://davijara.uz`), path
+  qo'shilmaydi. HTTPS bo'lishi shart (aks holda sessiya cookie'lari `Secure` bo'lmaydi).
+
+⚠️ Sub-path deploy'da sessiya cookie nomlari `obyektlar.session-token` ga o'zgaradi
+(davijara ildizidagi ilova bilan to'qnashmasligi uchun) — yangilanishdan keyin barcha
+foydalanuvchilar bir marta qayta kirishi kerak.
 
 ### 1.6 Tekshirish
 

@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { requireRole } from "@/lib/authz";
 import { listSources, listSourceNames } from "@/server/services/sources";
 import { CreateSourceForm, SourceRow } from "./SourceForms";
+import { withBase } from "@/lib/basePath";
 
 type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -59,7 +60,7 @@ export default async function SourcesPage({ searchParams }: { searchParams: Prom
       {/* Filtr: hudud va soha */}
       <form
         method="get"
-        action="/dashboard/sources"
+        /* action berilmaydi — joriy URL'ga (basePath bilan) yuboriladi */
         className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
       >
         <div className="flex flex-col">
@@ -93,7 +94,7 @@ export default async function SourcesPage({ searchParams }: { searchParams: Prom
           Filtrlash
         </button>
         <a
-          href="/dashboard/sources"
+          href={withBase("/dashboard/sources")}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition hover:bg-slate-50"
         >
           <RotateCcw className="h-4 w-4" />

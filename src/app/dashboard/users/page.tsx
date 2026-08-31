@@ -7,6 +7,7 @@ import { listUsers } from "@/server/services/users";
 import { ROLE_LABEL } from "@/lib/roles";
 import { CreateUserForm } from "./CreateUserForm";
 import { UserRow } from "./UserRow";
+import { withBase } from "@/lib/basePath";
 
 type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -69,7 +70,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       {/* Filtr */}
       <form
         method="get"
-        action="/dashboard/users"
+        /* action berilmaydi — joriy URL'ga (basePath bilan) yuboriladi */
         className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
       >
         <div className="flex flex-col">
@@ -103,7 +104,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
           Filtrlash
         </button>
         <a
-          href="/dashboard/users"
+          href={withBase("/dashboard/users")}
           className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600 shadow-sm transition hover:bg-slate-50"
         >
           <RotateCcw className="h-4 w-4" />

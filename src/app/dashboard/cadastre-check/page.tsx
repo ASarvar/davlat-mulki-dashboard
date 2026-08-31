@@ -3,6 +3,7 @@ import { requireRole } from "@/lib/authz";
 import { fetchPropertyBase } from "@/server/integrations/api2";
 import { API2 } from "@/server/integrations/config";
 import { objectHref } from "@/lib/cadastre";
+import { withBase } from "@/lib/basePath";
 import { prisma } from "@/lib/prisma";
 import { JsonView } from "./JsonView";
 
@@ -58,7 +59,7 @@ export default async function CadastreCheckPage({ searchParams }: { searchParams
 
       <form
         method="get"
-        action="/dashboard/cadastre-check"
+        /* action berilmaydi — joriy URL'ga (basePath bilan) yuboriladi */
         className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-card p-4 shadow-sm"
       >
         <div className="flex flex-col">
@@ -82,7 +83,7 @@ export default async function CadastreCheckPage({ searchParams }: { searchParams
         </button>
         {existing ? (
           <a
-            href={objectHref(existing.cadNumber)}
+            href={withBase(objectHref(existing.cadNumber))}
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-600 shadow-sm transition hover:bg-slate-50"
           >
             Obyekt sahifasi

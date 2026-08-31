@@ -39,6 +39,7 @@ import {
 import { listSourceNames } from "@/server/services/sources";
 import { isLandSplitSoha } from "@/lib/sourceLabel";
 import { env } from "@/lib/env";
+import { withBase } from "@/lib/basePath";
 import { SyncRunStatusBadge } from "@/components/badges";
 import { SourceFilter, ALL_SOHA, OWN_SOHA } from "./SourceFilter";
 
@@ -655,7 +656,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             {soha ? `${soha} balansidagi obyektlar` : "Davlat mulki balansidagi obyektlar"}
           </SectionTitle>
           <a
-            href={`/api/export/dashboard-categories${sohaParam ? `?${sohaParam}` : ""}`}
+            href={withBase(`/api/export/dashboard-categories${sohaParam ? `?${sohaParam}` : ""}`)}
             className={EXPORT_BTN}
           >
             <Download className="h-3.5 w-3.5" />
@@ -934,7 +935,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <SectionTitle icon={MapPin}>
             Hududlar kesimi — ijara shartnomalari
           </SectionTitle>
-          <a href="/api/export/dashboard-rent" className={EXPORT_BTN}>
+          <a href={withBase("/api/export/dashboard-rent")} className={EXPORT_BTN}>
             <Download className="h-3.5 w-3.5" />
             Excelga eksport
           </a>
@@ -1089,7 +1090,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           <SectionTitle icon={Droplets}>
             Bo&apos;sh turgan obyektlarda kommunal xizmatlar mavjudligi
           </SectionTitle>
-          <a href="/api/export/dashboard-utility" className={EXPORT_BTN}>
+          <a href={withBase("/api/export/dashboard-utility")} className={EXPORT_BTN}>
             <Download className="h-3.5 w-3.5" />
             Excelga eksport
           </a>

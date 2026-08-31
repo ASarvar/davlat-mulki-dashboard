@@ -27,6 +27,7 @@ import {
 import { requireUser, isAdmin } from "@/lib/authz";
 import { getPropertyDetail } from "@/server/services/properties";
 import { pathToCad } from "@/lib/cadastre";
+import { withBase } from "@/lib/basePath";
 import { totalBuildingAreaWithSource, totalAreaLabel, usefulArea } from "@/lib/area";
 import { CATEGORY_BY_CODE, ASSIGNABLE_CATEGORY_CODES } from "@/lib/categories";
 import { describeSyncError, BLAME_LABEL } from "@/lib/syncError";
@@ -704,7 +705,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
                       {d.fileName}
                     </span>
                     <a
-                      href={`/api/documents/${d.id}`}
+                      href={withBase(`/api/documents/${d.id}`)}
                       target="_blank"
                       rel="noreferrer"
                       className="inline-flex items-center gap-1 hover:underline"
@@ -782,7 +783,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
                     </p>
                     {a.note ? <p className="mt-1 text-xs">{a.note}</p> : null}
                     {a.document ? (
-                      <a href={`/api/documents/${a.document.id}`} target="_blank" rel="noreferrer" className="text-xs hover:underline" style={{ color: "var(--cobalt)" }}>
+                      <a href={withBase(`/api/documents/${a.document.id}`)} target="_blank" rel="noreferrer" className="text-xs hover:underline" style={{ color: "var(--cobalt)" }}>
                         Hujjat: {a.document.fileName}
                       </a>
                     ) : null}

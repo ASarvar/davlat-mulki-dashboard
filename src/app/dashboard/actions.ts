@@ -1,7 +1,9 @@
 "use server";
 
 import { signOut } from "@/auth";
+import { withBase } from "@/lib/basePath";
 
 export async function signOutAction() {
-  await signOut({ redirectTo: "/login" });
+  // Auth.js core `redirectTo` ni mutlaq URL qiladi — basePath'ni qo'lda qo'shamiz.
+  await signOut({ redirectTo: withBase("/login") });
 }

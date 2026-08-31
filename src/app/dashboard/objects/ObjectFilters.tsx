@@ -98,7 +98,7 @@ export function ObjectFilters({
   return (
     <form
       method="get"
-      action="/dashboard/objects"
+      /* action berilmaydi — joriy URL'ga (basePath bilan) yuboriladi; forma shu sahifada */
       className="mb-4 rounded-xl border border-border bg-card p-4 shadow-sm"
     >
       {/* Dashboard'dan kelgan filtrlarni saqlab qolamiz (yuqoridagi izohga qarang). */}

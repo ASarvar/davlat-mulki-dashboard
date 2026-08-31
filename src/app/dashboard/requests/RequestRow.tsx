@@ -3,6 +3,7 @@
 import { useActionState, useState } from "react";
 import { Check, X, ExternalLink, ImageIcon, AlertTriangle } from "lucide-react";
 import { reviewRequestAction, type ReviewState } from "./actions";
+import { withBase } from "@/lib/basePath";
 
 /**
  * So'rovdagi obyektning kommunal holati — moderator/rahbariyat qaror qabul qilishdan
@@ -85,7 +86,7 @@ export function RequestRow({ req }: { req: RequestRowData }) {
   return (
     <tr className="border-b border-border last:border-0 align-top">
       <td className="px-4 py-3">
-        <a href={req.objectHref} className="font-medium hover:underline" style={{ color: "var(--cobalt)" }}>
+        <a href={withBase(req.objectHref)} className="font-medium hover:underline" style={{ color: "var(--cobalt)" }}>
           {req.cadNumber}
         </a>
         <p className="text-xs text-muted-foreground">{req.regionName}</p>
@@ -115,7 +116,7 @@ export function RequestRow({ req }: { req: RequestRowData }) {
       <td className="px-4 py-3">
         {req.documentId ? (
           <a
-            href={`/api/documents/${req.documentId}`}
+            href={withBase(`/api/documents/${req.documentId}`)}
             target="_blank"
             rel="noreferrer"
             className="inline-flex items-center gap-1 text-sm hover:underline"
@@ -131,7 +132,7 @@ export function RequestRow({ req }: { req: RequestRowData }) {
             {req.images.map((img, i) => (
               <a
                 key={img.id}
-                href={`/api/documents/${img.id}`}
+                href={withBase(`/api/documents/${img.id}`)}
                 target="_blank"
                 rel="noreferrer"
                 className="flex items-center gap-1 text-xs hover:underline"

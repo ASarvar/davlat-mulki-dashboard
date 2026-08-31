@@ -27,6 +27,7 @@ import { listSourceNames, listSources } from "@/server/services/sources";
 import { listDistricts } from "@/server/services/districts";
 import { CAT_HAS_VACANT_AREA } from "@/server/services/classification";
 import { objectHref } from "@/lib/cadastre";
+import { withBase } from "@/lib/basePath";
 import { sourceScopeLabel } from "@/lib/sourceLabel";
 import { CategoryBadge, InefficientBadge, RemovedFromBalanceBadge, SyncStatusBadge } from "@/components/badges";
 import { Pagination } from "@/components/Pagination";
@@ -133,15 +134,17 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   if (utility) baseParams.set("utility", utility);
   if (syncStatus) baseParams.set("status", syncStatus);
 
-  const exportHref = `/api/export/objects?${baseParams.toString()}`;
+  // Plain <a> (Link emas) — basePath'ni qo'lda qo'shamiz.
+  const exportHref = withBase(`/api/export/objects?${baseParams.toString()}`);
 
   // Dashboard'dan kelgan maxsus filtrlar — formada tanlagich sifatida yo'q, yorliq
   // (chip) ko'rinishida chiqadi. `removeHref` — faqat shu filtrni olib tashlaydigan URL.
+  // Yorliq (chip) plain <a> orqali render bo'ladi — basePath qo'lda.
   const hrefWithout = (key: string) => {
     const params = new URLSearchParams(baseParams);
     params.delete(key);
     const qs = params.toString();
-    return qs ? `/dashboard/objects?${qs}` : "/dashboard/objects";
+    return withBase(qs ? `/dashboard/objects?${qs}` : "/dashboard/objects");
   };
   const chips: FilterChip[] = [];
   if (onAnyAuctionStr === "1")
@@ -199,7 +202,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
         canSeeRemoved={canSeeRemoved}
         chips={chips}
         total={result.total}
-        clearHref="/dashboard/objects"
+        clearHref={withBase("/dashboard/objects")}
         current={{ q, region: regionRaw, district, soha, tashkilot, category: categoryStr, inefficient: inefficientStr }}
       />
 

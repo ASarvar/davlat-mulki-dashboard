@@ -708,6 +708,41 @@ Kategoriya kodini o'zgartirishdan oldin `manualCategoryCode` ishlatilganini teks
 
 ## Konventsiyalar
 
+### ⚠️ Sub-path: ilova production'da `davijara.uz/obyektlar` ostida (2026-09-01)
+
+`next.config.mjs` → `basePath` va `src/lib/basePath.ts` → `BASE_PATH` — ikkalasi ham
+`NODE_ENV === "production" ? "/obyektlar" : ""`. Ya'ni `next build` (Docker yoki `npm start`)
+avtomatik sub-path'li quriladi; `npm run dev` esa ildizda, o'zgarmagan. Sinash uchun:
+`npm run build && npm start` → `http://localhost:3000/obyektlar`.
+
+Next.js O'ZI prefikslaydigan narsalarga **tegilmaydi**: `next/link`, `redirect()`,
+`<Image>`, Server Action `<form action={fn}>`, `_next/`, route handlerlar, middleware
+`matcher`. Prisma `revalidatePath()` ham basePath'siz (`objectHref()` shundayligicha).
+
+**Qo'lda `withBase()` shart bo'lgan joylar** (`@/lib/basePath`):
+- plain `<a href="/...">` (eksport/hujjat yuklab olish havolalari),
+- plain `<img src="/...">` (`public/` rasmlari — `Sidebar.tsx` logotiplari),
+- `signIn/signOut` ning `redirectTo` (Auth.js core uni mutlaq URL qiladi — `login/page.tsx`,
+  `dashboard/actions.ts`).
+- string `<form action="/...">` — buning o'rniga `action` **umuman berilmaydi** (GET forma
+  joriy URL'ga yuboradi, basePath bilan). Filtr formalari shunday.
+
+**Auth.js sub-path tuzoqlari:**
+- Auth.js core `basePath` (`/api/auth`) — **TEGILMAYDI**. Next uni route handler (`req.url`)
+  va middleware'dan avtomatik ajratadi; `createActionURL` ham `/api/auth/...` quradi.
+  `\`${BASE_PATH}/api/auth\`` berish HAMMA auth so'rovini "UnknownAction" bilan yiqitadi.
+- NextAuth'ning O'ZIDAGI signIn redirect'i basePath'ni **yo'qotadi** (`reqWithEnvURL`
+  `nextUrl`ni qayta quradi). Shuning uchun `auth.config.ts`da `callbacks.authorized` YO'Q —
+  himoya va login redirect `middleware.ts`da QO'LDA, tashqi domen `Host`/`X-Forwarded-*`
+  dan olinadi (`nextUrl.origin` proxy ortida ichki `127.0.0.1:3000`).
+- Cookie nomlari `obyektlar.*` (davijara ildizidagi Auth.js ilova bilan to'qnashmasin) —
+  faqat `BASE_PATH` bo'lganda. `__Secure-`/`__Host-` prefiksisiz (edge bundle NEXTAUTH_URL'ni
+  Docker build'da ko'rmaydi), lekin `Secure`/`HttpOnly` runtime'da baribir qo'yiladi.
+- `NEXTAUTH_URL` — faqat domen (`https://davijara.uz`), pathsiz, HTTPS shart.
+
+nginx: `location ^~ /obyektlar { proxy_pass http://127.0.0.1:3000; }` — `proxy_pass`da
+**path yo'q** (prefiks saqlanadi). Batafsil — `deploy/nginx.example.conf`, `DEPLOY.md` §1.5.
+
 - Izohlar va UI matni — **o'zbek tilida**.
 - Ma'lumot yo'qotadigan amallar (o'chirish) UI'da **bloklanadi**, sababi tugma yonida ko'rsatiladi
   (masalan: obyekti bor manbani o'chirib bo'lmaydi — "Faol" belgisini oling).
