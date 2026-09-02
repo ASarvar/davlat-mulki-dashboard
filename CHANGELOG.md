@@ -7,6 +7,35 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.8.0
+
+- **Yangi bo'lim: "Ijara imtiyozi" (ПҚ-3782)** — sidebarda alohida menyu, hamma rolga ochiq.
+  Ijarachining STIR yoki JSHSHIR raqami bo'yicha 50% lik ijara imtiyozini tekshiradi:
+  xodimlarning kamida 30% ini nogironligi bo'lgan shaxslar tashkil etsa, imtiyoz beriladi.
+  Xodimlar ro'yxati Soliq bazasidan, nogironlik holati TIEK reyestridan olinadi.
+  Ilgari bu alohida ilova edi (o'z serveri, o'z logini, o'z bazasi) — endi dashboard ichida,
+  bitta login bilan. **Obyektlar va kategoriyalarga hech qanday aloqasi yo'q.**
+- **Uzilish hech qachon rad javobiga aylanmaydi.** Tashqi baza javob bermasa yoki xodimlar
+  ro'yxati to'liq yuklanmasa, natija "Imtiyoz qo'llanilmaydi" emas, **"Hozircha aniqlanmadi"**
+  bo'ladi — nima aniq noto'g'ri ketgani ro'yxat qilib ko'rsatiladi va "Qayta tekshirish"
+  tugmasi chiqadi. Rad javobida bu tugma **umuman yo'q**: operator rad javobini vaqtinchalik
+  nosozlik deb tushunib qolmasin.
+- **Qayta tekshirish faqat tekshirilmagan xodimlarni qayta so'raydi** — muvaffaqiyatli
+  javoblar keshda qoladi. Jonli o'lchov: 5 xodimli tekshiruvda qayta urinishda reyestrga
+  5 ta emas, **1 ta** so'rov ketdi.
+- **Tekshiruvlar tarixi** — kim, qachon, qaysi raqamni tekshirgan va qanday javob berilgan.
+  Har bir yozuvni ochib, o'sha paytdagi natijaning **o'zgarmagan nusxasini** ko'rish mumkin
+  (chop etish bilan). Filtrlar: STIR/JSHSHIR, natija turi, sana oralig'i. CSV eksport bor.
+  Jurnal **faqat to'ldiriladi** — yozuvni o'zgartirish yoki o'chirish yo'li yo'q.
+- **Shartnoma formasi uchun ochiq manzil o'zgardi** — eski alohida serverdagi
+  `:3008/api/v1/check-discount/:tin` o'rniga endi
+  `davijara.uz/obyektlar/api/imtiyoz/check-discount/:tin`. Javob shakli o'zgarmagan.
+  ⚠️ Formani yangi manzilga o'tkazmasdan eski serverni to'xtatmang — `DEPLOY.md` §2 ga qarang.
+- ⚠️ **Deploy:** `.env.production` ga beshta yangi o'zgaruvchi qo'shilishi kerak
+  (`IMTIYOZ_*`), tafsilotlar `DEPLOY.md` da. Worker birinchi ishga tushganda YATT indeksini
+  quradi (bir necha daqiqa) — shu tugamaguncha 14 xonali JSHSHIR tekshiruvlari
+  "aniqlanmadi" beradi, 9 xonali STIR esa darhol ishlaydi.
+
 ## 1.7.1
 
 - **Bug fix: "Sotilgan" biriktirilgan obyektni qaytarib bo'lmasdi** — "Kategoriyani

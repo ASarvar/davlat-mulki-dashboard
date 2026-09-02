@@ -59,6 +59,7 @@ model User {
   moderatedChanges CategoryChangeRequest[]      @relation("ModeratorReview")
   approvedChanges  CategoryChangeRequest[]      @relation("RahbarReview")
   notifications    Notification[]
+  imtiyozChecks    ImtiyozCheck[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -607,4 +608,191 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+// ───────────────── Ijara imtiyozi (ПҚ-3782) ─────────────────
+// Mehnat shartnomasi asosida ishlayotgan xodimlarning kamida 30% ini nogironligi
+// bo'lgan shaxslar tashkil etsa, ijara to'lovi auksion summasining 50% i etib
+// belgilanadi. Uchta tashqi manba: Soliq comp_workers (yuridik shaxs),
+// Soliq yatt_workers (YATT) va TIEK minzdrav_pas (nogironlik reyestri).
+
+/// Javobning YAGONA ishonchli maydoni — UI hech qachon xabar MATNini solishtirmaydi.
+/// ⚠️ `INCONCLUSIVE_*` = "aniqlanmadi" (isEligible NULL), rad javobi EMAS.
+enum ImtiyozResultCode {
+  ELIGIBLE // ≥30% — imtiyoz qo'llaniladi
+  NOT_ELIGIBLE // <30%, ma'lumot TO'LIQ
+  NO_WORKERS // baza javob berdi, shartnoma yo'q — haqiqiy fakt
+  INCONCLUSIVE_SOLIQ // xodimlar ro'yxati olinmadi yoki qisman
+  INCONCLUSIVE_TIEK // ≥1 xodim nogironlik reyestrida tekshirilmadi
+  INCONCLUSIVE_YATT_INDEX // YATT indeksi to'liq sinxronlanmagan
+}
+
+enum ImtiyozSubjectType {
+  STIR // 9 xonali — yuridik shaxs
+  JSHSHIR // 14 xonali — yakka tartibdagi tadbirkor
+}
+
+enum ImtiyozWorkerStatus {
+  DISABLED
+  NOT_DISABLED
+  NOT_FOUND // TIEK bazasida bunday PINFL yo'q (result_code 1001)
+  FAILED // TIEK javob bermadi — holat NOMA'LUM
+}
+
+/// Audit jurnali: FAQAT QO'SHILADI (kodda UPDATE/DELETE yo'li yo'q).
+/// Har bir BERISH alohida yozuv — keshdan berilganda ham. Audit "kimga qachon nima
+/// aytilgan"ga javob beradi, "qachon hisoblangan"ga emas.
+model ImtiyozCheck {
+  id String @id @default(cuid())
+
+  /// Har bir berish uchun alohida. Keshdan berilganda `sourceRequestId` asl hisoblashga ishora qiladi.
+  requestId       String  @unique
+  sourceRequestId String?
+
+  createdAt  DateTime @default(now()) // javob BERILGAN payt
+  computedAt DateTime // natija HISOBLANGAN payt (keshda eskiroq)
+
+  /// Hisob o'chirilsa ham "kim tekshirgan" javobi yo'qolmasin — `username`
+  /// denormalizatsiya qilingan. Ochiq endpoint (shartnoma formasi) uchun
+  /// `userId` NULL va `username` = "forma".
+  userId   String?
+  user     User?   @relation(fields: [userId], references: [id])
+  username String
+  clientIp String?
+
+  subjectId   String
+  subjectType ImtiyozSubjectType
+  year        Int
+  period      Int
+  isRetry     Boolean            @default(false)
+  fromCache   Boolean            @default(false)
+
+  resultCode ImtiyozResultCode
+  /// NULL = aniqlab bo'lmadi. ⚠️ `false` + to'liqsiz ma'lumot HECH QACHON yozilmaydi
+  /// (`assertNoFalseNegative`) — yagona istisno `NO_WORKERS`.
+  isEligible Boolean?
+
+  totalWorkers       Int
+  checkedCount       Int
+  disabledCount      Int
+  requiredCount      Int
+  disabledPercentage Float?
+  notDisabledCount   Int    @default(0)
+  notFoundCount      Int    @default(0)
+  failedCount        Int    @default(0)
+
+  yattIndexIncomplete Boolean @default(false)
+  yattIndexReady      Boolean @default(true)
+  soliqError          String? // "kind: message"
+
+  message    String
+  durationMs Int?
+  appVersion String?
+
+  workers ImtiyozCheckWorker[]
+
+  @@index([createdAt])
+  @@index([subjectId, createdAt])
+  @@index([username, createdAt])
+  @@index([resultCode, createdAt])
+}
+
+/// Tekshiruv paytidagi xodimlar ro'yxati — arxiv nusxasi jonli natija bilan
+/// aynan bir xil ko'rinishi uchun saqlanadi.
+/// ⚠️ PII: PINFL, F.I.Sh., nogironlik guruhi va ICD-10 kodi.
+model ImtiyozCheckWorker {
+  id      String       @id @default(cuid())
+  checkId String
+  check   ImtiyozCheck @relation(fields: [checkId], references: [id], onDelete: Cascade)
+
+  ord      Int // Soliq bergan tartib
+  pinfl    String
+  position String?
+  rate     String?
+  status   ImtiyozWorkerStatus
+
+  fullName          String?
+  birthOn           String?
+  disabilityGroup   Int?
+  disabilityStartOn String?
+  disabilityEndOn   String?
+  icd10Code         String?
+
+  fromCache    Boolean @default(false)
+  errorMessage String?
+
+  @@index([checkId])
+  @@index([pinfl])
+}
+
+/// YATT ishchilar indeksi.
+///
+/// ⚠️ `yatt_workers` endpoint `entrepreneurPinfl` bo'yicha FILTRLAMAYDI — har bir so'rov
+/// BUTUN respublika bo'yicha shartnoma yozuvlarini qaytaradi (~76 000+). Shuning uchun
+/// har bir tekshiruvda jonli so'rash imkonsiz: ro'yxat fon rejimida (worker, pg-boss
+/// jadvali) to'liq yuklanib shu jadvalga yoziladi.
+///
+/// Bekor qilingan yoki muddati o'tgan shartnomalar yozilmaydi — jadvalda faqat FAOL
+/// bog'lanishlar bo'ladi.
+model ImtiyozYattWorker {
+  entrepreneurPinfl String
+  workerPinfl       String
+
+  @@id([entrepreneurPinfl, workerPinfl])
+  @@index([entrepreneurPinfl])
+}
+
+/// Indeksning holati — bitta qator (`id = "singleton"`).
+///
+/// ⚠️ `ready`/`failedPages` siz bo'sh indeks "nol xodim" deb talqin qilinardi. To'liq
+/// sinxronlanmagan indeksda topilmagan JSHSHIR uchun natija HAR DOIM
+/// `INCONCLUSIVE_YATT_INDEX` bo'ladi — "xodim yo'q" degan xulosa asossiz.
+model ImtiyozYattSync {
+  id String @id @default("singleton")
+
+  ready       Boolean   @default(false)
+  syncing     Boolean   @default(false)
+  startedAt   DateTime?
+  finishedAt  DateTime? // oxirgi MUVAFFAQIYATLI yakun
+  totalPages  Int       @default(0)
+  failedPages Int       @default(0)
+
+  entrepreneurCount Int     @default(0)
+  recordCount       Int     @default(0)
+  lastError         String?
+
+  updatedAt DateTime @updatedAt
+}
+
+/// TIEK (nogironlik reyestri) keshi. Holat kunlar davomida o'zgarmaydi, shuning uchun
+/// 400 xodimli korxonani qayta tekshirganda reyestrga qayta so'rov ketmaydi.
+///
+/// ⚠️ FAQAT aniq javob keshlanadi (topildi / result_code 1001). Tizim xatosi
+/// KESHLANMAYDI — aks holda vaqtinchalik uzilish 24 soatga "nogironligi yo'q"
+/// bo'lib muzlab qolardi. Shu sababli "qayta tekshirish" faqat muvaffaqiyatsiz
+/// PINFL'lar uchun so'rov yuboradi.
+model ImtiyozTiekCache {
+  pinfl      String   @id
+  isDisabled Boolean
+  notFound   Boolean  @default(false)
+  /// TIEK yozuvidan TANLAB olingan maydonlar (butun blob emas).
+  person     Json?
+  checkedAt  DateTime @default(now())
+
+  @@index([checkedAt])
+}
+
+/// Yakuniy natija keshi (`subjectId_year_period`) — bir xil STIR ketma-ket bir necha
+/// marta tekshirilishining oldini oladi.
+///
+/// ⚠️ `NO_WORKERS` KESHLANMAYDI: xodim qo'shilishi mumkin, keyingi so'rov yangi
+/// javob olsin. "Aniqlanmadi" holatlari ham keshlanmaydi.
+model ImtiyozResultCache {
+  key        String   @id // "{subjectId}_{year}_{period}"
+  requestId  String // asl hisoblashning requestId'si (audit zanjiri uzilmasin)
+  result     Json
+  computedAt DateTime
+  expiresAt  DateTime
+
+  @@index([expiresAt])
 }

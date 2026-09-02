@@ -98,6 +98,44 @@ const schema = z.object({
   // ishlatilayotganini bildiradi.
   UTILITY_RECENT_PAYMENT_MONTHS: z.coerce.number().int().positive().default(3),
 
+  // ── Ijara imtiyozi (ПҚ-3782): Soliq + TIEK ──
+  // Uchalasi ham kommunal API'lar bilan BIR XIL shlyuzda (10.190.5.2:8675/markaz) va
+  // odatda bir xil Basic juftlikda, lekin alohida sozlanadi (kelajakda ajralishi mumkin).
+  //   comp_workers  -> yuridik shaxs xodimlari, GET ?tin&year&period&page&size
+  //   yatt_workers  -> YATT shartnomalari, GET ?page&size (⚠️ tadbirkor bo'yicha FILTRLAMAYDI)
+  //   minzdrav_pas  -> nogironlik reyestri, GET ?pinfl
+  IMTIYOZ_COMP_WORKERS_URL: z.string().url().optional(),
+  IMTIYOZ_YATT_WORKERS_URL: z.string().url().optional(),
+  IMTIYOZ_TIEK_URL: z.string().url().optional(),
+  IMTIYOZ_API_USER: z.string().optional(),
+  IMTIYOZ_API_PASSWORD: z.string().optional(),
+
+  /**
+   * Nogironlik reyestriga bir vaqtda nechta parallel so'rov.
+   * ⚠️ Rate-limit qo'yilmagan (`rateKey` yo'q) — aynan shu son yagona throttle.
+   * Oshirsangiz shlyuz 400 xodimli korxonada 500 qaytara boshlaydi.
+   */
+  IMTIYOZ_TIEK_CONCURRENCY: z.coerce.number().int().positive().default(15),
+  /** Imtiyoz uchun kerakli ulush (0.3 = 30%, ПҚ-3782). */
+  IMTIYOZ_REQUIRED_RATIO: z.coerce.number().positive().max(1).default(0.3),
+  /** Nogironlik holati kunlar davomida o'zgarmaydi. */
+  IMTIYOZ_TIEK_CACHE_HOURS: z.coerce.number().int().positive().default(24),
+  /** Yakuniy natija keshi (faqat aniq xulosalar uchun). */
+  IMTIYOZ_RESULT_CACHE_MINUTES: z.coerce.number().int().positive().default(60),
+  /** YATT sahifasi hajmi — server kichikroq cheklov qo'ysa avtomatik moslashadi. */
+  IMTIYOZ_YATT_PAGE_SIZE: z.coerce.number().int().positive().default(500),
+  /**
+   * YATT sinxronlash parallelligi. Katta OFFSET'li sahifalarda shlyuz 500 qaytarmasligi
+   * uchun ataylab kichik.
+   */
+  IMTIYOZ_YATT_CONCURRENCY: z.coerce.number().int().positive().default(5),
+  /**
+   * Indeks shu muddatdan yosh bo'lsa, navbatdagi jadval ishga tushishi O'TKAZIB
+   * YUBORILADI. To'liqsiz sinxronlashdan keyin esa har safar qayta uriniladi
+   * (6 soatlik cron). 24 soatlik tsikl + 2 soat xavfsizlik marjasi.
+   */
+  IMTIYOZ_YATT_FRESH_HOURS: z.coerce.number().int().positive().default(22),
+
   // Rate-limit / retry
   API_RATE_MAX: z.coerce.number().int().positive().default(10),
   API_RATE_DURATION_MS: z.coerce.number().int().positive().default(1000),

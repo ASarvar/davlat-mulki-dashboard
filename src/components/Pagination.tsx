@@ -33,6 +33,7 @@ export function Pagination({
   total,
   pageSize,
   hrefFor,
+  emptyLabel = "Obyekt topilmadi",
 }: {
   page: number;
   pageCount: number;
@@ -40,6 +41,8 @@ export function Pagination({
   pageSize: number;
   /** Sahifa raqamidan URL yasaydi (joriy filtrlarni saqlagan holda). */
   hrefFor: (page: number) => string;
+  /** Ro'yxat bo'sh bo'lganda chiqadigan matn — obyektdan boshqa narsa sanalsa beriladi. */
+  emptyLabel?: string;
 }) {
   const from = total === 0 ? 0 : (page - 1) * pageSize + 1;
   const to = Math.min(page * pageSize, total);
@@ -48,7 +51,7 @@ export function Pagination({
     <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
       <p className="text-sm text-muted-foreground">
         {total === 0 ? (
-          "Obyekt topilmadi"
+          emptyLabel
         ) : (
           <>
             <span className="font-medium text-slate-700">

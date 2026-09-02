@@ -19,7 +19,11 @@ async function createAndStart(): Promise<PgBoss> {
       retryLimit: 2,
       retryDelay: 5,
       retryBackoff: true,
-      expireInSeconds: 120,
+      // ⚠️ YATT indeksini qayta qurish butun respublika ro'yxatini (150+ sahifa,
+      // ~76 000 yozuv) yuklaydi va odatda bir necha daqiqa oladi. Umumiy 120s
+      // limitida job o'rtasida "expired" bo'lib, keyin qayta ishga tushardi —
+      // ya'ni indeks hech qachon yakunlanmasdi.
+      expireInSeconds: name === QUEUE.IMTIYOZ_YATT_SYNC ? 3600 : 120,
     });
   }
   return boss;

@@ -35,5 +35,10 @@ export default auth((req) => {
 
 export const config = {
   // Statik fayllar va auth API'dan tashqari hamma narsa himoyalangan.
-  matcher: ["/((?!api/auth|_next/static|_next/image|favicon.ico).*)"],
+  //
+  // ⚠️ `api/imtiyoz/check-discount` ATAYLAB ochiq: uni shartnoma formasi (boshqa
+  // ilova, boshqa origin) sessiyasiz chaqiradi. Middleware uni ushlasa, forma
+  // JSON o'rniga login sahifasining HTML'ini olardi. Boshqa `api/imtiyoz/*`
+  // yo'llari (operator tekshiruvi, holat) himoyalangan bo'lib qoladi.
+  matcher: ["/((?!api/auth|api/imtiyoz/check-discount|_next/static|_next/image|favicon.ico).*)"],
 };

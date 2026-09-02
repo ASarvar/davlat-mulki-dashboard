@@ -10,6 +10,8 @@ import { processPropertyBase } from "./processors/syncPropertyBase";
 import { processStatusCheck } from "./processors/checkPropertyStatus";
 import { incrementSuccess, incrementFail, finalizeIfComplete } from "@/server/services/runProgress";
 import { triggerFullSync } from "./enqueue";
+import { isYattIndexFresh, syncYattIndex } from "@/server/services/imtiyoz/yattIndex";
+import { imtiyozConfigured } from "@/server/integrations/imtiyoz";
 
 const leafOpts: PgBoss.WorkOptions = {
   batchSize: env.WORKER_CONCURRENCY,
@@ -113,6 +115,36 @@ async function main() {
     }
   });
   await boss.schedule(QUEUE.DAILY_FULL_SYNC, "0 3 * * *", {}, { tz: "Asia/Tashkent" });
+
+  // ── Ijara imtiyozi: YATT ishchilar indeksi ──
+  //
+  // ⚠️ Jadval har 6 SOATDA ishga tushadi, lekin indeks yangi bo'lsa ishlov beruvchi
+  // uni O'TKAZIB YUBORADI. Bu asl ilovadagi adaptiv rejalashtirishning cron'dagi
+  // ko'rinishi: muvaffaqiyatli to'liq sinxronlashdan keyin ~22 soat tinch turadi,
+  // to'liqsiz bo'lsa esa keyingi 6 soatlik urinishda darhol qayta uriniladi
+  // (yetishmayotgan sahifalar tufayli tadbirkorlar noto'g'ri "xodimsiz" ko'rinmasin).
+  //
+  // `force: true` — web'dan qo'lda ishga tushirilganda yangilik tekshiruvi o'tkazilmaydi.
+  await boss.work<{ force?: boolean }>(QUEUE.IMTIYOZ_YATT_SYNC, async ([job]) => {
+    if (!imtiyozConfigured()) {
+      console.warn("[imtiyoz-yatt] o'tkazib yuborildi: IMTIYOZ_* env sozlanmagan");
+      return;
+    }
+    if (!job?.data?.force && (await isYattIndexFresh())) {
+      console.log("[imtiyoz-yatt] indeks yangi — o'tkazib yuborildi");
+      return;
+    }
+    await syncYattIndex();
+  });
+  await boss.schedule(QUEUE.IMTIYOZ_YATT_SYNC, "0 */6 * * *", {}, { tz: "Asia/Tashkent" });
+
+  // Worker ishga tushganda indeks umuman yo'q bo'lsa darhol qurishni boshlaymiz —
+  // aks holda birinchi jadvalgacha (6 soatgacha) barcha YATT tekshiruvlari
+  // "aniqlanmadi" bo'lib turardi.
+  if (imtiyozConfigured() && !(await isYattIndexFresh())) {
+    await boss.send(QUEUE.IMTIYOZ_YATT_SYNC, {});
+    console.log("[imtiyoz-yatt] indeks eskirgan/yo'q — dastlabki sinxronlash navbatga qo'yildi");
+  }
 
   console.log(
     `🚀 Worker (pg-boss) ishga tushdi. batchSize=${env.WORKER_CONCURRENCY}, poll=${env.WORKER_POLL_SECONDS}s. Queue'lar: ${Object.values(QUEUE).join(", ")}`,

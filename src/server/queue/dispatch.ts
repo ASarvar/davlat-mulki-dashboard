@@ -48,3 +48,15 @@ export async function insertStatusCheckBulk(jobs: StatusCheckJob[]): Promise<voi
     })),
   );
 }
+
+/**
+ * Imtiyoz: YATT indeksini darhol qayta qurishni so'rash (web -> worker).
+ *
+ * ⚠️ `singletonKey` shart: indeks tayyor bo'lmaganda HAR BIR tekshiruv shu yerga
+ * kelib tushadi — usiz o'nlab bir xil job navbatga yig'ilib, shlyuzni paralel
+ * to'liq yuklashlar bilan ko'mib tashlardi.
+ */
+export async function enqueueYattIndexSync(): Promise<void> {
+  const boss = await getBoss();
+  await boss.send(QUEUE.IMTIYOZ_YATT_SYNC, { force: true }, { singletonKey: "imtiyoz-yatt" });
+}

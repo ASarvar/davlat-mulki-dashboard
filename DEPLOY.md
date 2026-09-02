@@ -90,6 +90,10 @@ curl -I http://127.0.0.1:3000/login    # 200
 So'ng brauzerda: kirish → **Sinxronizatsiya** sahifasidan hududni sync qilib ko'ring
 (worker ishlayotganini shu tasdiqlaydi).
 
+**Ijara imtiyozi** sozlangan bo'lsa (§2 dagi bo'limga qarang) — **Ijara imtiyozi** sahifasida
+9 xonali STIR bilan tekshirib ko'ring va pastdagi "Tizim holati" panelini oching: Soliq, TIEK
+va YATT indeksining holati ko'rinadi.
+
 ---
 
 ## 2. Yangi versiyani chiqarish
@@ -127,9 +131,57 @@ bo'lsa, alohida eslab qo'lda ishga tushiring:
   ```bash
   docker compose run --rm migrate npx tsx prisma/<fayl-nomi>.ts
   ```
+- **Yangi env o'zgaruvchisi qo'shilgan bo'lsa** — `.env.production` **git'da yo'q**, ya'ni
+  `git pull` unga hech narsa qo'shmaydi. Konteyner esa `@/lib/env` dagi zod validatsiyasi
+  bilan ishga tushadi: majburiy o'zgaruvchi yetishmasa **web ham, worker ham ko'tarilmaydi**.
+  Pull qilgandan keyin `.env.production.example` bilan solishtiring:
+  ```bash
+  diff <(grep -oP '^[A-Z0-9_]+(?==)' .env.production.example | sort) \
+       <(grep -oP '^[A-Z0-9_]+(?==)' .env.production | sort)
+  ```
 - **Umumiy qoida:** migratsiya papkasidan tashqarida `.ts` fayl orqali ma'lumot
   o'zgartirilsa (seed yoki bir martalik skript), uni push qilgan sessiyada shu haqda
   ANIQ eslatib o'tish kerak — "faqat kodni pull qiling" degan xulosa yetarli emas.
+
+### Ijara imtiyozi (ПҚ-3782) — 1.8.0 dan boshlab
+
+Ilgari alohida server edi (pm2 `imtiyoz-3782`, 3008-port). Endi dashboard ichida.
+
+**1. `.env.production` ga besh o'zgaruvchi qo'shilishi SHART** (usiz konteyner ishga tushadi,
+lekin imtiyoz sahifasi "sozlanmagan" ogohlantirishini beradi):
+
+```bash
+IMTIYOZ_COMP_WORKERS_URL="http://10.190.5.2:8675/markaz/comp_workers"
+IMTIYOZ_YATT_WORKERS_URL="http://10.190.5.2:8675/markaz/yatt_workers"
+IMTIYOZ_TIEK_URL="http://10.190.5.2:8675/markaz/minzdrav_pas"
+IMTIYOZ_API_USER="rent"
+IMTIYOZ_API_PASSWORD="<eski Imtiyoz-API .env dagi GATEWAY_PASSWORD>"
+```
+
+**2. Shartnoma formasining manzili o'zgartirilishi kerak** — eski ochiq endpoint
+`http://<host>:3008/api/v1/check-discount/:tin` o'rniga:
+
+```
+https://davijara.uz/obyektlar/api/imtiyoz/check-discount/:tin
+```
+
+Javob shakli o'zgarmagan (`{ success, data }`, ichida `reason` va `tin`), auth talab
+qilinmaydi, CORS ochiq. nginx'ga o'zgartirish **kerak emas** — bu yo'l allaqachon
+`location ^~ /obyektlar` ostiga tushadi.
+
+⚠️ **Eski `imtiyoz-3782` xizmatini FAQAT forma yangi manzilga o'tkazilgandan keyin to'xtating.**
+Uning `data/` papkasidagi audit jurnali dashboard bazasiga ko'chirilmagan — o'chirmang, saqlab
+qo'ying.
+
+**3. Birinchi ishga tushishda worker YATT indeksini quradi** (butun respublika bo'yicha
+~76 000 shartnoma yozuvi, bir necha daqiqa). Shu tugamaguncha **JSHSHIR** (14 xonali)
+tekshiruvlari "hozircha aniqlanmadi" beradi — bu kutilgan xulq, xato emas. STIR (9 xonali)
+tekshiruvlari indeksga bog'liq emas va darhol ishlaydi. Kuzatish:
+
+```bash
+docker compose logs -f worker | grep imtiyoz-yatt
+# ✅ [imtiyoz-yatt] indeks tayyor: N tadbirkor, M bog'lanish, X/X sahifa
+```
 
 ### ⚠️ Hech qachon
 

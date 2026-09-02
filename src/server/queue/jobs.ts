@@ -5,6 +5,12 @@ export const QUEUE = {
   PROPERTY_BASE: "property-base", // API2: kadastr -> asosiy ma'lumot
   STATUS_CHECK: "status-check", // API3-8: holat + fallback + klassifikatsiya
   DAILY_FULL_SYNC: "daily-full-sync", // pg-boss cron — har kuni tunda to'liq sync
+  /**
+   * Ijara imtiyozi: YATT ishchilar indeksini qayta qurish.
+   * ⚠️ Uzoq ishlaydi (~76 000 yozuv, 150+ sahifa) — shuning uchun `boss.ts` da
+   * unga ALOHIDA `expireInSeconds` beriladi, umumiy 120s uni yarmida uzardi.
+   */
+  IMTIYOZ_YATT_SYNC: "imtiyoz-yatt-sync",
 } as const;
 
 export interface SyncSourceJob {

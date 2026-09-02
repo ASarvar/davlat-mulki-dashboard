@@ -15,6 +15,7 @@ import {
   Bell,
   ClipboardCheck,
   FileSearch,
+  BadgePercent,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { withBase } from "@/lib/basePath";
@@ -39,6 +40,9 @@ const NAV = [
   // Hammaga ko'rinadi: ko'rib chiqish jadvali rolga qarab, tarix esa har bir rol uchun
   // o'z doirasida (ijrochi — faqat o'z so'rovlari, qolganlar — hammasi).
   { href: "/dashboard/requests", label: "Tasdiqlash so'rovlari", icon: ClipboardCheck, exact: false, roles: [] },
+  // ПҚ-3782 — ijarachining 50% imtiyozga haqli-haqsizligini tekshirish. Hamma rolga
+  // ochiq: tekshiruv hech narsani o'zgartirmaydi, faqat tashqi bazalardan o'qiydi.
+  { href: "/dashboard/imtiyoz", label: "Ijara imtiyozi", icon: BadgePercent, exact: false, roles: [] },
   // Moderator ham xabar oladi: rahbariyat u qabul qilgan so'rov bo'yicha qaror chiqarsa.
   { href: "/dashboard/notifications", label: "Bildirishnomalar", icon: Bell, exact: false, roles: ["IJROCHI", "MODERATOR"] },
   { href: "/dashboard/cadastre-check", label: "Kadastrni tekshirish", icon: FileSearch, exact: false, roles: ["SUPER_ADMIN", "ADMIN"] },
