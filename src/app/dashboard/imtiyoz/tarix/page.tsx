@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { ArrowLeft, Download, History, Search } from "lucide-react";
 import type { ImtiyozResultCode as DbResultCode } from "@prisma/client";
-import { requireUser } from "@/lib/authz";
+import { requireSection } from "@/server/services/sectionAccess";
 import { withBase } from "@/lib/basePath";
 import { RESULT_SHORT, type ImtiyozResultCode } from "@/lib/imtiyoz";
 import { listChecks } from "@/server/services/imtiyoz/audit";
@@ -48,7 +48,7 @@ function fmtDateTime(d: Date): string {
 }
 
 export default async function ImtiyozHistoryPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireUser();
+  await requireSection("imtiyoz");
   const sp = await searchParams;
 
   const subjectId = str(sp.subjectId)?.replace(/\D/g, "") || "";

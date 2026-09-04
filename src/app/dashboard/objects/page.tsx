@@ -3,7 +3,8 @@ import { Building2, Download, ExternalLink } from "lucide-react";
 import { lotUrl } from "@/server/integrations/auction";
 import { SyncStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireUser, isAdmin } from "@/lib/authz";
+import { isAdmin } from "@/lib/authz";
+import { requireSection } from "@/server/services/sectionAccess";
 import { CAT_REMOVED_FROM_BALANCE, REMOVED_FROM_BALANCE_LABEL } from "@/lib/categories";
 import {
   listProperties,
@@ -37,7 +38,7 @@ type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export default async function ObjectsPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const user = await requireUser();
+  const user = await requireSection("objects");
   const sp = await searchParams;
 
   const q = str(sp.q)?.trim() || undefined;

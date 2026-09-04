@@ -60,6 +60,7 @@ model User {
   approvedChanges  CategoryChangeRequest[]      @relation("RahbarReview")
   notifications    Notification[]
   imtiyozChecks    ImtiyozCheck[]
+  sectionAccessUpdates SectionAccess[]  @relation("SectionAccessUpdatedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -795,4 +796,36 @@ model ImtiyozResultCache {
   expiresAt  DateTime
 
   @@index([expiresAt])
+}
+
+// ─────────────────────────── Bo'limlar ko'rinishi ───────────────────────────
+
+enum SectionVisibility {
+  SUPER_ONLY // faqat super admin (yangi bo'limning standart holati)
+  ROLES      // super admin + `roles` ro'yxatidagilar
+  EVERYONE   // `SectionDef.allowRoles` doirasidagi hamma
+}
+
+/**
+ * Bir bo'lim = bir qator. Bo'limlarning O'ZI kodda e'lon qilinadi
+ * (`src/lib/sections.ts`), bu jadval faqat KIMGA KO'RINISHINI saqlaydi —
+ * shuning uchun UI'dan yangi qator yaratilmaydi, faqat mavjudi tahrirlanadi.
+ *
+ * ⚠️ QATOR YO'Q BO'LSA — `SUPER_ONLY` deb qaraladi (`sectionAccess.ts`).
+ * Ya'ni yangi bo'lim qo'shib deploy qilinganda, hech narsa sozlanmasa ham u
+ * avtomatik faqat super adminga ko'rinadi (fail-closed). Bu ataylab: unutilgan
+ * bo'lim yashirin qoladi, ochilib ketmaydi.
+ *
+ * ⚠️ `roles` bazada cheklanmaydi — chegara `SectionDef.allowRoles` orqali
+ * KODDA qo'yiladi va o'qish paytida kesishma olinadi. Sabab: chegara kod bilan
+ * birga o'zgaradi (yangi rol qo'shilishi mumkin), migratsiya bilan emas.
+ */
+model SectionAccess {
+  key        String            @id
+  visibility SectionVisibility @default(SUPER_ONLY)
+  roles      Role[]            @default([])
+
+  updatedById String?
+  updatedBy   User?    @relation("SectionAccessUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
+  updatedAt   DateTime @updatedAt
 }

@@ -7,6 +7,22 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.9.0
+
+- **Yangi bo'lim: "Bo'limlar" — ko'rinishni boshqarish (faqat super admin).**
+  Endi qaysi sahifa qaysi rolga ko'rinishi **bazadan** boshqariladi, deploysiz.
+  Yangi sahifa serverga chiqarilganda avval **faqat super admin** ko'radi;
+  tekshirilgach, super admin uni `/dashboard/sections` orqali kerakli rollarga ochadi.
+  O'zgarish darhol kuchga kiradi — qayta deploy shart emas.
+- **Menyu va ruxsat endi bitta manbadan** (`src/lib/sections.ts`). Ilgari ular mustaqil
+  edi: sidebar'dagi menyu bandi va sahifadagi haqiqiy ruxsat bir-biridan ajralib qolgan
+  edi — masalan "Bildirishnomalar" menyuda ikki rolga ko'rinsa ham, manzilni to'g'ridan-
+  to'g'ri yozgan istalgan rol sahifani ochardi. Endi ikkalasi ham bir joydan keladi.
+- Ruxsat etilmagan sahifaga kirishga urinilganda **"Sahifa topilmadi"** ko'rsatiladi —
+  bo'limning borligi ham oshkor qilinmaydi.
+- ⚠️ Super admin har doim **barcha** bo'limlarni ko'radi (rejimdan qat'i nazar) —
+  aks holda o'zini shu sozlamadan qulflab qo'yishi mumkin bo'lardi.
+
 ## 1.8.0
 
 - **Yangi bo'lim: "Ijara imtiyozi" (ПҚ-3782)** — sidebarda alohida menyu, hamma rolga ochiq.

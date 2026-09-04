@@ -1,11 +1,11 @@
 import Link from "next/link";
 import { Bell, CheckCheck } from "lucide-react";
-import { requireUser } from "@/lib/authz";
+import { requireSection } from "@/server/services/sectionAccess";
 import { listNotifications } from "@/server/services/notifications";
 import { markAllReadAction } from "./actions";
 
 export default async function NotificationsPage() {
-  const user = await requireUser();
+  const user = await requireSection("notifications");
   const items = await listNotifications(user.id);
   const hasUnread = items.some((n) => !n.isRead);
 

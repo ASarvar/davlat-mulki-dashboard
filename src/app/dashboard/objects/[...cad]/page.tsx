@@ -24,7 +24,8 @@ import {
   type UtilityInfo,
   type UtilityKind,
 } from "@/server/integrations/utilities";
-import { requireUser, isAdmin } from "@/lib/authz";
+import { isAdmin } from "@/lib/authz";
+import { requireSection } from "@/server/services/sectionAccess";
 import { getPropertyDetail } from "@/server/services/properties";
 import { pathToCad } from "@/lib/cadastre";
 import { withBase } from "@/lib/basePath";
@@ -222,7 +223,7 @@ function SectionTitle({ icon: Icon, children }: { icon: LucideIcon; children: Re
 export default async function ObjectDetailPage({ params }: { params: Promise<{ cad: string[] }> }) {
   const { cad } = await params;
   const cadNumber = pathToCad(cad);
-  const user = await requireUser();
+  const user = await requireSection("objects");
 
   const p = await getPropertyDetail(user, cadNumber);
   if (!p) notFound();

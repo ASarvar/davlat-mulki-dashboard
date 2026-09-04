@@ -12,6 +12,17 @@ export const ROLE_LABEL: Record<Role, string> = {
   VIEWER: "Kuzatuvchi",
 };
 
+// Barcha rollar — enum tartibida. Ro'yxat/tanlagichlarda va bo'limlar registrida
+// (`lib/sections.ts` → `allowRoles`) ishlatiladi, shuning uchun bir joyda turadi.
+export const ALL_ROLES: Role[] = [
+  "SUPER_ADMIN",
+  "ADMIN",
+  "RAHBARIYAT",
+  "MODERATOR",
+  "IJROCHI",
+  "VIEWER",
+];
+
 export interface RoleOption {
   value: Role;
   label: string;

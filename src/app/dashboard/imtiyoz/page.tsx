@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { AlertTriangle, BadgePercent, History } from "lucide-react";
-import { getCurrentUser } from "@/lib/authz";
+import { requireSection } from "@/server/services/sectionAccess";
 import { imtiyozConfigured } from "@/server/integrations/imtiyoz";
 import { CheckForm } from "./CheckForm";
 
@@ -12,7 +12,7 @@ import { CheckForm } from "./CheckForm";
  * bo'yicha belgilangan summaning 50% i miqdorida belgilanadi.
  */
 export default async function ImtiyozPage() {
-  const user = await getCurrentUser();
+  const user = await requireSection("imtiyoz");
   const operator = user ? `${user.name ?? ""} (${user.username ?? ""})`.trim() : "";
 
   return (

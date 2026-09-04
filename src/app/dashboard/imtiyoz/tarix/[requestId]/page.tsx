@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Archive } from "lucide-react";
-import { requireUser } from "@/lib/authz";
+import { requireSection } from "@/server/services/sectionAccess";
 import { getCheckAsResult } from "@/server/services/imtiyoz/audit";
 import { ResultView } from "../../ResultView";
 
@@ -14,7 +14,7 @@ import { ResultView } from "../../ResultView";
  * hech qachon murojaat qilmaydi.
  */
 export default async function ImtiyozArchivePage({ params }: { params: Promise<{ requestId: string }> }) {
-  await requireUser();
+  await requireSection("imtiyoz");
   const { requestId } = await params;
   const data = await getCheckAsResult(requestId);
   if (!data) notFound();

@@ -16,9 +16,12 @@ import {
   ClipboardCheck,
   FileSearch,
   BadgePercent,
+  SlidersHorizontal,
 } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { withBase } from "@/lib/basePath";
+import { SECTIONS } from "@/lib/sections";
 import { signOutAction } from "@/app/dashboard/actions";
 import packageJson from "../../package.json";
 
@@ -33,23 +36,29 @@ export interface SidebarUser {
   roleLabel: string;
 }
 
-// `roles` — bo'sh bo'lsa hammaga ko'rinadi; aks holda faqat shu rollarga.
-const NAV = [
-  { href: "/dashboard", label: "Boshqaruv paneli", icon: LayoutDashboard, exact: true, roles: [] as string[] },
-  { href: "/dashboard/objects", label: "Obyektlar", icon: Building2, exact: false, roles: [] },
-  // Hammaga ko'rinadi: ko'rib chiqish jadvali rolga qarab, tarix esa har bir rol uchun
-  // o'z doirasida (ijrochi — faqat o'z so'rovlari, qolganlar — hammasi).
-  { href: "/dashboard/requests", label: "Tasdiqlash so'rovlari", icon: ClipboardCheck, exact: false, roles: [] },
-  // ПҚ-3782 — ijarachining 50% imtiyozga haqli-haqsizligini tekshirish. Hamma rolga
-  // ochiq: tekshiruv hech narsani o'zgartirmaydi, faqat tashqi bazalardan o'qiydi.
-  { href: "/dashboard/imtiyoz", label: "Ijara imtiyozi", icon: BadgePercent, exact: false, roles: [] },
-  // Moderator ham xabar oladi: rahbariyat u qabul qilgan so'rov bo'yicha qaror chiqarsa.
-  { href: "/dashboard/notifications", label: "Bildirishnomalar", icon: Bell, exact: false, roles: ["IJROCHI", "MODERATOR"] },
-  { href: "/dashboard/cadastre-check", label: "Kadastrni tekshirish", icon: FileSearch, exact: false, roles: ["SUPER_ADMIN", "ADMIN"] },
-  { href: "/dashboard/sync", label: "Sinxronizatsiya", icon: RefreshCw, exact: false, roles: ["SUPER_ADMIN", "ADMIN"] },
-  { href: "/dashboard/sources", label: "Manbalar (STIR)", icon: Database, exact: false, roles: ["SUPER_ADMIN", "ADMIN"] },
-  { href: "/dashboard/users", label: "Foydalanuvchilar", icon: Users, exact: false, roles: ["SUPER_ADMIN", "ADMIN"] },
-];
+/**
+ * Ikonkalar bo'lim kaliti bo'yicha. Bo'limlarning O'ZI (manzil, nom, tartib) —
+ * `lib/sections.ts` da; bu yerda faqat ikonka qoladi, chunki lucide komponentlarini
+ * server komponentidan prop orqali uzatib bo'lmaydi (bu fayl "use client").
+ *
+ * ⚠️ Bu yerda ROL TEKSHIRUVI YO'Q. Qaysi bo'lim ko'rinishini server hal qiladi
+ * (`services/sectionAccess.ts` → `allowedSectionKeys`) va `allowedKeys` propida
+ * beradi. Ilgari menyu O'Z rol ro'yxatini saqlardi va sahifadagi haqiqiy qorovuldan
+ * ajralib ketgan edi — masalan "Bildirishnomalar" menyuda ikki rolga ko'rinsa ham,
+ * URL'ni qo'lda yozgan istalgan rol sahifani ochardi.
+ */
+const ICONS: Record<string, LucideIcon> = {
+  dashboard: LayoutDashboard,
+  objects: Building2,
+  requests: ClipboardCheck,
+  imtiyoz: BadgePercent,
+  notifications: Bell,
+  "cadastre-check": FileSearch,
+  sync: RefreshCw,
+  sources: Database,
+  users: Users,
+  sections: SlidersHorizontal,
+};
 
 const SIDEBAR_BG = "linear-gradient(180deg, var(--navy) 0%, var(--navy-mid) 100%)";
 
@@ -59,14 +68,24 @@ function initials(name: string): string {
   return chars || "?";
 }
 
-export function Sidebar({ user, unreadCount = 0 }: { user: SidebarUser; unreadCount?: number }) {
+export function Sidebar({
+  user,
+  unreadCount = 0,
+  allowedKeys,
+}: {
+  user: SidebarUser;
+  unreadCount?: number;
+  /** Serverda hisoblangan ochiq bo'limlar kalitlari (`allowedSectionKeys`). */
+  allowedKeys: string[];
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
   // Sahifa almashganda mobil menyuni yopamiz.
   useEffect(() => setOpen(false), [pathname]);
 
-  const items = NAV.filter((i) => i.roles.length === 0 || i.roles.includes(user.role));
+  const allowed = new Set(allowedKeys);
+  const items = SECTIONS.filter((sec) => allowed.has(sec.key));
 
   const inner = (
     <>
@@ -83,23 +102,26 @@ export function Sidebar({ user, unreadCount = 0 }: { user: SidebarUser; unreadCo
 
       {/* Navigatsiya */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
-        {items.map(({ href, label, icon: Icon, exact }) => {
+        {items.map(({ key, href, label, exact }) => {
+          const Icon = ICONS[key];
           const active = exact ? pathname === href : pathname.startsWith(href);
           return (
             <Link
-              key={href}
+              key={key}
               href={href}
               className={cn(
                 "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 active ? "bg-white/10 text-white" : "text-white/60 hover:bg-white/5 hover:text-white",
               )}
             >
-              <Icon
-                className={cn("h-[18px] w-[18px] shrink-0 transition-colors", !active && "text-white/50 group-hover:text-white/80")}
-                style={active ? { color: "var(--gold)" } : undefined}
-              />
+              {Icon ? (
+                <Icon
+                  className={cn("h-[18px] w-[18px] shrink-0 transition-colors", !active && "text-white/50 group-hover:text-white/80")}
+                  style={active ? { color: "var(--gold)" } : undefined}
+                />
+              ) : null}
               <span className="truncate">{label}</span>
-              {href === "/dashboard/notifications" && unreadCount > 0 ? (
+              {key === "notifications" && unreadCount > 0 ? (
                 <span className="ml-auto rounded-full bg-red-500 px-1.5 text-[11px] font-semibold text-white">
                   {unreadCount}
                 </span>

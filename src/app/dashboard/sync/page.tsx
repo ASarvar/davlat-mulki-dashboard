@@ -1,6 +1,6 @@
 import { RefreshCw, History, AlertTriangle } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/authz";
+import { requireSection } from "@/server/services/sectionAccess";
 import { getPendingJobCounts, getQueueHealth, syncFailureBreakdown, type SyncFailureBucket } from "@/server/services/syncAdmin";
 import { BLAME_LABEL } from "@/lib/syncError";
 import { listSourceNames } from "@/server/services/sources";
@@ -32,7 +32,7 @@ function refreshedModules(r: {
 
 export default async function SyncPage() {
   // Sinxronizatsiya faqat SUPER_ADMIN va ADMIN uchun.
-  await requireRole("SUPER_ADMIN", "ADMIN");
+  await requireSection("sync");
 
   const [regions, sohaList, runs] = await Promise.all([
     prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),

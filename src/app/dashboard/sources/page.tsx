@@ -1,6 +1,6 @@
 import { Database, AlertTriangle, Plus, Search, RotateCcw } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { requireRole } from "@/lib/authz";
+import { requireSection } from "@/server/services/sectionAccess";
 import { listSources, listSourceNames } from "@/server/services/sources";
 import { CreateSourceForm, SourceRow } from "./SourceForms";
 import { withBase } from "@/lib/basePath";
@@ -12,7 +12,7 @@ const selectCls =
   "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-cobalt focus:ring-2 focus:ring-cobalt/20";
 
 export default async function SourcesPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireRole("SUPER_ADMIN", "ADMIN");
+  await requireSection("sources");
   const sp = await searchParams;
 
   const regionId = str(sp.region) || undefined;

@@ -1,5 +1,5 @@
 import { FileSearch, Search, AlertTriangle, ExternalLink } from "lucide-react";
-import { requireRole } from "@/lib/authz";
+import { requireSection } from "@/server/services/sectionAccess";
 import { fetchPropertyBase } from "@/server/integrations/api2";
 import { API2 } from "@/server/integrations/config";
 import { objectHref } from "@/lib/cadastre";
@@ -22,7 +22,7 @@ const inputCls =
  * obyekt sahifasidagi "API orqali yangilash" yoki Sinxronizatsiya sahifasi ishlatiladi.
  */
 export default async function CadastreCheckPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireRole("SUPER_ADMIN", "ADMIN");
+  await requireSection("cadastre-check");
   const sp = await searchParams;
   const cad = str(sp.cad)?.trim() || undefined;
 

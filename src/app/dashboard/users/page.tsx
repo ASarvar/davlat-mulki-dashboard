@@ -2,7 +2,8 @@ import { Users, UserPlus, Search, RotateCcw } from "lucide-react";
 import { Role } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { sourceScopeLabel } from "@/lib/sourceLabel";
-import { requireRole, isAdmin } from "@/lib/authz";
+import { isAdmin } from "@/lib/authz";
+import { requireSection } from "@/server/services/sectionAccess";
 import { listUsers } from "@/server/services/users";
 import { ROLE_LABEL } from "@/lib/roles";
 import { CreateUserForm } from "./CreateUserForm";
@@ -16,7 +17,7 @@ const selectCls =
   "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-cobalt focus:ring-2 focus:ring-cobalt/20";
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const actor = await requireRole("SUPER_ADMIN", "ADMIN");
+  const actor = await requireSection("users");
   const sp = await searchParams;
 
   // Filtr SOHA bo'yicha (`OrganizationSource.name`), aynan tashkilot bo'yicha emas —

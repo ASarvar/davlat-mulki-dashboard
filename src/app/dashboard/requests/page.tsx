@@ -1,7 +1,7 @@
 import { ClipboardCheck, History, ExternalLink, ImageIcon, Search, RotateCcw } from "lucide-react";
 import type { ChangeRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireUser } from "@/lib/authz";
+import { requireSection } from "@/server/services/sectionAccess";
 import { listPendingRequests, listRequestHistory, reviewableStages, type RequestFilters } from "@/server/services/assignment";
 import { ASSIGNABLE_CATEGORIES, assignFormLabel, CATEGORY_BY_CODE } from "@/lib/categories";
 import { objectHref } from "@/lib/cadastre";
@@ -61,7 +61,7 @@ type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export default async function RequestsPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const user = await requireUser();
+  const user = await requireSection("requests");
   const sp = await searchParams;
   const canReview = reviewableStages(user.role).length > 0;
 

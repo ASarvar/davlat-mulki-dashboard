@@ -20,7 +20,8 @@ import {
   Droplets,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { requireUser, isAdmin, userSourceScope } from "@/lib/authz";
+import { isAdmin, userSourceScope } from "@/lib/authz";
+import { requireSection } from "@/server/services/sectionAccess";
 import {
   getDashboardStats,
   computeDistrictStats,
@@ -387,7 +388,7 @@ type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SP> }) {
-  const user = await requireUser();
+  const user = await requireSection("dashboard");
   const sp = await searchParams;
 
   // ── Rol doirasi ──
