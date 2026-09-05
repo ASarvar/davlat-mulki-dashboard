@@ -201,9 +201,19 @@ bo'lardi. Yon ta'siri: super admin menyusida "Bildirishnomalar" ham paydo bo'ldi
 (ilgari u faqat IJROCHI/MODERATOR ga ko'rinardi) — bu ataylab, chunki ish tartibi
 super admin ochilmagan bo'limni OLDIN ko'rishini talab qiladi.
 
-⚠️ **`/dashboard` — `core: true`**, bazaga bo'ysunmaydi. `app/page.tsx` tizimga
-kirgan foydalanuvchini o'sha yerga yo'naltiradi; u yopilsa odam kirgan zahoti
-"sahifa topilmadi"ga tushardi.
+⚠️ **`/dashboard` — `core: true` + `hidden: true`**: u faqat KIRISH MARSHRUTI,
+menyu bandi EMAS. `app/page.tsx` tizimga kirgan foydalanuvchini o'sha yerga
+yo'naltiradi, shuning uchun u hech qachon yopilmasligi kerak — aks holda odam
+kirgan zahoti "sahifa topilmadi"ga tushardi. Lekin marshrutning O'ZI hech narsa
+ko'rsatmaydi: ruxsatga qarab `panel` (vizual panel) yoki `firstOpenSectionHref()`
+(odatda `hisobot`) ga uzatadi.
+
+⚠️ **Vizual panel — alohida `panel` bo'limi, `core` EMAS.** 1.10.0 da u
+to'g'ridan-to'g'ri `core` marshrutda edi va shu sabab serverga chiqarilgan zahoti
+HAMMA rolga ochilib ketgan edi (foydalanuvchi topdi, 2026-09-05) — aynan
+`SectionAccess` oldini olishi kerak bo'lgan holat. Saboq: **`core` — "hamma
+ko'radi" degani EMAS, "marshrut yopilmaydi" degani.** Ko'rinishi boshqariladigan
+har qanday MAZMUN `core` marshrutda emas, o'z bo'limida yashashi kerak.
 
 ⚠️ **Ruxsat yo'qda `notFound()`, `throw` EMAS.** Next.js production'da xato
 XABARINI o'chiradi (faqat `digest` qoladi), ya'ni `error.tsx` da "Ruxsat yo'q"ni

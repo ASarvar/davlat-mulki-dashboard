@@ -7,6 +7,18 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.10.1
+
+- **Tuzatildi: yangi vizual panel serverga chiqarilgan zahoti hamma rolga ochilib
+  ketgan edi.** U `/dashboard` marshrutida turgan, bu esa "o'zak" (`core`) bo'lim —
+  ya'ni "Bo'limlar" sahifasidan yopib ham bo'lmasdi. Endi panel **alohida bo'lim**
+  sifatida boshqariladi va standart holatda **faqat super adminga** ko'rinadi;
+  super admin uni `/dashboard/sections` orqali kerakli rollarga ochadi — xuddi
+  boshqa yangi bo'limlar kabi.
+- Panel ochilmagan foydalanuvchi `/dashboard` ga kirganda **rasmiy hisobotga**
+  (eski ko'rinish) yo'naltiriladi va menyusida panel bandi umuman ko'rinmaydi —
+  ya'ni u uchun hech narsa o'zgarmaydi.
+
 ## 1.10.0
 
 - **Yangi asosiy sahifa: vizual boshqaruv paneli.** `/dashboard` endi 25–30 ustunli

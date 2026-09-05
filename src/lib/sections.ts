@@ -39,15 +39,35 @@ export interface SectionDef {
    * tushardi va o'zini o'zi qulflab qo'yish mumkin bo'lardi.
    */
   core?: true;
+  /**
+   * Menyuda KO'RINMAYDI — faqat marshrut qorovuli.
+   *
+   * ⚠️ Faqat `/dashboard` uchun: u kirish sahifasi (`app/page.tsx` shu yerga
+   * yo'naltiradi), shuning uchun `core` bo'lishi SHART — lekin uning O'ZI hech
+   * narsa ko'rsatmaydi, faqat foydalanuvchini ruxsati bor ko'rinishga uzatadi.
+   * Menyudagi band esa `panel` bo'limiga tegishli (u yopilishi mumkin).
+   */
+  hidden?: true;
 }
 
 const ADMINS: Role[] = ["SUPER_ADMIN", "ADMIN"];
 
 /** Tartib — Sidebar menyusidagi tartib. */
 export const SECTIONS: SectionDef[] = [
-  { key: "dashboard",      href: "/dashboard",                    label: "Boshqaruv paneli",     exact: true,  allowRoles: ALL_ROLES, core: true },
+  // ⚠️ Kirish MARSHRUTI — menyu bandi emas. `core` bo'lgani uchun hech qachon
+  // yopilmaydi (aks holda odam tizimga kirgan zahoti "sahifa topilmadi"ga tushardi),
+  // lekin o'zi hech narsa ko'rsatmaydi: ruxsatga qarab `panel` yoki `hisobot` ga uzatadi.
+  { key: "dashboard",      href: "/dashboard",                    label: "Boshqaruv paneli",     exact: true,  allowRoles: ALL_ROLES, core: true, hidden: true },
+  // ⚠️ VIZUAL PANEL — `/dashboard` da ko'rsatiladi, lekin ALOHIDA bo'lim sifatida
+  // boshqariladi va standart holatda YOPIQ (qator yo'q ⇒ SUPER_ONLY). Ilgari u
+  // to'g'ridan-to'g'ri `core` marshrutda edi va shu sabab chiqarilgan zahoti hamma
+  // rolga ochilib ketgan edi (foydalanuvchi topdi, 2026-09-05) — aynan `SectionAccess`
+  // oldini olishi kerak bo'lgan holat.
+  { key: "panel",          href: "/dashboard",                    label: "Boshqaruv paneli",     exact: true,  allowRoles: ALL_ROLES },
   // Rasmiy hisobot shakli (uchta jadval). Ilgari `/dashboard` da edi; vizual panel
-  // uning o'rnini egallagach shu yerga ko'chirildi (2026-09-05).
+  // uning o'rnini egallagach shu yerga ko'chirildi (2026-09-05). Panel yopiq bo'lgan
+  // foydalanuvchi `/dashboard` dan SHU YERGA yo'naltiriladi — ya'ni u uchun hech narsa
+  // o'zgarmaydi, eski ko'rinish o'z joyida qoladi.
   { key: "hisobot",        href: "/dashboard/hisobot",            label: "Rasmiy hisobot",       exact: false, allowRoles: ALL_ROLES },
   { key: "objects",        href: "/dashboard/objects",            label: "Obyektlar",            exact: false, allowRoles: ALL_ROLES },
   { key: "requests",       href: "/dashboard/requests",           label: "Tasdiqlash so'rovlari", exact: false, allowRoles: ALL_ROLES },

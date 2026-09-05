@@ -1,6 +1,7 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { ArrowRight, CheckCircle2, Clock3, XCircle, LineChart, AlertTriangle } from "lucide-react";
-import { requireSection } from "@/server/services/sectionAccess";
+import { canAccess, firstOpenSectionHref, requireSection } from "@/server/services/sectionAccess";
 import { getDashboardStats, getUtilityStats } from "@/server/services/stats";
 import { getRentContractTrend } from "@/server/services/trends";
 import { getMapData } from "@/server/services/map";
@@ -35,7 +36,14 @@ const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
  * oziqlanadi, ya'ni ekrandagi sonlar hech qachon ajralib qolmaydi.
  */
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<SP> }) {
+  // ⚠️ `/dashboard` — `core` marshrut, u HECH QACHON yopilmaydi (kirish sahifasi).
+  // Lekin bu yerda ko'rsatiladigan VIZUAL PANEL alohida bo'lim (`panel`) va u
+  // standart holatda faqat super adminga ochiq. Ruxsat bo'lmasa foydalanuvchi eski
+  // ko'rinishga (rasmiy hisobot) yo'naltiriladi — ya'ni u uchun hech narsa
+  // o'zgarmaydi, super admin `/dashboard/sections` dan ochmaguncha.
   const user = await requireSection("dashboard");
+  if (!(await canAccess(user, "panel"))) redirect(await firstOpenSectionHref(user));
+
   const sp = await searchParams;
 
   const { scope, soha, sohaList, activeSourceKey, showOwn } = await resolveDashboardScope(

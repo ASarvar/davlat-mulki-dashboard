@@ -82,6 +82,19 @@ export async function requireSection(key: string): Promise<SessionUser> {
   return user;
 }
 
+/**
+ * `/dashboard` yopiq bo'lgan foydalanuvchi qayerga tushishi kerak.
+ *
+ * ⚠️ Qattiq `/dashboard/hisobot` yozib qo'yilmaydi: super admin kelajakda hisobotni
+ * ham qandaydir rol uchun yopishi mumkin va u holda yo'naltirish "sahifa topilmadi"ga
+ * olib borardi. Shuning uchun MENYUDAGI birinchi ochiq bo'lim olinadi.
+ */
+export async function firstOpenSectionHref(user: SessionUser): Promise<string> {
+  const access = await loadAccess();
+  const first = SECTIONS.find((def) => !def.hidden && canAccessWith(access, user, def));
+  return first?.href ?? "/dashboard/hisobot";
+}
+
 // ───────────────────────── Boshqaruv (faqat super admin) ─────────────────────
 
 export interface SectionRow extends SectionDef {
@@ -106,7 +119,9 @@ export async function listSections(): Promise<SectionRow[]> {
 
   // ⚠️ Registr ustidan yuriladi, baza ustidan EMAS: koddan olib tashlangan bo'limning
   // eski qatori ro'yxatda "arvoh" bo'lib qolmasin.
-  return SECTIONS.map((def) => {
+  // ⚠️ `hidden` bo'limlar chiqarib tashlanadi — ular menyu bandi emas, faqat
+  // marshrut (`/dashboard`), va `core` bo'lgani uchun sozlanadigan narsa yo'q.
+  return SECTIONS.filter((def) => !def.hidden).map((def) => {
     const row = byKey.get(def.key);
     return {
       ...def,

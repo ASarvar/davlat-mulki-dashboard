@@ -49,7 +49,7 @@ export interface SidebarUser {
  * URL'ni qo'lda yozgan istalgan rol sahifani ochardi.
  */
 const ICONS: Record<string, LucideIcon> = {
-  dashboard: LayoutDashboard,
+  panel: LayoutDashboard,
   hisobot: Table2,
   objects: Building2,
   requests: ClipboardCheck,
@@ -87,7 +87,9 @@ export function Sidebar({
   useEffect(() => setOpen(false), [pathname]);
 
   const allowed = new Set(allowedKeys);
-  const items = SECTIONS.filter((sec) => allowed.has(sec.key));
+  // ⚠️ `hidden` bo'limlar menyuda ko'rsatilmaydi — `/dashboard` faqat kirish
+  // marshruti (u yerdagi menyu bandi `panel` bo'limiga tegishli).
+  const items = SECTIONS.filter((sec) => !sec.hidden && allowed.has(sec.key));
 
   const inner = (
     <>
