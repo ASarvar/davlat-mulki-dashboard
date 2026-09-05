@@ -398,6 +398,15 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
         isInefficient,
         hasPrivatizationLot,
         hasRentLot,
+        // ⚠️ KOORDINATA `refreshAuction` blokidan TASHQARIDA va faqat YANGI qiymat
+        // bo'lganda yoziladi — hech qachon `null` ga qaytarilmaydi.
+        //
+        // Sabab: auksion maydonlari lot topilmasa ataylab tozalanadi (eski lot raqami
+        // qolib ketmasin), lekin bino auksion tugagani uchun joyidan KO'CHMAYDI.
+        // Blok ichiga qo'yilsa obyekt savdodan chiqishi bilan xaritadan yo'qolardi.
+        ...(auction?.coords
+          ? { lat: auction.coords.lat, lng: auction.coords.lng, coordSource: "AUCTION", coordsAt: new Date() }
+          : {}),
         ...(refreshAuction
           ? {
               // Auksion maydonlari (topilmasa tozalanadi — eski qiymat qolib ketmasin).

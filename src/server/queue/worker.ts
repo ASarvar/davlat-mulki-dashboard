@@ -11,6 +11,7 @@ import { processStatusCheck } from "./processors/checkPropertyStatus";
 import { incrementSuccess, incrementFail, finalizeIfComplete } from "@/server/services/runProgress";
 import { triggerFullSync } from "./enqueue";
 import { isYattIndexFresh, syncYattIndex } from "@/server/services/imtiyoz/yattIndex";
+import { takeDashboardSnapshot } from "@/server/services/snapshots";
 import { imtiyozConfigured } from "@/server/integrations/imtiyoz";
 
 const leafOpts: PgBoss.WorkOptions = {
@@ -115,6 +116,25 @@ async function main() {
     }
   });
   await boss.schedule(QUEUE.DAILY_FULL_SYNC, "0 3 * * *", {}, { tz: "Asia/Tashkent" });
+
+  // ── Boshqaruv paneli: kunlik snapshot ──
+  //
+  // ⚠️ Soat **02:00** — kunlik to'liq sync (03:00) dan BIR SOAT OLDIN. Sync
+  // o'rtasida olingan o'lchov yarim yangilangan holatni yozib, trendda mavjud
+  // bo'lmagan sakrashni ko'rsatardi. `takeDashboardSnapshot()` faol run bo'lsa
+  // xato tashlaydi — bu yerda uni jim o'tkazib yuboramiz (ertaga qayta olinadi).
+  //
+  // ⚠️ O'lchov TARIXI — uni keyin backfill qilib bo'lmaydi. Shuning uchun job
+  // o'tkazib yuborilgani ALBATTA log'ga yoziladi: sababsiz bo'shliq qolmasin.
+  await boss.work(QUEUE.DASHBOARD_SNAPSHOT, async () => {
+    try {
+      const r = await takeDashboardSnapshot();
+      console.log(`[dashboard-snapshot] ${r.day}: ${r.rows} qator (eskirgan: ${r.removed})`);
+    } catch (err) {
+      console.warn("[dashboard-snapshot] o'tkazib yuborildi:", msg(err));
+    }
+  });
+  await boss.schedule(QUEUE.DASHBOARD_SNAPSHOT, "0 2 * * *", {}, { tz: "Asia/Tashkent" });
 
   // ── Ijara imtiyozi: YATT ishchilar indeksi ──
   //

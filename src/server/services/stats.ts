@@ -196,7 +196,7 @@ export interface StatsScope {
  * cheklov aynan shu yerda — BIR joyda — turadi. Yangi agregat qo'shsangiz `sourceCond()`
  * ni ishlating, shartni qo'lda yozmang (aks holda chiqarilgan obyekt hisobga qaytib kirardi).
  */
-function sourceCond(scope: StatsScope, alias: Prisma.Sql = Prisma.empty): Prisma.Sql {
+export function sourceCond(scope: StatsScope, alias: Prisma.Sql = Prisma.empty): Prisma.Sql {
   // Bo'sh doira = biriktirilmagan foydalanuvchi: hech narsa ko'rmasligi kerak.
   if (scope.sourceIds != null && scope.sourceIds.length === 0) return Prisma.sql`FALSE`;
 
@@ -213,7 +213,7 @@ function sourceCond(scope: StatsScope, alias: Prisma.Sql = Prisma.empty): Prisma
 }
 
 /** O'sha doiraning Prisma `where` ko'rinishi (count'lar uchun) — shu jumladan chiqarilganlarsiz. */
-function sourceWhere(scope: StatsScope): Prisma.PropertyWhereInput {
+export function sourceWhere(scope: StatsScope): Prisma.PropertyWhereInput {
   const and: Prisma.PropertyWhereInput[] = [{ removedFromBalance: false }];
   if (scope.sourceName) and.push({ source: { name: scope.sourceName } });
   if (scope.sourceIds != null) and.push({ sourceId: { in: scope.sourceIds } });
@@ -221,18 +221,31 @@ function sourceWhere(scope: StatsScope): Prisma.PropertyWhereInput {
 }
 
 /**
- * Doira ichidagi RESPUBLIKA darajasidagi (regionId=null) tashkilotlar — masalan
- * "Davlat aktivlari agentligi"ning markaziy tashkiloti yoki "Direksiya". Ularning
- * obyektlari kadastr prefiksi orqali istalgan hududga tarqalgan bo'lishi mumkin —
- * shuning uchun hudud jadvalida ALOHIDA qator sifatida ko'rsatiladi (hech qanday
- * hudud qatoriga QO'SHILMAYDI, aks holda qaysi hisob qayerdan kelgani ko'rinmay qolardi).
+ * RESPUBLIKA darajasidagi manbaning ta'rifi — **YAGONA joy** (`recentPaymentCutoff()`
+ * naqshi). Uch joy shu bitta konstantaga tayanadi:
+ *   1. `nationalOrgRows()` — hudud/tuman qatorlaridan CHIQARIB tashlash,
+ *   2. `properties.ts` → `buildWhere()` — `?hududiy=1` filtri (ro'yxat tomoni),
+ *   3. o'sha filtr orqali dashboard va rasmiy hisobotdagi hudud havolalari.
+ *
+ * ⚠️ Ta'rif ikkiga bo'linsa jadvaldagi son bilan ro'yxatdagi son jimgina ajralib
+ * qoladi — bu loyihadagi eng ko'p uchragan xatolar sinfi.
+ *
+ * ⚠️ `restrictedRegionId` bor manba (masalan Direksiya → Toshkent sh.) BU YERGA
+ * KIRMAYDI — u oddiy hudud qatori sifatida ko'rinadi (uning `Property`lari haqiqatda
+ * ham shu bitta hududda, fan-out'da tekshiriladi — `enqueue.ts`), "Respublika" /
+ * "Markaziy apparat" alohida qatoriga emas.
+ */
+export const NATIONAL_SOURCE = { regionId: null, restrictedRegionId: null } as const;
+
+/**
+ * Doira ichidagi respublika darajasidagi tashkilotlar — masalan "Davlat aktivlari
+ * agentligi"ning markaziy tashkiloti. Ularning obyektlari kadastr prefiksi orqali
+ * istalgan hududga tarqalgan bo'lishi mumkin — shuning uchun hudud jadvalida
+ * ALOHIDA qator sifatida ko'rsatiladi (hech qanday hudud qatoriga QO'SHILMAYDI,
+ * aks holda qaysi hisob qayerdan kelgani ko'rinmay qolardi).
  */
 async function nationalOrgRows(scope: StatsScope): Promise<{ id: string; name: string }[]> {
-  // `restrictedRegionId` bor manba (masalan Direksiya → Toshkent sh.) BU YERGA
-  // kirmaydi — u endi oddiy hudud qatori sifatida ko'rinadi (uning Property'lari
-  // haqiqatda ham shu bitta hududda, fan-out'da tekshirilgan — enqueue.ts'ga qarang),
-  // "Respublika"/"Markaziy apparat" alohida qatoriga emas.
-  const where: Prisma.OrganizationSourceWhereInput = { regionId: null, restrictedRegionId: null };
+  const where: Prisma.OrganizationSourceWhereInput = { ...NATIONAL_SOURCE };
   if (scope.sourceName) where.name = scope.sourceName;
   if (scope.sourceIds != null) {
     if (scope.sourceIds.length === 0) return [];
@@ -967,6 +980,17 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
 // v10 — balansdan chiqarilganlar hisobdan chiqarildi (hisoblash mantiqi o'zgardi,
 // shuning uchun eski keshlangan qiymatlar yaroqsiz).
 export const getDashboardStats = unstable_cache(computeDashboardStats, ["dashboard-stats-v10"], {
+  tags: ["dashboard"],
+  revalidate: 60,
+});
+
+// Kommunal jadval agregati — boshqaruv panelidagi "Kommunal qamrov" grafigi uchun
+// keshlangan o'ram. ⚠️ `computeUtilityStats()` ning O'ZI keshlanmagan holicha qoladi:
+// uni rasmiy hisobot sahifasi tuman kesimi bilan birga chaqiradi va o'sha yerda
+// har bir kesim uchun alohida kesh kaliti keraksiz shovqin bo'lardi.
+// ⚠️ `scope` argument sifatida uzatiladi — kesh kaliti rol doirasini ham qamraydi,
+// aks holda cheklangan foydalanuvchiga begona natija qaytishi mumkin.
+export const getUtilityStats = unstable_cache(computeUtilityStats, ["dashboard-utility-v1"], {
   tags: ["dashboard"],
   revalidate: 60,
 });

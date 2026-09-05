@@ -760,6 +760,100 @@ Aniqlash qoidalari (`classification.ts` → `deriveAuctionCategory`, tartib muhi
 
 Kategoriya kodini o'zgartirishdan oldin `manualCategoryCode` ishlatilganini tekshiring.
 
+## Boshqaruv paneli — vizual panel + xarita (2026-09-05)
+
+`/dashboard` — **vizual xulosa** (kartalar, grafiklar, xarita). Rasmiy hisobot shakli
+(uchta jadval) `/dashboard/hisobot` ga ko'chdi. Ikkalasi bir xil
+`resolveDashboardScope()` (`app/dashboard/scope.ts`) va bir xil `getDashboardStats()`
+dan oziqlanadi — ekrandagi sonlar hech qachon ajralib qolmaydi.
+
+⚠️ **`SourceFilter` ga `basePath` propi MAJBURIY** — ilgari `/dashboard` qattiq
+yozilgan edi va hisobotdagi manba tugmasi foydalanuvchini vizual panelga otib yuborardi.
+
+Yangi umumiy qatlam: `lib/format.ts` (`nf`/`km`/`pct1`/`money` — **yagona joy**,
+ilgari hisobot ichida lokal edi) · `lib/chartColors.ts` · `lib/geo.ts` ·
+`components/{ui,charts,map}` · `services/{trends,map,snapshots}.ts`.
+
+⚠️ **Matn SERVERDA formatlanadi.** `toLocaleString("uz-UZ")` Node'da `1 167`,
+brauzerda `1,167` beradi — client grafik komponentiga tayyor SATR uzatiladi
+(`countLabel`/`pctLabel`/`label`), son emas. Aks holda gidratsiya buziladi.
+
+⚠️ **Recharts'da `isAnimationActive={false}` HAR BIR seriyada.** React 19 dev
+rejimida ikki marta render bo'ladi va animatsiya yoqiq bo'lsa halqa/ustunlar bo'sh
+`<g>` bo'lib qoladi (donutda aynan shu bo'lgan). `cx`/`cy` ham foiz emas, SON.
+
+⚠️ **Halqa diagramma `effectiveCategory=N` ni ishlatadi, `category=N` NI EMAS.**
+`category=` 3/4/5/6/12 uchun XUSUSIYAT bo'yicha filtrlaydi (hisobot ustunlari
+shunday), halqa esa TAQSIMOT — bo'laklar kesishmasligi va yig'indisi jamiga teng
+bo'lishi shart. Jonli farq katta edi: kat 3 → 522 ↔ 599, kat 12 → 0 ↔ 281.
+
+### Xarita — `services/map.ts` + `components/map/`
+
+Koordinata `Property.lat/lng` da (`coordSource`, `coordsAt`). ⚠️ Manbasi —
+`ObjectStatusCheck.rawResponse.$.api4`, ya'ni **auksion LOTINING nuqtasi**, kadastr
+chegarasi emas; qamrov ~31% (faqat auksionga chiqqan obyektda bor). Ikkalasi ham
+xarita sarlavhasida OCHIQ yoziladi.
+
+⚠️ **Koordinata `refreshAuction` blokidan TASHQARIDA yoziladi** — bino auksion
+tugagani uchun joyidan ko'chmaydi, ya'ni lot topilmasa `null` ga qaytarilmasligi kerak.
+⚠️ **Standart Leaflet markeri ISHLATILMAYDI** — `marker-icon.png` `/obyektlar`
+sub-path ostida 404 beradi. O'rniga `L.circleMarker` (vektor).
+⚠️ `ssr:false` Server Component ichida build xatosi beradi — oraliq `"use client"`
+o'ram (`MapSection.tsx`) shu uchun bor.
+Tile manzili `MAP_TILE_URL` env orqali (standarti OSM); `tileerror` da ogohlantirish
+chiqadi, nuqtalar baribir chiziladi.
+
+### Kunlik snapshot — `services/snapshots.ts` + `DashboardSnapshot`
+
+`Property` ning statistika ustunlari har sinxronizatsiyada ustidan yoziladi, ya'ni
+"kecha nechta obyekt bo'sh turgan edi" degan savolga bazada javob yo'q. Snapshot shu
+bo'shliqni to'ldiradi.
+
+- Gran **`(day, sourceId, regionId)`** — birlamchi kalitning O'ZI, NULL yo'q. Barcha
+  kesimlar (rol doirasi, soha, hudud) shundan YIG'INDI bilan tiklanadi.
+- ⚠️ `soha` (nom) ustuni ATAYLAB yo'q: `OrganizationSource.name` admin UI'da qayta
+  nomlanishi mumkin → tarix ikkiga bo'linardi. JOIN joriy nomni beradi.
+- Cron `QUEUE.DASHBOARD_SNAPSHOT`, **`0 2 * * *` Asia/Tashkent — kunlik sync (03:00)
+  dan OLDIN**: sync o'rtasidagi o'lchov yarim yangilangan holatni yozib, trendda
+  soxta sakrash berardi. Faol `SyncRun` bo'lsa o'tkazib yuboriladi (log'ga yoziladi).
+- Qo'lda olish: `/dashboard/sync` → "Kunlik snapshot olish" (navbatga qo'yilmaydi,
+  DARHOL bajariladi — worker o'chiq bo'lsa ham birinchi kun ma'lumot yozilsin).
+- ⚠️ **Tarixni backfill qilib BO'LMAYDI.** `< 2` kun bo'lsa grafik UMUMAN
+  ko'rsatilmaydi (`MIN_DAYS`) — bitta nuqtadan chiqadigan tekis chiziq "hech narsa
+  o'zgarmadi" degan yolg'on xulosa berardi.
+- ⚠️ Bu faylni **worker ham import qiladi** (`tsx`, Next'siz). Yozish yo'li faqat
+  xom SQL ishlatadi va `unstable_cache` ga tegmaydi — kesh o'rami (`getKpiHistory`)
+  Next so'rov konteksti tashqarisida chaqirilsa yiqiladi.
+
+⚠️ **Hodisaviy trendlar** (`services/trends.ts`) snapshotga bog'liq EMAS va birinchi
+kundanoq ishlaydi — manbasi `RentContract.contractDate` / `AuctionLot.auctionDate`.
+`AuctionLot` har sinxronizatsiyada qayta yoziladi, ya'ni auksion trendi haqiqiy tarix
+emas — grafik ostida shu ochiq yoziladi.
+
+### ⚠️ Hudud havolalarida `hududiy=1` MAJBURIY
+
+Hudud va tuman qatorlari respublika darajasidagi tashkilotlarni ("Markaziy apparat")
+o'z ichiga OLMAYDI — ular alohida qatorda hisoblanadi. Lekin ularning obyektlari
+kadastr prefiksi orqali oddiy hududlarga tarqalgan, ya'ni oddiy `?region=<id>`
+havolasi ularni QAYTA olib kirardi va ro'yxatdagi son jadvaldagidan katta chiqardi
+(jonli o'lchov: Toshkent sh. — 47 ↔ 71, 24 ta obyekt Agentlik markaziy apparatiniki).
+
+- Ta'rif **yagona joyda**: `stats.ts` → `NATIONAL_SOURCE` (`recentPaymentCutoff()`
+  naqshi). `nationalOrgRows()` ham, `buildWhere()` ham shundan oziqlanadi.
+- Ro'yxat filtri: `PropertyFilters.regionBoundSource` → URL'da `hududiy=1`.
+- Hisobotda havolalar `regionScope()` / `districtScope()` orqali quriladi — qo'lda
+  `region=...` yozmang.
+- ⚠️ **JAMI qatoriga va `tashkilot=<id>` qatoriga QO'SHILMAYDI** — birinchisi butun
+  doira bo'yicha, ikkinchisi aynan o'sha tashkilot bo'yicha.
+
+### ⚠️ `landSplit` sohalarda grafik BUTUNLAY binolar bo'yicha
+
+"Davlat aktivlari agentligi"/"Direksiya" tanlanganda hududlar reytingi jami ham,
+bo'sh turgan ham, ikkala havolasi ham binolardan quriladi
+(`landSplit.total.building` va `rentBreakdown.vacant.buildingCount`, `&isLand=0`).
+Ilgari ustun balandligi `r.inefficient` (yer + bino) dan olinib havola `&isLand=0`
+bilan ochilardi: Andijonda ustun **256**, ro'yxat **9** ta obyekt berardi.
+
 ## Ijara imtiyozi — ПҚ-3782 (`/dashboard/imtiyoz`) — 2026-09-02
 
 Alohida ilova edi (`github.com/ASarvar/Imtiyoz-API`, Express + SQLite + o'z auth'i), dashboardga

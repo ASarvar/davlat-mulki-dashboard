@@ -17,6 +17,7 @@ import {
   FileSearch,
   BadgePercent,
   SlidersHorizontal,
+  Table2,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,7 @@ export interface SidebarUser {
  */
 const ICONS: Record<string, LucideIcon> = {
   dashboard: LayoutDashboard,
+  hisobot: Table2,
   objects: Building2,
   requests: ClipboardCheck,
   imtiyoz: BadgePercent,

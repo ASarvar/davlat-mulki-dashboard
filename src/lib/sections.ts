@@ -46,6 +46,9 @@ const ADMINS: Role[] = ["SUPER_ADMIN", "ADMIN"];
 /** Tartib — Sidebar menyusidagi tartib. */
 export const SECTIONS: SectionDef[] = [
   { key: "dashboard",      href: "/dashboard",                    label: "Boshqaruv paneli",     exact: true,  allowRoles: ALL_ROLES, core: true },
+  // Rasmiy hisobot shakli (uchta jadval). Ilgari `/dashboard` da edi; vizual panel
+  // uning o'rnini egallagach shu yerga ko'chirildi (2026-09-05).
+  { key: "hisobot",        href: "/dashboard/hisobot",            label: "Rasmiy hisobot",       exact: false, allowRoles: ALL_ROLES },
   { key: "objects",        href: "/dashboard/objects",            label: "Obyektlar",            exact: false, allowRoles: ALL_ROLES },
   { key: "requests",       href: "/dashboard/requests",           label: "Tasdiqlash so'rovlari", exact: false, allowRoles: ALL_ROLES },
   { key: "imtiyoz",        href: "/dashboard/imtiyoz",            label: "Ijara imtiyozi",       exact: false, allowRoles: ALL_ROLES },

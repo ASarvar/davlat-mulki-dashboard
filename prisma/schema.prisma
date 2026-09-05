@@ -97,6 +97,7 @@ model Region {
   // faqat Toshkent sh.) — `OrganizationSource.restrictedRegionId` ga qarang.
   restrictedByOrgs OrganizationSource[] @relation("OrgRestrictedRegion")
   districts       District[]
+  snapshots       DashboardSnapshot[]
   createdAt       DateTime             @default(now())
   updatedAt       DateTime             @updatedAt
 }
@@ -149,6 +150,7 @@ model OrganizationSource {
   // Foydalanuvchi doirasi shu tashkilotga bog'lanadi (IJROCHI — bitta, MODERATOR — ko'p).
   ijrochilar User[]       @relation("UserSource1")
   moderatorLinks UserSource[] @relation("UserSourceMany")
+  snapshots  DashboardSnapshot[]
   createdAt  DateTime   @default(now())
   updatedAt  DateTime   @updatedAt
 
@@ -341,6 +343,24 @@ model Property {
   // Sinxronizatsiya holati
   syncStatus    SyncStatus @default(PENDING)
   lastSyncedAt  DateTime?
+
+  /**
+   * Xaritadagi joylashuv.
+   *
+   * ⚠️ Manba — AUKSION LOTI (API 4 `order.lat/lng`), kadastr chegarasi EMAS. Shuning
+   * uchun qamrov qisman: faqat auksionga chiqarilgan obyektlarda mavjud (~31%).
+   * `coordSource` shuni yozib qo'yadi, UI esa buni ochiq ko'rsatadi.
+   *
+   * ⚠️ `Float`, `Decimal` EMAS: `Decimal` RSC chegarasidan va `unstable_cache`
+   * serializatsiyasidan o'tmaydi. API 6 xonagacha aniqlik beradi (≈11 sm) — `double`
+   * yetarli. PostGIS ataylab rad etildi: `postgres:15` image'ni almashtirish 1800 ta
+   * nuqta uchun oqlanmaydi.
+   */
+  lat           Float?
+  lng           Float?
+  /** Koordinata qayerdan olingani ("AUCTION") — kelajakda boshqa manba qo'shilishi mumkin. */
+  coordSource   String?
+  coordsAt      DateTime?
   lastSyncError String?
 
   statusChecks ObjectStatusCheck[]
@@ -357,6 +377,8 @@ model Property {
   @@index([districtId])
   @@index([sourceId])
   @@index([syncStatus])
+  // Xarita so'rovi faqat koordinatasi bor obyektlarni oladi.
+  @@index([lat, lng])
   @@index([integrationCategoryCode])
   @@index([manualCategoryCode])
   @@index([lotNumber])
@@ -398,6 +420,8 @@ model AuctionLot {
   @@index([propertyId])
   @@index([lotNumber])
   @@index([type])
+  // Auksion trendi shu ustun bo'yicha 24 oylik oraliqni skanerlaydi.
+  @@index([auctionDate])
 }
 
 // Ijara shartnomalari (API 5). Bitta kadastrda bir nechta shartnoma bo'lishi mumkin
@@ -423,6 +447,8 @@ model RentContract {
 
   @@index([propertyId])
   @@index([contractNumber])
+  // Boshqaruv panelidagi oylik ijara trendi shu ustun bo'yicha 24 oylik oraliqni skanerlaydi.
+  @@index([contractDate])
 }
 
 // API 3–8 natijalari (har bir manba uchun bitta qator)
@@ -828,4 +854,70 @@ model SectionAccess {
   updatedById String?
   updatedBy   User?    @relation("SectionAccessUpdatedBy", fields: [updatedById], references: [id], onDelete: SetNull)
   updatedAt   DateTime @updatedAt
+}
+
+// ─────────────────────────── Kunlik snapshot ───────────────────────────
+
+/**
+ * Boshqaruv panelidagi ko'rsatkichlarning KUNLIK o'lchovi.
+ *
+ * ⚠️ **Sabab:** `Property` ning statistika ustunlari har sinxronizatsiyada USTIDAN
+ * yoziladi, `ObjectStatusCheck` da esa `@@unique([propertyId, apiSource])` — ya'ni
+ * "o'tgan oyda nechta obyekt bo'sh turgan edi" degan savolga bazada javob YO'Q.
+ * Bu jadval o'sha bo'shliqni to'ldiradi: har kuni bir marta joriy holat yoziladi.
+ *
+ * ⚠️ **Tarixni backfill qilib BO'LMAYDI** — o'tmishdagi holat hech qayerda saqlanmagan.
+ * Shuning uchun jadval bo'sh bo'lganda grafik NOL chiziq chizmaydi, umuman
+ * ko'rsatilmaydi (aks holda "hech narsa o'zgarmadi" degan yolg'on xulosa chiqardi).
+ *
+ * **Gran — `(day, sourceId, regionId)`.** Barcha kesimlar shundan YIG'INDI bilan
+ * tiklanadi: rol doirasi (`sourceIds`), soha filtri (JOIN orqali `name`), hudud kesimi.
+ * Faqat hudud grani `sourceIds` doirasini tiklay olmasdi, faqat manba grani esa
+ * hudud kesimini bera olmasdi — shuning uchun ikkalasi birga.
+ *
+ * ⚠️ **`soha` (nom) ustuni ATAYLAB yo'q.** `OrganizationSource.name` admin UI'da
+ * qayta nomlanishi mumkin — nom saqlansa tarix ikkiga bo'linib qolardi. JOIN esa
+ * har doim joriy nomni beradi.
+ *
+ * ⚠️ **Kalitda NULL yo'q** (ikkala ustun ham NOT NULL) — loyihada bu naqsh
+ * allaqachon bir marta buzgan: `@@unique([regionId, stir])` da `regionId` NULL
+ * bo'lganda Postgres NULL'larni farqli deb hisoblab dublikatni o'tkazib yuborgan.
+ * Bu yerda `Property.sourceId`/`regionId` ikkalasi ham majburiy, ya'ni muammo yo'q.
+ */
+model DashboardSnapshot {
+  /** O'lchov sanasi — **Asia/Tashkent** kuni (`snapshots.ts`), UTC emas. */
+  day      DateTime @db.Date
+  sourceId String
+  source   OrganizationSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
+  regionId String
+  region   Region             @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  /** Balansdagi obyektlar soni (`removedFromBalance = false` — `sourceCond()` bilan bir xil). */
+  totalObjects Int
+  /** Effektiv kategoriyasi 11 ("Bo'sh turgan"). */
+  vacantObjects Int
+  /**
+   * Shundan FAQAT binolar (`NOT isLand`) — `landSplit` sohalarida (Davlat aktivlari
+   * agentligi / Direksiya) kartada aynan shu son ko'rsatiladi.
+   */
+  vacantBuildings Int
+  /** Ijara shartnomasi bor obyektlar (`rentContractCount > 0`) — kategoriyadan mustaqil. */
+  rentedObjects Int
+  /** Shartnomalar soni (obyektlar bo'yicha yig'indi). */
+  contractCount Int
+
+  rentArea Decimal @db.Decimal(18, 2)
+  rentSum  Decimal @db.Decimal(20, 2)
+  /** Bo'sh maydon yig'indisi (`Property.vacantArea` = foydali − ijarada). */
+  vacantArea Decimal @db.Decimal(18, 2)
+
+  /**
+   * O'lchov QACHON olingani. Kun ichida qayta olinganda yangilanadi va shu bilan
+   * eskirgan qatorlarni topish imkonini beradi (`snapshots.ts` — manbasi yo'qolgan
+   * (manba, hudud) juftligi kun ichida qolib ketmasin).
+   */
+  takenAt DateTime
+
+  @@id([day, sourceId, regionId])
+  @@index([day])
 }

@@ -11,6 +11,12 @@ export const QUEUE = {
    * unga ALOHIDA `expireInSeconds` beriladi, umumiy 120s uni yarmida uzardi.
    */
   IMTIYOZ_YATT_SYNC: "imtiyoz-yatt-sync",
+  /**
+   * Boshqaruv paneli ko'rsatkichlarining kunlik o'lchovi (`services/snapshots.ts`).
+   * ⚠️ Jadvali **02:00** — kunlik to'liq sync (03:00) dan OLDIN. Sync o'rtasida
+   * olingan snapshot yarim yangilangan holatni yozib, trendda soxta sakrash berardi.
+   */
+  DASHBOARD_SNAPSHOT: "dashboard-snapshot",
 } as const;
 
 export interface SyncSourceJob {

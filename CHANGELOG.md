@@ -7,6 +7,40 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.10.0
+
+- **Yangi asosiy sahifa: vizual boshqaruv paneli.** `/dashboard` endi 25–30 ustunli
+  hisobot jadvali emas — 6 ta KPI karta, 4 ta grafik (kategoriya taqsimoti, hududlar
+  reytingi, maydon balansi, kommunal qamrov), obyektlar xaritasi va ijara shartnomalari
+  trendi. Eski rasmiy hisobot shakli (uchta jadval) o'z joyida qoladi —
+  `/dashboard/hisobot` ga ko'chdi, sidebarda alohida bandda.
+- **Obyektlar xaritasi.** Auksionga chiqarilgan obyektlarning geografik joylashuvi —
+  klasterlangan nuqtalar (davijara.uz naqshi) yoki hududlar rejimi (`?xarita=hudud`).
+  ⚠️ Koordinata faqat **auksion lotining nuqtasi** (kadastr chegarasi emas) va faqat
+  auksionga chiqqan obyektlarda mavjud (~31% qamrov) — xarita sarlavhasida doim ochiq
+  yoziladi. Mavjud bo'lganlar bazadan (auksion API javobidan) backfill qilindi, hech
+  qanday yangi tashqi so'rov yubormasdan.
+- **Ijara shartnomalari trendi** — oxirgi 24 oy, haqiqiy hodisa sanasi bo'yicha
+  (`RentContract.contractDate`). Sanasi ko'rsatilmagan shartnomalar alohida ko'rsatiladi.
+- **Kunlik snapshot — kelajak trendlari uchun.** Har kuni soat 02:00 da (kunlik
+  sinxronizatsiyadan oldin) "Jami", "Bo'sh turgan" va "Ijaraga berilgan" ko'rsatkichlari
+  saqlanadi. ⚠️ Tarixni backfill qilib bo'lmaydi — grafik kamida ikki kunlik o'lchov
+  to'plangach ochiladi, shu paytgacha "Birinchi o'lchov: ..." deb ko'rsatiladi.
+  `/dashboard/sync` da admin uchun "Kunlik snapshot olish" tugmasi (birinchi kun yoki
+  jadval o'tkazib yuborilgan kun uchun).
+- **Tuzatildi: hudud bo'yicha ro'yxatga o'tishda respublika darajasidagi tashkilotlar
+  ("Markaziy apparat") noto'g'ri qo'shilib ketardi.** Masalan Toshkent shahri ustunida
+  47 ta obyekt ko'rsatilib, ro'yxatga o'tilganda 71 ta chiqardi (24 tasi Agentlikning
+  markaziy apparati obyektlari, ular alohida hisoblanishi kerak edi). Bu xato rasmiy
+  hisobot sahifasida ham bor edi — ikkalasida ham tuzatildi.
+- **Tuzatildi: "Davlat aktivlari agentligi" / "Direksiya" sohalarida hududlar reytingi
+  grafigi noto'g'ri sonlar ko'rsatardi** (yer uchastkalari binolar bilan birga
+  sanalgani uchun, masalan Andijonda ustun 256 ko'rsatib, ro'yxat 9 ta obyekt berardi).
+  Endi bu sohalarda grafik butunlay binolar bo'yicha quriladi.
+- **Tuzatildi: Excel eksportida ba'zi dashboard filtrlari (ijaraga berilgan, effektiv
+  kategoriya, kommunal xizmat) hisobga olinmasdi** — eksport ekrandagi ro'yxatdan
+  ko'proq qator bilan chiqardi.
+
 ## 1.9.0
 
 - **Yangi bo'lim: "Bo'limlar" — ko'rinishni boshqarish (faqat super admin).**

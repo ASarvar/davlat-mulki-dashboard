@@ -1,12 +1,13 @@
 "use client";
 
 import { useActionState } from "react";
-import { RefreshCw, MapPin, Trash2, Zap } from "lucide-react";
+import { RefreshCw, MapPin, Trash2, Zap, LineChart } from "lucide-react";
 import {
   runFullSyncAction,
   runRegionSyncAction,
   runStatusRefreshAction,
   cleanupSyncAction,
+  takeSnapshotAction,
   type SyncState,
 } from "./actions";
 
@@ -46,6 +47,7 @@ export function SyncControls({
     {},
   );
   const [clnState, clnAction, clnPending] = useActionState<SyncState, FormData>(cleanupSyncAction, {});
+  const [snapState, snapAction, snapPending] = useActionState<SyncState, FormData>(takeSnapshotAction, {});
 
   return (
     <div className="grid gap-4 md:grid-cols-2">
@@ -181,6 +183,37 @@ export function SyncControls({
           </button>
           {refreshState.error ? <p className="mt-2 text-sm text-red-700">{refreshState.error}</p> : null}
           {refreshState.ok ? <p className="mt-2 text-sm text-emerald-700">{refreshState.ok}</p> : null}
+        </form>
+      ) : null}
+
+      {/* ⚠️ Kunlik o'lchov — TARIX. Uni keyin backfill qilib bo'lmaydi, shuning uchun
+          jadval (02:00) ishlamay qolgan kun uchun qo'lda olish imkoni kerak. */}
+      {canFullSync ? (
+        <form action={snapAction} className="rounded-xl border border-border bg-card p-5 shadow-sm md:col-span-2">
+          <h2 className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--navy)" }}>
+            <LineChart className="h-4 w-4" style={{ color: "var(--gold)" }} />
+            Kunlik snapshot olish
+          </h2>
+          <p className="mt-1 mb-3 text-sm text-muted-foreground">
+            Boshqaruv panelidagi &laquo;Asosiy ko&apos;rsatkichlar dinamikasi&raquo; grafigi shu o&apos;lchovlardan
+            quriladi. Har kuni <strong>02:00</strong> da avtomatik olinadi (kunlik sinxronizatsiyadan oldin) — bu tugma
+            faqat birinchi kun yoki jadval o&apos;tkazib yuborilgan kun uchun.{" "}
+            <span className="text-amber-700">
+              O&apos;tmish uchun o&apos;lchov olib bo&apos;lmaydi: obyekt ustunlari har sinxronizatsiyada ustidan
+              yoziladi.
+            </span>{" "}
+            Kun ichida qayta bosilsa qator yangilanadi, dublikat yaratilmaydi.
+          </p>
+          <button
+            type="submit"
+            disabled={snapPending}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+          >
+            <LineChart className="h-4 w-4" />
+            {snapPending ? "Olinmoqda..." : "Bugungi o'lchovni olish"}
+          </button>
+          {snapState.error ? <p className="mt-2 text-sm text-red-700">{snapState.error}</p> : null}
+          {snapState.ok ? <p className="mt-2 text-sm text-emerald-700">{snapState.ok}</p> : null}
         </form>
       ) : null}
 

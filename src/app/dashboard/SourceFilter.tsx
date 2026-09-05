@@ -19,15 +19,22 @@ export const OWN_SOHA = "__own__";
  *
  * `showOwn` — MODERATOR uchun: uning standart doirasi parametrsiz URL'da yashaydi,
  * shuning uchun boshqa sohaga o'tgandan keyin qaytish uchun alohida tugma kerak.
+ *
+ * ⚠️ `basePath` — havolalar QAYSI sahifaga qaytishi. Ilgari `/dashboard` qattiq yozilgan
+ * edi; rasmiy hisobot `/dashboard/hisobot` ga ko'chgach, usiz manba tugmasi foydalanuvchini
+ * hisobotdan yangi boshqaruv paneliga otib yuborardi — jimgina, xatosiz.
  */
 export function SourceFilter({
   names,
   activeKey,
   showOwn = false,
+  basePath,
 }: {
   names: string[];
   activeKey: string;
   showOwn?: boolean;
+  /** Havolalar quriladigan sahifa manzili (masalan `/dashboard/hisobot`). */
+  basePath: string;
 }) {
   // Bitta manba bo'lsa tanlashning ma'nosi yo'q — ko'rsatmaymiz.
   if (names.length < 2 && !showOwn) return null;
@@ -41,9 +48,9 @@ export function SourceFilter({
   });
 
   const items: { key: string; label: string; href: string }[] = [
-    ...(showOwn ? [{ key: OWN_SOHA, label: "Mening tashkilotim", href: "/dashboard" }] : []),
-    ...ordered.map((n) => ({ key: n, label: n, href: `/dashboard?soha=${encodeURIComponent(n)}` })),
-    { key: ALL_SOHA, label: "Hammasi", href: `/dashboard?soha=${ALL_SOHA}` },
+    ...(showOwn ? [{ key: OWN_SOHA, label: "Mening tashkilotim", href: basePath }] : []),
+    ...ordered.map((n) => ({ key: n, label: n, href: `${basePath}?soha=${encodeURIComponent(n)}` })),
+    { key: ALL_SOHA, label: "Hammasi", href: `${basePath}?soha=${ALL_SOHA}` },
   ];
 
   return (

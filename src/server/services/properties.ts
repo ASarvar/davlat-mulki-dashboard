@@ -16,7 +16,7 @@ import {
   type UtilityInfo,
   type UtilityKind,
 } from "@/server/integrations/utilities";
-import { recentPaymentCutoff } from "./stats";
+import { recentPaymentCutoff, NATIONAL_SOURCE } from "./stats";
 
 export interface PropertyFilters {
   q?: string; // kadastr (yangi/eski) bo'yicha qidiruv
@@ -24,6 +24,19 @@ export interface PropertyFilters {
   /** Tuman (District.id) — hudud ichida torroq kesim. */
   districtId?: string;
   categoryCode?: number; // effektiv kategoriya (1–10)
+  /**
+   * QAT'IY effektiv kategoriya: `COALESCE(integration, manual, 11) = N`.
+   *
+   * ⚠️ `categoryCode` bilan ARALASHTIRMANG. U 3/4/5/6/12 uchun ataylab XUSUSIYAT
+   * bo'yicha filtrlaydi (lot bayrog'i, shartnoma summasi, bo'sh maydon), chunki
+   * rasmiy hisobot jadvalidagi o'sha ustunlar ham shunday hisoblanadi va ustunlar
+   * yig'indisi "Jami"dan katta chiqadi.
+   *
+   * Boshqaruv panelidagi halqa diagramma esa TAQSIMOT — bo'laklari kesishmasligi va
+   * yig'indisi jamiga TENG bo'lishi shart. Shu sabab unga aynan effektiv kategoriya
+   * kerak. Jonli o'lchovda farq katta: kat 3 → 522 va 599, kat 12 → 0 va 281.
+   */
+  effectiveCategory?: number;
   inefficient?: boolean;
   syncStatus?: SyncStatus;
   /** Soha = manba nomi ("Ijara markazi", "Sog'liqni saqlash", ...) */
@@ -34,10 +47,35 @@ export interface PropertyFilters {
   fullyRented?: boolean;
   /** Ijara shartnomasi bor — tekin foydalanish yoki pullik, ikkisidan biri. Kategoriyaga bog'liq emas. */
   hasRentContract?: boolean;
+  /**
+   * KAMIDA BITTA ijara shartnomasi bor (`rentContractCount > 0`) — kategoriyadan mustaqil.
+   *
+   * ⚠️ `hasRentContract` bilan ARALASHTIRMANG: u effektiv kategoriya 5/6 ni talab qiladi,
+   * bu esa savdodagi/sotilgan obyektning shartnomasini ham sanaydi. Ikkalasi TURLI son
+   * beradi. Bu filtr boshqaruv panelidagi "Ijaraga berilgan" kartasi uchun —
+   * `DashboardStats.totals.rentedObjects` aynan shu mezon bilan hisoblanadi.
+   */
+  hasAnyRentContract?: boolean;
   /** Xususiylashtirish YOKI ijara savdosida (kat 3 va 4 birlashmasi, takror sanalmaydi). */
   onAnyAuction?: boolean;
   /** Yer uchastkasimi (true) yoki bino (false) — Davlat aktivlari/Direksiya jadvalidagi Yer/Bino ustunlaridan. */
   isLand?: boolean;
+  /**
+   * FAQAT hududiy manbalar — respublika darajasidagi tashkilotlar (`NATIONAL_SOURCE`)
+   * chiqarib tashlanadi.
+   *
+   * ⚠️ Dashboard va rasmiy hisobotdagi HUDUD/TUMAN qatorlari respublika darajasidagi
+   * tashkilotlarni ("Markaziy apparat") o'z ichiga OLMAYDI — ular alohida qatorda
+   * hisoblanadi. Lekin ularning obyektlari kadastr prefiksi orqali oddiy hududlarga
+   * tarqalgan, ya'ni `?region=<id>` havolasi ularni QAYTA olib kirardi va ro'yxatdagi
+   * son jadvaldagidan katta chiqardi (jonli o'lchov: Toshkent sh. — 47 ↔ 71, 24 ta
+   * obyekt Agentlik markaziy apparatiniki). Shu sabab har bir hudud/tuman havolasiga
+   * `hududiy=1` qo'shiladi.
+   *
+   * ⚠️ JAMI qatori havolasiga QO'SHILMAYDI — u butun doira bo'yicha, respublika
+   * darajasidagilar bilan birga.
+   */
+  regionBoundSource?: boolean;
   /** MODERATOR uchun: faqat o'ziga biriktirilgan hudud(lar) bo'yicha saralash (ko'rish cheklovi emas). */
   myRegionsOnly?: boolean;
   /** Kommunal xizmat kesimi — dashboard'dagi kommunal jadval ustunlaridan drill-down. */
@@ -147,6 +185,21 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
   // ⚠️ `wantsRemoved` bu yerga TUSHMASLIGI kerak: 13 haqiqiy kategoriya kodi emas,
   // pastdagi `else` shoxi uni `integrationCategoryCode = 13` deb qidirib, natijani
   // doim bo'sh qaytarardi (holbuki shart yuqorida allaqachon qo'yilgan).
+  // ⚠️ Halqa diagramma uchun: kategoriya ustunlaridan hisoblanadigan EFFEKTIV qiymat.
+  // `CAT_VACANT` (11) ikkala ustun ham null bo'lgan holat — bazada literal 11 saqlanmaydi.
+  if (f.effectiveCategory && !wantsRemoved) {
+    const c = f.effectiveCategory;
+    if (c === CAT_VACANT) {
+      and.push({ integrationCategoryCode: null, manualCategoryCode: null });
+    } else {
+      and.push({
+        OR: [
+          { integrationCategoryCode: c },
+          { integrationCategoryCode: null, manualCategoryCode: c },
+        ],
+      });
+    }
+  }
   if (f.categoryCode && !wantsRemoved) {
     const c = f.categoryCode;
     if (c === CAT_ON_AUCTION) {
@@ -180,6 +233,10 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
   if (f.soha) and.push({ source: { name: f.soha } });
   // Aniq tashkilot (soha ichidagi bitta hudud yoki "Markaziy apparat") — soha filtri bilan AND birikadi.
   if (f.sourceId) and.push({ sourceId: f.sourceId });
+  // Faqat hududiy manbalar — hudud/tuman qatoridan kelgan havolalar uchun.
+  // ⚠️ Ta'rif `stats.ts` → `NATIONAL_SOURCE` dan, ya'ni jadvalni quruvchi so'rov bilan
+  // AYNAN bir xil manbadan (`recentPaymentCutoff()` naqshi).
+  if (f.regionBoundSource) and.push({ source: { NOT: { ...NATIONAL_SOURCE } } });
 
   // To'liq ijaraga berilgan — dashboard'dagi mos ustun bilan bir xil mantiq (stats.ts → rentRaw).
   if (f.fullyRented) and.push({ rentContractCount: { gt: 0 }, vacantArea: 0 });
@@ -195,6 +252,8 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
       ],
     });
   }
+  // Boshqaruv panelidagi "Ijaraga berilgan" kartasi — `totals.rentedObjects` bilan bir xil mezon.
+  if (f.hasAnyRentContract) and.push({ rentContractCount: { gt: 0 } });
   // "Auksion savdolarida (Xususiy. va Ijara)" ustuni — xususiylashtirish YOKI ijara savdosida.
   if (f.onAnyAuction) and.push({ OR: [{ hasPrivatizationLot: true }, { hasRentLot: true }] });
 

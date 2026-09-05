@@ -53,8 +53,11 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   const inefficientStr = str(sp.inefficient);
   const fullyRentedStr = str(sp.fullyRented);
   const hasRentContractStr = str(sp.hasRentContract);
+  const hasAnyRentContractStr = str(sp.hasAnyRentContract);
+  const effCatStr = str(sp.effectiveCategory);
   const onAnyAuctionStr = str(sp.onAnyAuction);
   const isLandStr = str(sp.isLand);
+  const hududiyStr = str(sp.hududiy);
   const utilityRaw = str(sp.utility);
   const utility = UTILITY_FILTERS.includes(utilityRaw as UtilityFilter)
     ? (utilityRaw as UtilityFilter)
@@ -74,8 +77,11 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     syncStatus,
     fullyRented: fullyRentedStr === "1" ? true : undefined,
     hasRentContract: hasRentContractStr === "1" ? true : undefined,
+    hasAnyRentContract: hasAnyRentContractStr === "1" ? true : undefined,
+    effectiveCategory: effCatStr ? Number(effCatStr) : undefined,
     onAnyAuction: onAnyAuctionStr === "1" ? true : undefined,
     isLand: isLandStr === "1" ? true : isLandStr === "0" ? false : undefined,
+    regionBoundSource: hududiyStr === "1" ? true : undefined,
     myRegionsOnly: myRegionsOnly || undefined,
     utility,
   };
@@ -130,8 +136,11 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   if (inefficientStr) baseParams.set("inefficient", inefficientStr);
   if (fullyRentedStr) baseParams.set("fullyRented", fullyRentedStr);
   if (hasRentContractStr) baseParams.set("hasRentContract", hasRentContractStr);
+  if (hasAnyRentContractStr) baseParams.set("hasAnyRentContract", hasAnyRentContractStr);
+  if (effCatStr) baseParams.set("effectiveCategory", effCatStr);
   if (onAnyAuctionStr) baseParams.set("onAnyAuction", onAnyAuctionStr);
   if (isLandStr) baseParams.set("isLand", isLandStr);
+  if (hududiyStr) baseParams.set("hududiy", hududiyStr);
   if (utility) baseParams.set("utility", utility);
   if (syncStatus) baseParams.set("status", syncStatus);
 
@@ -152,6 +161,13 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     chips.push({ key: "onAnyAuction", value: "1", label: "Auksion savdolarida", removeHref: hrefWithout("onAnyAuction") });
   if (hasRentContractStr === "1")
     chips.push({ key: "hasRentContract", value: "1", label: "Ijaraga berilgan", removeHref: hrefWithout("hasRentContract") });
+  if (hasAnyRentContractStr === "1")
+    chips.push({
+      key: "hasAnyRentContract",
+      value: "1",
+      label: "Ijara shartnomasi bor",
+      removeHref: hrefWithout("hasAnyRentContract"),
+    });
   if (fullyRentedStr === "1")
     chips.push({ key: "fullyRented", value: "1", label: "To'liq ijara berilgan", removeHref: hrefWithout("fullyRented") });
   if (utility)
@@ -163,6 +179,16 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     });
   if (isLandStr === "1") chips.push({ key: "isLand", value: "1", label: "Yer", removeHref: hrefWithout("isLand") });
   if (isLandStr === "0") chips.push({ key: "isLand", value: "0", label: "Bino", removeHref: hrefWithout("isLand") });
+  // ⚠️ Yorliq MAJBURIY: hudud qatoridan kelgan foydalanuvchi ro'yxatdagi son nega
+  // "Markaziy apparat" obyektlarini o'z ichiga olmasligini ko'rishi va bir bosishda
+  // olib tashlay olishi kerak.
+  if (hududiyStr === "1")
+    chips.push({
+      key: "hududiy",
+      value: "1",
+      label: "Faqat hududiy manbalar",
+      removeHref: hrefWithout("hududiy"),
+    });
   if (syncStatus)
     chips.push({ key: "status", value: syncStatus, label: `Sinxronizatsiya: ${syncStatus}`, removeHref: hrefWithout("status") });
 

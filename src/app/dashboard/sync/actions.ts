@@ -4,6 +4,7 @@ import { revalidatePath, revalidateTag } from "next/cache";
 import { requireRole } from "@/lib/authz";
 import { triggerFullSync, triggerRegionSync, triggerStatusRefresh } from "@/server/queue/enqueue";
 import { cleanupStuckSyncs } from "@/server/services/syncAdmin";
+import { takeDashboardSnapshot } from "@/server/services/snapshots";
 
 export interface SyncState {
   ok?: string;
@@ -80,6 +81,26 @@ export async function runStatusRefreshAction(_prev: SyncState, formData: FormDat
     return {
       ok: `Holat yangilash navbatga qo'yildi (${run.id.slice(0, 8)}) — ${run.totalCount} ta obyekt`,
     };
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Xatolik yuz berdi" };
+  }
+}
+
+/**
+ * Kunlik snapshotni QO'LDA olish — SUPER_ADMIN yoki ADMIN.
+ *
+ * ⚠️ Navbatga qo'yilmaydi, DARHOL bajariladi (bitta SQL). Sabab: birinchi kun
+ * grafik bo'sh qolmasligi kerak, worker esa o'chirilgan bo'lishi mumkin —
+ * navbatga qo'yilsa tugma "qo'yildi" deb yozib, hech narsa yozilmasdi.
+ * Idempotent: kun ichida qayta bosilsa qatorlar yangilanadi, dublikat chiqmaydi.
+ */
+export async function takeSnapshotAction(_prev: SyncState, _formData: FormData): Promise<SyncState> {
+  try {
+    await requireRole("SUPER_ADMIN", "ADMIN");
+    const r = await takeDashboardSnapshot();
+    revalidatePath("/dashboard/sync");
+    revalidateTag("dashboard");
+    return { ok: `${r.day} kuni uchun o'lchov olindi — ${r.rows} ta (manba × hudud) qatori` };
   } catch (err) {
     return { error: err instanceof Error ? err.message : "Xatolik yuz berdi" };
   }

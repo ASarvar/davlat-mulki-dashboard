@@ -1,4 +1,5 @@
 import { env } from "@/lib/env";
+import { pickAuctionCoords, type Coords } from "@/lib/geo";
 import { httpJson, NotFoundError } from "./http";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,6 +45,13 @@ export interface Api4Order {
   start_price?: number | null;
   auction_date?: string | null;
   winner_name?: string | null;
+  /**
+   * Auksion lotining joylashuvi. Javobda ALLAQACHON bor edi (`[k: string]: unknown`
+   * orqali `rawResponse` ga tushib turgan) — endi aniq tiplangan.
+   * ⚠️ Bu LOT nuqtasi, kadastr chegarasi emas.
+   */
+  lat?: number | string | null;
+  lng?: number | string | null;
   details?: Api4Detail[] | null;
   [k: string]: unknown;
 }
@@ -82,6 +90,8 @@ export interface AuctionInfo {
   auctionDate: Date | null;
   /** API 4 `details["hudud_kvm_2"]` — binolar/inshootlar egallagan maydon (kv.m). */
   area: number | null;
+  /** Lot koordinatasi — `lib/geo.ts` orqali tekshirilgan (chegaradan tashqarisi `null`). */
+  coords: Coords | null;
   raw: unknown;
 }
 
@@ -103,6 +113,7 @@ export const EMPTY_AUCTION: AuctionInfo = {
   startPrice: null,
   auctionDate: null,
   area: null,
+  coords: null,
   raw: null,
 };
 
@@ -300,6 +311,7 @@ export async function checkAuction(cadNumber: string): Promise<AuctionInfo> {
     startPrice: numLoose(order.start_price),
     auctionDate: parseApi4Date(order.auction_date),
     area: parseAreaText(detailValue(order, "hudud_kvm_2")),
+    coords: pickAuctionCoords(order),
     // group_name'ni ham saqlaymiz — keyinchalik API'siz qayta hisoblash uchun kerak.
     raw: { api3: asset, api4: order, group_name: groupName },
   };

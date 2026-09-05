@@ -4,7 +4,12 @@ import { NextResponse } from "next/server";
 import { SyncStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/authz";
 import { CATEGORY_BY_CODE, effectiveCategory } from "@/lib/categories";
-import { iteratePropertiesForExport, type PropertyFilters } from "@/server/services/properties";
+import {
+  iteratePropertiesForExport,
+  UTILITY_FILTERS,
+  type PropertyFilters,
+  type UtilityFilter,
+} from "@/server/services/properties";
 
 const SYNC_LABEL: Record<string, string> = {
   PENDING: "Kutilmoqda",
@@ -28,6 +33,13 @@ export async function GET(req: Request) {
   const hasRentContract = sp.get("hasRentContract");
   const onAnyAuction = sp.get("onAnyAuction");
   const isLand = sp.get("isLand");
+  // ⚠️ `baseParams` dagi HAR BIR filtr shu yerda ham o'qilishi SHART — aks holda
+  // Excel ekrandagidan KO'PROQ qator bilan chiqadi (`status` bir marta aynan shu
+  // sabab eksportga yetib bormagan edi, CLAUDE.md → "Obyektlar filtri", 3-qoida).
+  const hasAnyRentContract = sp.get("hasAnyRentContract");
+  const effCat = sp.get("effectiveCategory");
+  const hududiy = sp.get("hududiy");
+  const utilityRaw = sp.get("utility");
   // "mine" — Hudud select'idagi maxsus variant (faqat MODERATOR), haqiqiy hudud ID emas.
   const regionRaw = sp.get("region") || undefined;
   const myRegionsOnly = regionRaw === "mine";
@@ -45,6 +57,12 @@ export async function GET(req: Request) {
     hasRentContract: hasRentContract === "1" ? true : undefined,
     onAnyAuction: onAnyAuction === "1" ? true : undefined,
     isLand: isLand === "1" ? true : isLand === "0" ? false : undefined,
+    hasAnyRentContract: hasAnyRentContract === "1" ? true : undefined,
+    effectiveCategory: effCat ? Number(effCat) : undefined,
+    regionBoundSource: hududiy === "1" ? true : undefined,
+    utility: UTILITY_FILTERS.includes(utilityRaw as UtilityFilter)
+      ? (utilityRaw as UtilityFilter)
+      : undefined,
     myRegionsOnly: myRegionsOnly || undefined,
   };
 

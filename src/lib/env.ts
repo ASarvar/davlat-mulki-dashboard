@@ -98,6 +98,14 @@ const schema = z.object({
   // ishlatilayotganini bildiradi.
   UTILITY_RECENT_PAYMENT_MONTHS: z.coerce.number().int().positive().default(3),
 
+  // ── Xarita foni (tile) ──
+  // ⚠️ Standarti OSM: ichki tarmoqda tashqi internet bo'lmasligi mumkin, shuning uchun
+  // manzil KODSIZ almashtiriladigan qilingan (ichki geoserverga o'tish uchun).
+  // Fon yuklanmasa xarita bo'sh qolmaydi — nuqtalar baribir chiziladi va ogohlantirish
+  // ko'rsatiladi (`tileerror`).
+  MAP_TILE_URL: z.string().url().default("https://tile.openstreetmap.org/{z}/{x}/{y}.png"),
+  MAP_TILE_ATTRIBUTION: z.string().default("© OpenStreetMap"),
+
   // ── Ijara imtiyozi (ПҚ-3782): Soliq + TIEK ──
   // Uchalasi ham kommunal API'lar bilan BIR XIL shlyuzda (10.190.5.2:8675/markaz) va
   // odatda bir xil Basic juftlikda, lekin alohida sozlanadi (kelajakda ajralishi mumkin).
