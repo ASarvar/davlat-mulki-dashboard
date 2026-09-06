@@ -1,6 +1,15 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, CheckCircle2, Clock3, XCircle, LineChart, AlertTriangle } from "lucide-react";
+import {
+  LineChart,
+  AlertTriangle,
+  Building2,
+  DoorClosed,
+  KeyRound,
+  FileSignature,
+  LandPlot,
+  Banknote,
+} from "lucide-react";
 import { canAccess, firstOpenSectionHref, requireSection } from "@/server/services/sectionAccess";
 import { getDashboardStats, getUtilityStats } from "@/server/services/stats";
 import { getRentContractTrend } from "@/server/services/trends";
@@ -210,21 +219,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             {soha ? ` — ${soha}` : ""}
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <SourceFilter
-            names={sohaList}
-            activeKey={activeSourceKey}
-            showOwn={showOwn}
-            basePath="/dashboard"
-          />
-          <Link
-            href={`/dashboard/hisobot${sohaParam ? `?${sohaParam}` : ""}`}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-border bg-card px-3 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-muted"
-          >
-            Rasmiy hisobot
-            <ArrowRight className="h-3.5 w-3.5" />
-          </Link>
-        </div>
+        <SourceFilter
+          names={sohaList}
+          activeKey={activeSourceKey}
+          showOwn={showOwn}
+          basePath="/dashboard"
+        />
       </div>
 
       {/* Asosiy ko'rsatkichlar */}
@@ -234,6 +234,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           value={nf(t.total)}
           accent={BRAND.cobalt}
           href={objHref()}
+          icon={Building2}
           footer="balansdagi obyektlar"
         />
         <KpiCard
@@ -241,6 +242,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           value={nf(vacantCount)}
           accent={BRAND.gold}
           href={vacantHref}
+          icon={DoorClosed}
           footer={
             <>
               <Tag>{pct1(vacantCount, t.total)}%</Tag> jami obyektdan
@@ -255,12 +257,14 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           value={nf(t.rentedObjects)}
           accent="#2c6e8a"
           href={objHref("hasAnyRentContract=1")}
+          icon={KeyRound}
           footer="obyektda shartnoma bor"
         />
         <KpiCard
           label="Ijara shartnomalari"
           value={nf(t.contractCount)}
           accent="#2c6e8a"
+          icon={FileSignature}
           footer={
             t.rentedObjects > 0
               ? `o'rtacha ${nf(t.contractCount / t.rentedObjects, 1)} ta obyektiga`
@@ -277,6 +281,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           value={km(t.rentArea)}
           unit="ming m²"
           accent="#2e7d5b"
+          icon={LandPlot}
           footer="shartnomalar bo'yicha jami"
         />
         <KpiCard
@@ -284,29 +289,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           value={rentSum.value}
           unit={rentSum.unit}
           accent="#2e7d5b"
+          icon={Banknote}
           footer="yillik ijara to'lovi"
         />
       </div>
-
-      {/* Sinxronizatsiya holati — ingichka chiziq, chunki bu kundalik ko'rsatkich emas,
-          nazorat ma'lumoti. */}
-      <Card className="mt-3 flex flex-wrap items-center gap-x-6 gap-y-2 px-4 py-2.5 text-[12.5px] text-slate-600">
-        <span className="inline-flex items-center gap-1.5">
-          <CheckCircle2 className="h-3.5 w-3.5 text-green-600" />
-          <b className="font-semibold text-foreground">{nf(s.synced)}</b> sinxronlangan
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <Clock3 className="h-3.5 w-3.5 text-amber-500" />
-          <b className="font-semibold text-foreground">{nf(s.pending)}</b> kutilmoqda
-        </span>
-        <span className="inline-flex items-center gap-1.5">
-          <XCircle className="h-3.5 w-3.5 text-red-500" />
-          <b className="font-semibold text-foreground">{nf(s.failed)}</b> xato
-        </span>
-        <span className="text-muted-foreground">
-          Kunlik to'liq sinxronizatsiya — har kuni soat 03:00 da
-        </span>
-      </Card>
 
       {/* Kategoriya taqsimoti + hududlar reytingi */}
       <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">

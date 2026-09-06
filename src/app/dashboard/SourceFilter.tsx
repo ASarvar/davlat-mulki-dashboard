@@ -54,21 +54,25 @@ export function SourceFilter({
   ];
 
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <span className="inline-flex items-center gap-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-        <Layers3 className="h-3.5 w-3.5" />
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+      <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+        <Layers3 className="h-3.5 w-3.5" style={{ color: "var(--gold)" }} />
         Manba
       </span>
-      <div className="flex flex-wrap gap-1 rounded-lg border border-border bg-card p-1 shadow-sm">
+      <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
         {items.map((it) => {
           const active = it.key === activeKey;
           return (
             <Link
               key={it.key}
               href={it.href}
-              className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
-                active ? "text-white shadow-sm" : "text-slate-600 hover:bg-slate-50"
-              }`}
+              aria-current={active ? "page" : undefined}
+              className={[
+                "rounded-lg px-3 py-1.5 text-[13px] font-medium transition-all duration-150 ease-out",
+                active
+                  ? "text-white shadow-[0_2px_10px_-3px_rgba(26,58,124,0.6)]"
+                  : "text-slate-500 hover:bg-muted hover:text-slate-900",
+              ].join(" ")}
               style={active ? { background: "var(--cobalt)" } : undefined}
             >
               {it.label}

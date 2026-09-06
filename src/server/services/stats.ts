@@ -133,9 +133,6 @@ export interface RentAreaStat {
 export interface DashboardStats {
   total: number;
   inefficient: number;
-  synced: number;
-  pending: number;
-  failed: number;
   /** JAMI qatori (barcha hududlar yig'indisi) */
   totals: Omit<RegionStat, "regionId" | "name" | "sortOrder">;
   byRegion: RegionStat[];
@@ -839,11 +836,8 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
     ? Prisma.sql`${srcCond} AND p."sourceId" NOT IN (${Prisma.join(natIds)})`
     : srcCond;
 
-  const [total, synced, pending, failed, regionRows, byCategoryRaw] = await Promise.all([
+  const [total, regionRows, byCategoryRaw] = await Promise.all([
     prisma.property.count({ where: srcWhere }),
-    prisma.property.count({ where: { syncStatus: "SYNCED", ...srcWhere } }),
-    prisma.property.count({ where: { syncStatus: "PENDING", ...srcWhere } }),
-    prisma.property.count({ where: { syncStatus: "FAILED", ...srcWhere } }),
     // Hudud kesimi — umumiy yordamchi orqali (tuman kesimi ham shuni ishlatadi).
     groupTotalsRows({
       table: Prisma.sql`"Region"`,
@@ -954,9 +948,6 @@ export async function computeDashboardStats(scope: StatsScope = {}): Promise<Das
   return {
     total,
     inefficient,
-    synced,
-    pending,
-    failed,
     totals: {
       total: totalObjects,
       inefficient: sum((s) => s.inefficient),

@@ -4,9 +4,6 @@ import {
   Building2,
   TrendingDown,
   Percent,
-  CheckCircle2,
-  Clock3,
-  XCircle,
   RefreshCw,
   MapPin,
   Tags,
@@ -626,9 +623,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           icon={Layers}
           tone="cobalt"
         />
-        {/* <StatCard label="Sinxronlangan" value={s.synced} icon={CheckCircle2} tone="green" /> */}
-        {/* <StatCard label="Kutilmoqda" value={s.pending} icon={Clock3} tone="amber" /> */}
-        {/* <StatCard label="Xato" value={s.failed} icon={XCircle} tone="red" /> */}
       </div>
 
       {/* Kategoriyalar kesimi — hududlar bo'yicha (JAMI yuqorida) */}
