@@ -193,10 +193,25 @@ const schema = z.object({
    * tushmaydigan qilib qo'yardi, holbuki auksion bo'limi ixtiyoriy.
    */
   AUCTION_ORDERS_CREDENTIALS: z.string().optional(),
-  /** Bitta sahifadagi yozuvlar soni — API o'zi 20 ta beradi, faqat kutish uchun. */
-  AUCTION_ORDERS_PAGE_SIZE: z.coerce.number().int().positive().default(20),
-  /** Sahifalar orasidagi pauza (ms) — skriptdagi 100 ms bilan bir xil. */
+  /**
+   * Bitta sahifadagi yozuvlar (`per_page`).
+   * ⚠️ Server 50 da CHEGARALAYDI — 100/200/500 so'ralganda ham 50 qaytaradi
+   * (jonli o'lchov, 2026-09-07). Kattaroq qiymat berish foydasiz, kichikroq esa
+   * so'rovlar sonini keraksiz oshiradi.
+   */
+  AUCTION_ORDERS_PAGE_SIZE: z.coerce.number().int().positive().max(50).default(50),
+  /**
+   * Bir vaqtda nechta sahifa yuklanadi (bitta akkaunt ichida).
+   * ⚠️ O'lchov (2026-09-07): 1 → 1.8 sahifa/s, 3 → 1.8, 6 → 3.5, xato 0 ta.
+   * Ya'ni foyda bor, lekin chiziqli emas — server o'zi qisman navbatga qo'yadi.
+   * 4 — ehtiyotkor standart; kommunal API'lardagi saboq (bitta 500 butun
+   * tekshiruvni yiqitgan) shlyuzni bosmaslikni talab qiladi.
+   */
+  AUCTION_ORDERS_CONCURRENCY: z.coerce.number().int().positive().max(10).default(4),
+  /** Sahifalar to'plamlari orasidagi pauza (ms). */
   AUCTION_ORDERS_DELAY_MS: z.coerce.number().int().nonnegative().default(100),
+  /** Sahifa uchun urinishlar soni (backoff bilan) — xato butun akkauntni to'xtatadi. */
+  AUCTION_ORDERS_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
 
   // Rate-limit / retry
   API_RATE_MAX: z.coerce.number().int().positive().default(10),

@@ -324,6 +324,7 @@ model Property {
   // chaqiruvi ism, manzil, balans, oylik sarf va to'lov tarixini beradi.
   /**
    * /**
+   * /**
    * Oxirgi `ELECTRIC_CONSUMING_MONTHS` oyda `SALDO_PERIOD.CURRENT_EE_KWH > 0` —
    * ya'ni hisoblagich bo'yicha HAQIQIY elektr sarfi qayd etilgan. Gazdagi
    * `gasConsuming` ning elektr muqobili, lekin ishonchliroq: elektrda hisoblagichsiz
@@ -1047,4 +1048,65 @@ model AuctionOrder {
   @@index([orderStatusesId])
   @@index([lotNumber])
   @@index([customerInn])
+}
+
+/**
+ * Auksion reyestrini yuklash jarayoni — ekranda "yangilanmoqda" ko'rsatish uchun.
+ * ⚠️ `SyncRun` dan ALOHIDA: u obyektlar pipeline'iga (API1/2 fan-out, leaf job
+ * hisoblagichlari, `assertNoActiveRun`) mahkam bog'langan. Auksion reyestri esa
+ * mustaqil quyi tizim — uni o'sha jadvalga tiqish ikkalasining ham mantiqini
+ * chalkashtirardi.
+ * ⚠️ Har yozuv EMAS, har SAHIFA yakunida yangilanadi (~1 360 marta) — yozuv
+ * boshiga update 68 000 ta ortiqcha UPDATE degani bo'lardi.
+ */
+model AuctionSyncRun {
+  id         String            @id @default(cuid())
+  status     AuctionSyncStatus @default(RUNNING)
+  startedAt  DateTime          @default(now())
+  finishedAt DateTime?
+
+  /**
+   * Hozir yuklanayotgan akkaunt (QR, AND …) — tugagach oxirgisi qoladi.
+   */
+  credential      String?
+  credentialIndex Int     @default(0)
+  credentialTotal Int     @default(0)
+  /**
+   * Joriy akkaunt ichidagi sahifa.
+   */
+  page            Int     @default(0)
+  pages           Int     @default(0)
+
+  /**
+   * Butun run bo'yicha jamlanma.
+   */
+  saved   Int @default(0)
+  skipped Int @default(0)
+
+  /**
+   * Akkaunt kesimidagi natija: [{name, saved, pages, error?}].
+   */
+  perCredential Json?
+  /**
+   * Butun run yiqilgan bo'lsa — sababi.
+   */
+  error         String?
+
+  /**
+   * Kim ishga tushirgan (`null` = kunlik cron).
+   */
+  startedById String?
+
+  @@index([startedAt])
+  @@index([status])
+}
+
+enum AuctionSyncStatus {
+  RUNNING
+  DONE
+  /**
+   * Ba'zi akkauntlar xato bergan, lekin run oxirigacha yetgan.
+   */
+  PARTIAL
+  FAILED
 }

@@ -2,16 +2,89 @@
 
 import { revalidatePath } from "next/cache";
 import { requireSection } from "@/server/services/sectionAccess";
+import { getCurrentUser } from "@/lib/authz";
 import { getBoss } from "@/server/queue/boss";
 import { QUEUE } from "@/server/queue/jobs";
 import { auctionConfigured } from "@/server/integrations/auctionOrders";
+import { latestAuctionSyncRun, isRunStale } from "@/server/services/auctionOrders";
+import { nf } from "@/lib/format";
+
+/** Ekranga uzatiladigan jarayon holati — client komponent uchun oddiy tiplar. */
+export interface AuctionSyncStatus {
+  running: boolean;
+  status: "RUNNING" | "DONE" | "PARTIAL" | "FAILED" | null;
+  credential: string | null;
+  credentialIndex: number;
+  credentialTotal: number;
+  page: number;
+  pages: number;
+  saved: number;
+  /**
+   * ⚠️ Son SERVERDA formatlanadi. `SyncPanel` client komponent bo'lsa ham Next.js
+   * uni avval serverda render qiladi; `toLocaleString("uz-UZ")` Node'da
+   * `68 196`, brauzerda `68,196` beradi va gidratsiya buziladi.
+   */
+  savedLabel: string;
+  /** 0–100. Akkauntlar va joriy akkaunt ichidagi sahifalardan hisoblanadi. */
+  percent: number;
+  startedAt: string | null;
+  finishedAt: string | null;
+  failedCredentials: string[];
+  error: string | null;
+  /** Worker o'lib qolgani sababli osilib qolgan run. */
+  stale: boolean;
+}
+
+function toStatus(run: Awaited<ReturnType<typeof latestAuctionSyncRun>>): AuctionSyncStatus | null {
+  if (!run) return null;
+  const stale = run.status === "RUNNING" && isRunStale(run.startedAt);
+  const per = Array.isArray(run.perCredential)
+    ? (run.perCredential as { name: string; error?: string }[])
+    : [];
+
+  // ⚠️ Foiz IKKI darajadan: tugagan akkauntlar + joriy akkauntning sahifalari.
+  // Faqat akkauntlar bo'yicha hisoblansa ko'rsatkich 14 marta sakrab, oradagi
+  // 5 daqiqa davomida qotib turardi.
+  const done = Math.max(0, run.credentialIndex - 1);
+  const inner = run.pages > 0 ? Math.min(1, run.page / run.pages) : 0;
+  const percent =
+    run.status !== "RUNNING"
+      ? 100
+      : run.credentialTotal > 0
+        ? Math.min(99, Math.round(((done + inner) / run.credentialTotal) * 100))
+        : 0;
+
+  return {
+    running: run.status === "RUNNING" && !stale,
+    status: run.status,
+    credential: run.credential,
+    credentialIndex: run.credentialIndex,
+    credentialTotal: run.credentialTotal,
+    page: run.page,
+    pages: run.pages,
+    saved: run.saved,
+    savedLabel: nf(run.saved),
+    percent,
+    startedAt: run.startedAt.toISOString(),
+    finishedAt: run.finishedAt?.toISOString() ?? null,
+    failedCredentials: per.filter((c) => c.error).map((c) => c.name),
+    error: run.error,
+    stale,
+  };
+}
+
+/** Jonli holat — client komponent shu bilan so'rov yuborib turadi. */
+export async function getAuctionSyncStatus(): Promise<AuctionSyncStatus | null> {
+  await requireSection("auksion");
+  return toStatus(await latestAuctionSyncRun());
+}
 
 /**
  * Reyestrni qo'lda yangilash — navbatga qo'yadi, DARHOL bajarmaydi.
  *
- * ⚠️ Bu yerda `syncAuctionOrders()` to'g'ridan-to'g'ri CHAQIRILMAYDI: u ~20–25
- * daqiqa ishlaydi va Next.js server action'i bunchaga cho'zilmaydi (foydalanuvchi
- * brauzeri ham kutmaydi). Worker uni fon rejimida bajaradi.
+ * ⚠️ Bu yerda `syncAuctionOrders()` to'g'ridan-to'g'ri CHAQIRILMAYDI: u bir necha
+ * daqiqa ishlaydi va Next.js server action'i bunchaga cho'zilmaydi. Worker uni
+ * fon rejimida bajaradi.
  *
  * ⚠️ `requireSection` MAJBURIY — bo'limni yashirish uning server action'ini
  * yashirmaydi (CLAUDE.md qoidasi).
@@ -23,14 +96,27 @@ export async function triggerAuctionSync(): Promise<{ ok: boolean; message: stri
     return { ok: false, message: "AUCTION_ORDERS_* sozlanmagan" };
   }
 
+  // ⚠️ Allaqachon ketayotgan run ustiga ikkinchisini qo'ymaymiz: ikkalasi bir xil
+  // yozuvlarni upsert qilib, shlyuzga ikki barobar yuk berardi. Osilib qolgan
+  // (worker o'lgan) run bundan mustasno — aks holda tugma abadiy bloklanardi.
+  const last = await latestAuctionSyncRun();
+  if (last?.status === "RUNNING" && !isRunStale(last.startedAt)) {
+    return { ok: true, message: "Yangilash allaqachon ketmoqda." };
+  }
+
   try {
+    const user = await getCurrentUser();
     const boss = await getBoss();
-    // ⚠️ `singletonKey` — takroriy bosishda navbat bir xil job bilan to'lib
-    // ketmasin (YATT indeksidagi bilan bir xil sabab).
-    const id = await boss.send(QUEUE.AUCTION_ORDERS_SYNC, {}, { singletonKey: "auction-orders-sync" });
+    const id = await boss.send(
+      QUEUE.AUCTION_ORDERS_SYNC,
+      { startedById: user?.id },
+      // ⚠️ `singletonKey` — takroriy bosishda navbat bir xil job bilan to'lib
+      // ketmasin (YATT indeksidagi bilan bir xil sabab).
+      { singletonKey: "auction-orders-sync" },
+    );
     revalidatePath("/dashboard/auksion");
     return id
-      ? { ok: true, message: "Navbatga qo'yildi — worker fon rejimida yuklaydi (~20–25 daqiqa)." }
+      ? { ok: true, message: "Navbatga qo'yildi — worker fon rejimida yuklaydi." }
       : { ok: true, message: "Allaqachon navbatda turibdi." };
   } catch (e) {
     return { ok: false, message: e instanceof Error ? e.message : "Navbatga qo'yib bo'lmadi" };

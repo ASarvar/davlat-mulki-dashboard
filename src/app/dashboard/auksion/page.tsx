@@ -4,12 +4,14 @@ import { auctionConfigured } from "@/server/integrations/auctionOrders";
 import {
   listAuctionOrders,
   auctionFacets,
+  auctionTotals,
   AUCTION_PAGE_SIZE,
   type AuctionOrderFilters,
 } from "@/server/services/auctionOrders";
 import { nf } from "@/lib/format";
 import { withBase } from "@/lib/basePath";
-import { SyncButton } from "./SyncButton";
+import { SyncPanel } from "./SyncPanel";
+import { getAuctionSyncStatus } from "./actions";
 import { OrderRow, type OrderView } from "./OrderRow";
 import type { AuctionOrder } from "@prisma/client";
 
@@ -116,7 +118,12 @@ export default async function AuksionPage({ searchParams }: { searchParams: Prom
   };
   const page = Math.max(1, Number(str(sp.p)) || 1);
 
-  const [data, facets] = await Promise.all([listAuctionOrders(f, page), auctionFacets()]);
+  const [data, facets, totals, syncStatus] = await Promise.all([
+    listAuctionOrders(f, page),
+    auctionFacets(),
+    auctionTotals(),
+    getAuctionSyncStatus(),
+  ]);
 
   // ⚠️ Eksport va sahifalash havolalari BIR XIL parametrlardan quriladi — yangi
   // filtr qo'shsangiz shu yerga ham qo'shing (obyektlar sahifasidagi `baseParams`
@@ -153,13 +160,13 @@ export default async function AuksionPage({ searchParams }: { searchParams: Prom
           </h1>
           <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px] text-muted-foreground">
             <span>
-              Bazada {nf(facets.totalRows)} buyurtma ({facets.credentials.length} ta akkaunt)
+              Bazada {nf(totals.totalRows)} buyurtma ({totals.credentialCount} ta akkaunt)
             </span>
-            {facets.lastSyncedAt && (
+            {totals.lastSyncedAt && (
               <span className="inline-flex items-center gap-1">
                 <Clock className="h-3.5 w-3.5" />
                 oxirgi yangilanish:{" "}
-                {facets.lastSyncedAt.toLocaleString("uz-UZ", {
+                {totals.lastSyncedAt.toLocaleString("uz-UZ", {
                   timeZone: "Asia/Tashkent",
                   dateStyle: "short",
                   timeStyle: "short",
@@ -168,7 +175,7 @@ export default async function AuksionPage({ searchParams }: { searchParams: Prom
             )}
           </p>
         </div>
-        <SyncButton />
+        <SyncPanel initial={syncStatus} />
       </div>
 
       {/* ⚠️ `action` ATAYLAB berilmagan — GET forma joriy URL'ga yuboradi va shu
@@ -278,7 +285,7 @@ export default async function AuksionPage({ searchParams }: { searchParams: Prom
               {data.rows.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="px-3 py-10 text-center text-muted-foreground">
-                    {facets.totalRows === 0
+                    {totals.totalRows === 0
                       ? "Baza hali to'ldirilmagan — «Yangilash» tugmasini bosing yoki kunlik jadvalni (04:00) kuting."
                       : "Bu filtrga mos buyurtma topilmadi."}
                   </td>

@@ -63,14 +63,8 @@ export interface OrderPage {
   orders: RawAuctionOrder[];
 }
 
-/**
- * Bitta sahifani oladi.
- *
- * ⚠️ `result_code !== 0` — HTTP 200 bilan keladigan MANTIQIY xato (API 2 ning
- * `code: 90000` tuzog'i bilan bir xil naqsh). Shuning uchun `res.ok` ni tekshirish
- * yetarli emas.
- */
-export async function fetchOrderPage(cred: AuctionCredential, page: number): Promise<OrderPage> {
+/** Bitta urinish — retry o'rami `fetchOrderPage()` da. */
+async function fetchOnce(cred: AuctionCredential, page: number): Promise<OrderPage> {
   const url = env.AUCTION_ORDERS_URL;
   if (!url) throw new Error("AUCTION_ORDERS_URL sozlanmagan");
 
@@ -82,6 +76,14 @@ export async function fetchOrderPage(cred: AuctionCredential, page: number): Pro
       password: cred.password,
       language: "uz",
       page,
+      // ⚠️ `per_page` — jonli o'lchovda (2026-09-07) server uni QABUL QILADI, lekin
+      // 50 da CHEGARALAYDI: 100/200/500 so'ralganda ham 50 qaytaradi. Standart 20
+      // edi, ya'ni bu so'rovlar sonini 2.5 barobar kamaytiradi (3 417 → 1 364 sahifa).
+      // ⚠️ Sana yoki holat bo'yicha filtr YO'Q — sinalgan barcha nom
+      // (date_from/from_date/begin_date/start_date/order_statuses_id/sort/order_by)
+      // javobga umuman ta'sir qilmadi. Shuning uchun "faqat yangilarini olish"
+      // imkonsiz va har safar to'liq to'kish shart.
+      per_page: env.AUCTION_ORDERS_PAGE_SIZE,
     }),
     signal: AbortSignal.timeout(env.API_TIMEOUT_MS * 2),
   });
@@ -97,14 +99,37 @@ export async function fetchOrderPage(cred: AuctionCredential, page: number): Pro
   };
 
   if (data.result_code !== 0) {
-    // ⚠️ `result_msg` API'dan keladi va parolni O'Z ICHIGA OLMAYDI, lekin akkaunt
-    // nomidan boshqa hech narsa qo'shilmaydi — login xatosida ham sir chiqmasin.
+    // ⚠️ `result_msg` API'dan keladi; akkaunt nomidan boshqa hech narsa
+    // qo'shilmaydi — login xatosida ham parol xabarga tushmasin.
     throw new Error(`get-order xatosi (${cred.name}): ${data.result_msg ?? data.result_code}`);
   }
 
-  return {
-    total: data.total ?? 0,
-    pages: data.pages ?? 1,
-    orders: data.orders ?? [],
-  };
+  return { total: data.total ?? 0, pages: data.pages ?? 1, orders: data.orders ?? [] };
+}
+
+/**
+ * Bitta sahifani oladi — qayta urinish bilan.
+ *
+ * ⚠️ `result_code !== 0` — HTTP 200 bilan keladigan MANTIQIY xato (API 2 ning
+ * `code: 90000` tuzog'i bilan bir xil naqsh). `res.ok` ni tekshirish yetarli emas.
+ *
+ * ⚠️ RETRY NIMA UCHUN KERAK: sahifa xatosi butun akkauntni to'xtatadi (yarim
+ * yuklangan ketma-ketlik "ma'lumot to'liq" degan yolg'on taassurot bermasligi
+ * uchun ataylab shunday). Retry'siz bitta tarmoq uzilishi 5 000 ta buyurtmani
+ * yo'qotardi. `http.ts` dagi umumiy yordamchi bu yerda ishlamaydi — u Basic auth
+ * uchun qurilgan, bu API esa login/parolni so'rov TANASIDA kutadi.
+ */
+export async function fetchOrderPage(cred: AuctionCredential, page: number): Promise<OrderPage> {
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= env.AUCTION_ORDERS_MAX_ATTEMPTS; attempt++) {
+    try {
+      return await fetchOnce(cred, page);
+    } catch (e) {
+      lastErr = e;
+      if (attempt === env.AUCTION_ORDERS_MAX_ATTEMPTS) break;
+      // Eksponensial backoff: 1s, 2s, 4s …
+      await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }

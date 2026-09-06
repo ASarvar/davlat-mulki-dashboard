@@ -177,15 +177,14 @@ async function main() {
   // ⚠️ Bu job obyektlar sinxronizatsiyasidan MUSTAQIL: `SyncRun` yaratmaydi,
   // `assertNoActiveRun()` ni tekshirmaydi va kategoriyaga ta'sir qilmaydi.
   // Uning yiqilishi obyektlar monitoringiga hech qanday zarar bermaydi.
-  await boss.work(QUEUE.AUCTION_ORDERS_SYNC, async () => {
+  await boss.work<{ startedById?: string }>(QUEUE.AUCTION_ORDERS_SYNC, async ([job]) => {
     if (!auctionConfigured()) {
       console.warn("[auction-orders] o'tkazib yuborildi: AUCTION_ORDERS_* env sozlanmagan");
       return;
     }
-    const r = await syncAuctionOrders((cred, page, pages) => {
-      // Har 25-sahifada bir marta — 3 400 qatorlik log foydasiz bo'lardi.
-      if (page % 25 === 0 || page === pages) console.log(`[auction-orders] ${cred}: ${page}/${pages}`);
-    });
+    // ⚠️ Progress endi `AuctionSyncRun` jadvaliga yoziladi (ekranda jonli ko'rinadi) —
+    // konsol logi faqat yakuniy xulosa.
+    const r = await syncAuctionOrders(job?.data?.startedById);
     const failed = r.perCredential.filter((c) => c.error);
     const mins = Math.round((r.finishedAt.getTime() - r.startedAt.getTime()) / 60000);
     console.log(

@@ -811,14 +811,39 @@ Mustaqil `get-auc-order2.js` skriptidan ko'chirildi; skript endi kerak emas.
 `AuctionLot` (API 3/4/6) kadastr bo'yicha **bittalab** so'raladi va faqat bizning
 obyektlarimizni qamraydi. Bu API esa 14 viloyat akkaunti bo'yicha auksion
 tizimidagi **barcha** buyurtmani sahifalab to'kadi — jonli o'lchov (2026-09-07):
-**68 196 buyurtma, 3 417 sahifa, ~20–25 daqiqa**.
+**68 196 buyurtma**. Optimallashtirilgandan keyin 1 364 sahifa, **~16 daqiqa**
+(71 yozuv/s, jonli o'lchov 2026-09-07).
 
 ```
 integrations/auctionOrders.ts   mijoz (fetchOrderPage, auctionCredentials)
 services/auctionOrders.ts       mapOrder + syncAuctionOrders + listAuctionOrders
 QUEUE.AUCTION_ORDERS_SYNC       worker, cron "0 4 * * *" (kunlik sync 03:00 dan KEYIN)
 AuctionOrder (Postgres)         orderId birlamchi kalit, upsert
+AuctionSyncRun (Postgres)       jarayon holati — ekrandagi jonli ko'rsatkich
 ```
+
+### Tezlik — o'lchangan qiymatlar (2026-09-07)
+
+⚠️ **`per_page` ISHLAYDI va 50 da CHEGARALANADI** — 100/200/500 so'ralganda ham 50
+qaytaradi. Standart 20 edi; 50 ga o'tish so'rovlar sonini **3 417 → 1 364** qildi.
+⚠️ **Sana/holat bo'yicha filtr YO'Q**: `date_from`, `from_date`, `begin_date`,
+`start_date`, `order_statuses_id`, `sort`, `order_by` — hammasi sinaldi, javobga
+umuman ta'sir qilmadi. Ya'ni **inkremental sinxronlash imkonsiz**, har safar
+to'liq to'kish shart. Tartib ham `order_id` yoki sana bo'yicha emas (1-sahifa
+2021, oxirgisi 2023) — "yangilarigacha o'qib to'xtash" ham ishlamaydi.
+⚠️ **Sahifa parallelligi** (`AUCTION_ORDERS_CONCURRENCY`, standart 4): o'lchov —
+1 oqim 1.8 sahifa/s, 3 oqim 1.8, 6 oqim 3.5, xato 0 ta. Foyda bor, lekin chiziqli
+emas. **Akkauntlar baribir KETMA-KET** — 14 oqim shlyuzni bosardi.
+⚠️ **ASOSIY TORMOZ BIZDA EMAS**: server sahifa chuqurlashgani sari sekinlashadi —
+2-sahifa 343 ms, 25-sahifa 665 ms, 50-sahifa 1 114 ms, 99-sahifa **2 303 ms**
+(klassik OFFSET narxi). Shuning uchun `per_page` ni oshirish eng kuchli lever:
+sahifa soni kamaysa, umumiy offset narxi ham kamayadi. Parallellikni oshirish
+bundan ancha kam foyda beradi.
+⚠️ Qidiruv uchun `prisma/sql/pg_trgm.sql` da 4 ta GIN indeks (`name`, `address`,
+`lotNumber`, `customerName`) — usiz har `contains` 68 000 qatorni skanerlardi.
+⚠️ `auctionFacets()` keshlangan (5 daq), lekin `auctionTotals()` — YO'Q: worker
+`revalidateTag` chaqira olmaydi, ya'ni sinxronizatsiya tugagach ekranda eski son
+turardi. Ikkalasi shu sabab ajratilgan.
 
 ⚠️ **Auth Basic EMAS** — login/parol so'rov **tanasida** ketadi va har viloyatning
 o'z juftligi bor. `http.ts` dagi umumiy Basic yordamchisi bu yerda ishlamaydi.
@@ -840,8 +865,16 @@ bo'lishi mumkin) — ya'ni "yangilarigacha o'qib to'xtash" ishonchsiz. Har safar
 to'liq to'kiladi, `orderId` bo'yicha upsert qilinadi.
 ⚠️ Akkauntlar **ketma-ket** yuklanadi, parallel emas — 14 oqim shlyuzda
 `result_code` xatolarini boshlardi (kommunal API'lardagi bilan bir xil saboq).
-⚠️ `boss.ts` da unga alohida **`expireInSeconds: 7200`** beriladi; umumiy 120s
-job'ni o'rtasida uzardi (YATT indeksi bilan bir xil sabab).
+⚠️ `boss.ts` da unga alohida **`expireInSeconds: 1800`** beriladi; umumiy 120s
+job'ni o'rtasida uzardi (YATT indeksi bilan bir xil sabab). **Bundan kattaroq
+qo'ymang**: bu ayni paytda "worker o'lsa job qachon qayta uriniladi" degani ham —
+dastlab 7200 qo'yilgan edi va worker to'xtaganda job 2 soat `active` bo'lib
+osilib qoldi, qayta ishga tushirish ham, ekrandagi ko'rsatkich ham bloklandi.
+`AUCTION_RUN_STALE_MINUTES` (30) shu qiymatga moslashtirilgan.
+
+⚠️ Sahifa xatosi 3 marta qayta uriniladi (backoff 1/2/4s), keyin BUTUN akkauntni
+to'xtatadi — ataylab: yarim yuklangan ketma-ketlik "ma'lumot to'liq" degan
+yolg'on taassurot berardi. Boshqa akkauntlar davom etadi, natija `PARTIAL` bo'ladi.
 
 ⚠️ **SHAXSIY MA'LUMOT**: g'olibning F.I.Sh., passport, JSHSHIR, telefon, manzili
 va bank hisob raqami saqlanadi. Shuning uchun `sections.ts` da `allowRoles`

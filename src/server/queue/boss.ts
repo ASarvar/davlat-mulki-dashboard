@@ -23,10 +23,19 @@ async function createAndStart(): Promise<PgBoss> {
       // ~76 000 yozuv) yuklaydi va odatda bir necha daqiqa oladi. Umumiy 120s
       // limitida job o'rtasida "expired" bo'lib, keyin qayta ishga tushardi —
       // ya'ni indeks hech qachon yakunlanmasdi.
-      // ⚠️ Auksion buyurtmalari ham shunday: 14 akkauntning ~3 400 sahifasi
-      // ketma-ket yuklanadi (~20–25 daqiqa). 2 soat — katta zaxira bilan.
+      // ⚠️ Auksion buyurtmalari: 14 akkauntning ~1 364 sahifasi (per_page=50,
+      // sahifalar 4 tadan parallel) — jonli o'lchov 2026-09-07: **71 yozuv/s**,
+      // ya'ni 68 000 yozuv uchun **~16 daqiqa**. 30 daqiqa ≈ 2× zaxira.
+      // (Sekinlikning asosiy sababi bizda emas: server sahifa chuqurlashgani sari
+      // sekinlashadi — 2-sahifa 343 ms, 99-sahifa 2 303 ms, klassik OFFSET narxi.)
+      //
+      // ⚠️ Bundan KATTA qiymat qo'ymang: `expireInSeconds` ayni paytda "worker
+      // o'lsa job qachon qayta uriniladi" degani ham. Dastlab 7200 (2 soat)
+      // qo'yilgan edi va worker to'xtaganda job 2 soat davomida `active` bo'lib
+      // osilib qoldi — qayta ishga tushirish ham, ekrandagi ko'rsatkich ham
+      // bloklanardi (ishlab chiqishda aynan shu holat chiqdi).
       expireInSeconds:
-        name === QUEUE.IMTIYOZ_YATT_SYNC ? 3600 : name === QUEUE.AUCTION_ORDERS_SYNC ? 7200 : 120,
+        name === QUEUE.IMTIYOZ_YATT_SYNC ? 3600 : name === QUEUE.AUCTION_ORDERS_SYNC ? 1800 : 120,
     });
   }
   return boss;

@@ -1,4 +1,5 @@
 import { Prisma } from "@prisma/client";
+import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 import { parseApi4Date } from "@/server/integrations/auction";
@@ -129,49 +130,70 @@ export interface AuctionSyncResult {
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/** Sahifadagi yozuvlarni bazaga yozadi va nechtasi saqlanganini qaytaradi. */
+async function persistPage(orders: RawAuctionOrder[], credName: string) {
+  const rows = orders.map((o) => mapOrder(o, credName));
+  const valid = rows.filter((r): r is NonNullable<typeof r> => r !== null);
+
+  // ⚠️ Bitta `$transaction` — Prisma uni BITTA batch qilib yuboradi. Skript har
+  // yozuv uchun alohida BEGIN/COMMIT qilardi, ya'ni 68 000 ta tranzaksiya.
+  await prisma.$transaction(
+    valid.map((data) =>
+      prisma.auctionOrder.upsert({
+        where: { orderId: data.orderId },
+        // ⚠️ `createdAt` yangilanmaydi — birinchi ko'rilgan vaqt saqlanib qolsin.
+        update: data,
+        create: data,
+      }),
+    ),
+  );
+
+  return { saved: valid.length, skipped: rows.length - valid.length };
+}
+
 /**
  * Bitta akkauntning barcha sahifasini yuklab, bazaga upsert qiladi.
  *
- * ⚠️ Sahifa BATCH bo'lib yoziladi (`$transaction` ichida 20 ta upsert), skriptdagidek
- * har yozuv uchun alohida BEGIN/COMMIT emas — 68 000 yozuvda bu 68 000 ta tranzaksiya
- * degani edi.
+ * ⚠️ 1-sahifa ALOHIDA olinadi — jami sahifalar soni faqat undan ma'lum bo'ladi.
+ * Qolganlari `AUCTION_ORDERS_CONCURRENCY` ta bo'lib, TO'PLAM-TO'PLAM yuklanadi.
  *
- * ⚠️ Bitta sahifaning xatosi butun akkauntni to'xtatadi (skript bilan bir xil xulq):
- * yarim yuklangan sahifa ketma-ketligi "ma'lumot to'liq" degan yolg'on taassurot
+ * ⚠️ Bitta sahifaning xatosi (3 urinishdan keyin) butun akkauntni to'xtatadi —
+ * ATAYLAB: yarim yuklangan ketma-ketlik "ma'lumot to'liq" degan yolg'on taassurot
  * berardi. Boshqa akkauntlar davom etadi va xato natijada ko'rsatiladi.
  */
 async function syncCredential(
   cred: AuctionCredential,
-  onProgress?: (page: number, pages: number) => void,
+  /** `saved` — SHU akkaunt bo'yicha shu paytgacha yozilgani (jamlanma emas). */
+  onProgress?: (page: number, pages: number, saved: number) => Promise<void> | void,
 ): Promise<{ saved: number; skipped: number; pages: number }> {
-  let saved = 0;
-  let skipped = 0;
-  let page = 1;
-  let pages = 1;
+  const first = await fetchOrderPage(cred, 1);
+  const pages = first.pages;
+  if (first.orders.length === 0) return { saved: 0, skipped: 0, pages };
 
-  while (page <= pages) {
-    const res = await fetchOrderPage(cred, page);
-    if (page === 1) pages = res.pages;
-    if (res.orders.length === 0) break;
+  const acc = await persistPage(first.orders, cred.name);
+  let saved = acc.saved;
+  let skipped = acc.skipped;
+  await onProgress?.(1, pages, saved);
 
-    const rows = res.orders.map((o) => mapOrder(o, cred.name));
-    skipped += rows.filter((r) => r === null).length;
-    const valid = rows.filter((r): r is NonNullable<typeof r> => r !== null);
+  const conc = env.AUCTION_ORDERS_CONCURRENCY;
+  for (let start = 2; start <= pages; start += conc) {
+    const batch: number[] = [];
+    for (let p = start; p < start + conc && p <= pages; p++) batch.push(p);
 
-    await prisma.$transaction(
-      valid.map((data) =>
-        prisma.auctionOrder.upsert({
-          where: { orderId: data.orderId },
-          // ⚠️ `createdAt` yangilanmaydi — birinchi ko'rilgan vaqt saqlanib qolsin.
-          update: data,
-          create: data,
-        }),
-      ),
-    );
-    saved += valid.length;
+    // ⚠️ `Promise.all` — birontasi yiqilsa butun akkaunt to'xtaydi (yuqoridagi
+    // izohga qarang). `allSettled` bo'lsa jimgina bo'shliq qolardi.
+    const results = await Promise.all(batch.map((p) => fetchOrderPage(cred, p)));
 
-    onProgress?.(page, pages);
-    page++;
+    // ⚠️ To'plamdagi sahifalar BITTA tranzaksiyada yoziladi (4×50 = 200 upsert),
+    // har sahifa uchun alohida emas — baza bilan aloqa 4 barobar kam bo'ladi.
+    const merged = results.flatMap((r) => r.orders);
+    if (merged.length > 0) {
+      const r = await persistPage(merged, cred.name);
+      saved += r.saved;
+      skipped += r.skipped;
+    }
+
+    await onProgress?.(Math.min(start + conc - 1, pages), pages, saved);
     if (env.AUCTION_ORDERS_DELAY_MS > 0) await delay(env.AUCTION_ORDERS_DELAY_MS);
   }
 
@@ -179,35 +201,118 @@ async function syncCredential(
 }
 
 /**
- * Barcha akkauntlarni ketma-ket sinxronlaydi.
+ * Barcha akkauntlarni ketma-ket sinxronlaydi va jarayonni `AuctionSyncRun` ga yozadi.
  *
- * ⚠️ KETMA-KET, parallel emas: 14 ta akkauntni birga tortish shlyuzga bir vaqtda
- * 14 oqim berardi va `result_code` xatolari boshlanardi (kommunal API'lardagi bilan
- * bir xil saboq). To'liq yuklash ~20–25 daqiqa.
+ * ⚠️ AKKAUNTLAR KETMA-KET, parallel emas: 14 ta akkauntni birga tortish shlyuzga
+ * bir vaqtda 14 oqim berardi (kommunal API'lardagi saboq — bitta HTTP 500 butun
+ * tekshiruvni yiqitgan). Parallellik faqat BITTA akkaunt ICHIDAGI sahifalarda,
+ * `AUCTION_ORDERS_CONCURRENCY` bilan cheklangan.
+ *
+ * ⚠️ Progress SAHIFA to'plamlari yakunida yoziladi (~340 marta), har yozuvda emas —
+ * aks holda 68 000 ta ortiqcha UPDATE bo'lardi.
  */
-export async function syncAuctionOrders(
-  onProgress?: (cred: string, page: number, pages: number) => void,
-): Promise<AuctionSyncResult> {
+export async function syncAuctionOrders(startedById?: string): Promise<AuctionSyncResult> {
   const startedAt = new Date();
   const creds = auctionCredentials();
   const perCredential: AuctionSyncResult["perCredential"] = [];
   let saved = 0;
   let skipped = 0;
 
-  for (const cred of creds) {
-    try {
-      const r = await syncCredential(cred, (p, t) => onProgress?.(cred.name, p, t));
-      perCredential.push({ name: cred.name, saved: r.saved, pages: r.pages });
-      saved += r.saved;
-      skipped += r.skipped;
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : String(e);
-      console.error(`Auksion sinxronlash xatosi (${cred.name}): ${msg}`);
-      perCredential.push({ name: cred.name, saved: 0, pages: 0, error: msg });
+  const run = await prisma.auctionSyncRun.create({
+    data: { credentialTotal: creds.length, startedById: startedById ?? null },
+  });
+
+  try {
+    for (const [i, cred] of creds.entries()) {
+      await prisma.auctionSyncRun.update({
+        where: { id: run.id },
+        data: { credential: cred.name, credentialIndex: i + 1, page: 0, pages: 0 },
+      });
+
+      try {
+        const r = await syncCredential(cred, async (page, pages, credSaved) => {
+          await prisma.auctionSyncRun.update({
+            where: { id: run.id },
+            // ⚠️ `saved` — oldingi akkauntlar jamlanmasi + SHU akkauntning joriy
+            // hisobi. Faqat jamlanmani yozsak, ko'rsatkich butun akkaunt davomida
+            // qotib turardi.
+            data: { page, pages, saved: saved + credSaved, skipped },
+          });
+        });
+        perCredential.push({ name: cred.name, saved: r.saved, pages: r.pages });
+        saved += r.saved;
+        skipped += r.skipped;
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        console.error(`Auksion sinxronlash xatosi (${cred.name}): ${msg}`);
+        perCredential.push({ name: cred.name, saved: 0, pages: 0, error: msg });
+      }
+
+      await prisma.auctionSyncRun.update({
+        where: { id: run.id },
+        data: { saved, skipped, perCredential },
+      });
     }
+
+    const failed = perCredential.filter((c) => c.error).length;
+    await prisma.auctionSyncRun.update({
+      where: { id: run.id },
+      data: {
+        // ⚠️ Uch xil yakun: hammasi ishlagan / ba'zilari xato bergan / hech biri
+        // ishlamagan. "PARTIAL" ni "DONE" deb ko'rsatish ma'lumot to'liq degan
+        // yolg'on taassurot berardi.
+        status: failed === 0 ? "DONE" : failed === creds.length ? "FAILED" : "PARTIAL",
+        finishedAt: new Date(),
+        saved,
+        skipped,
+        perCredential,
+      },
+    });
+  } catch (e) {
+    // Kutilmagan yiqilish (masalan baza uzildi) — run "RUNNING" bo'lib osilib
+    // qolmasin, aks holda keyingi urinish "allaqachon ketyapti" deb rad etilardi.
+    await prisma.auctionSyncRun
+      .update({
+        where: { id: run.id },
+        data: {
+          status: "FAILED",
+          finishedAt: new Date(),
+          error: e instanceof Error ? e.message : String(e),
+          saved,
+          skipped,
+          perCredential,
+        },
+      })
+      .catch(() => {});
+    throw e;
   }
 
   return { perCredential, saved, skipped, startedAt, finishedAt: new Date() };
+}
+
+/**
+ * Ekranda ko'rsatish uchun oxirgi run.
+ *
+ * ⚠️ Keshlanmaydi — "hozir yangilanmoqda" ko'rsatkichi 60 soniya kechikib
+ * ko'rinsa, foydalanuvchi tugmani qayta bosaverardi.
+ */
+export async function latestAuctionSyncRun() {
+  return prisma.auctionSyncRun.findFirst({ orderBy: { startedAt: "desc" } });
+}
+
+/**
+ * ⚠️ Osilib qolgan run'ni "tugagan" deb hisoblash chegarasi. Worker o'lib qolsa
+ * (deploy, konteyner restart) yozuv abadiy `RUNNING` bo'lib qolardi va tugma
+ * boshqa hech qachon ishlamasdi.
+ *
+ * ⚠️ `boss.ts` dagi `expireInSeconds` (1800s) BILAN MOSLASHTIRILGAN: pg-boss job'ni
+ * 30 daqiqadan keyin qayta uradi, ya'ni ekran undan uzoqroq "yangilanmoqda" deb
+ * turmasligi kerak. To'liq run ~7–8 daqiqa (jonli o'lchov, 2026-09-07).
+ */
+export const AUCTION_RUN_STALE_MINUTES = 30;
+
+export function isRunStale(startedAt: Date): boolean {
+  return Date.now() - startedAt.getTime() > AUCTION_RUN_STALE_MINUTES * 60_000;
 }
 
 // ── O'qish (ro'yxat sahifasi) ───────────────────────────────────────────────
@@ -271,9 +376,24 @@ export async function listAuctionOrders(f: AuctionOrderFilters, page: number) {
   return { rows, total, pages: Math.max(1, Math.ceil(total / AUCTION_PAGE_SIZE)) };
 }
 
-/** Filtr tanlagichlari uchun — bazada haqiqatan uchraydigan qiymatlar. */
-export async function auctionFacets() {
-  const [credentials, regions, statuses, groups, last] = await Promise.all([
+/**
+ * Filtr tanlagichlari uchun — bazada haqiqatan uchraydigan qiymatlar.
+ *
+ * ⚠️ KESHLANADI: beshta `groupBy` 68 000 qatorni to'liq skanerlaydi va bu har
+ * sahifa ochilganda takrorlanardi. Qiymatlar faqat sinxronizatsiyadan keyin
+ * o'zgaradi, ya'ni 5 daqiqalik TTL xavfsiz.
+ *
+ * ⚠️ `unstable_cache` Next so'rov konteksti TASHQARISIDA yiqiladi — worker bu
+ * funksiyani chaqirmaydi, faqat sahifa chaqiradi (`snapshots.ts` dagi bilan bir
+ * xil ehtiyot).
+ */
+export const auctionFacets = unstable_cache(computeAuctionFacets, ["auction-facets-v1"], {
+  tags: ["auction-orders"],
+  revalidate: 300,
+});
+
+async function computeAuctionFacets() {
+  const [credentials, regions, statuses, groups] = await Promise.all([
     prisma.auctionOrder.groupBy({ by: ["credential"], _count: true, orderBy: { credential: "asc" } }),
     prisma.auctionOrder.groupBy({ by: ["region"], _count: true, orderBy: { region: "asc" } }),
     prisma.auctionOrder.groupBy({
@@ -282,7 +402,6 @@ export async function auctionFacets() {
       orderBy: { orderStatusesId: "asc" },
     }),
     prisma.auctionOrder.groupBy({ by: ["groupName"], _count: true, orderBy: { groupName: "asc" } }),
-    prisma.auctionOrder.aggregate({ _max: { syncedAt: true }, _count: true }),
   ]);
   return {
     credentials: credentials.map((c) => c.credential),
@@ -291,7 +410,27 @@ export async function auctionFacets() {
       .filter((s) => s.orderStatusesId !== null)
       .map((s) => ({ id: s.orderStatusesId as number, label: s.orderStatus ?? `#${s.orderStatusesId}` })),
     groups: groups.map((g) => g.groupName).filter((g): g is string => Boolean(g)),
-    lastSyncedAt: last._max.syncedAt,
-    totalRows: last._count,
   };
+}
+
+/**
+ * Jami soni va oxirgi yangilanish vaqti — ATAYLAB keshlanmaydi.
+ *
+ * ⚠️ Nima uchun `auctionFacets()` dan ajratilgan: worker alohida process bo'lgani
+ * uchun `revalidateTag` chaqira olmaydi (CLAUDE.md qoidasi), ya'ni kesh faqat TTL
+ * bilan eskiradi. Sinxronizatsiya tugagach foydalanuvchi ekranda "yakunlandi —
+ * 68 196 yozuv" ni ko'rib turib, tepada eski sonni ko'rsa bu xatoga o'xshardi.
+ * Bu ikki qiymat arzon (PK bo'yicha `count` + `max`), shuning uchun har safar
+ * yangi o'qiladi.
+ */
+export async function auctionTotals() {
+  // ⚠️ Akkauntlar SONI ham shu yerda, keshlangan `auctionFacets()` da EMAS:
+  // sinxronizatsiya tugagach sarlavhada "68 196 buyurtma (9 ta akkaunt)" degan
+  // qarama-qarshi matn chiqqan edi (kesh 9 akkaunt bo'lgan paytdan qolgan).
+  // `credential` ustunida indeks bor, 14 ta aniq qiymat — arzon so'rov.
+  const [agg, creds] = await Promise.all([
+    prisma.auctionOrder.aggregate({ _max: { syncedAt: true }, _count: true }),
+    prisma.auctionOrder.groupBy({ by: ["credential"] }),
+  ]);
+  return { totalRows: agg._count, lastSyncedAt: agg._max.syncedAt, credentialCount: creds.length };
 }
