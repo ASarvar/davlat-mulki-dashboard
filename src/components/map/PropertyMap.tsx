@@ -55,6 +55,8 @@ export function PropertyMap({
   const boxRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
   const layerRef = useRef<L.Layer | null>(null);
+  /** Fon qatlami — to'liq ekranga o'tishda uni MAJBURAN qayta chizish kerak (pastga qarang). */
+  const tileRef = useRef<L.TileLayer | null>(null);
   const [tileFailed, setTileFailed] = useState(false);
   const [isFull, setIsFull] = useState(false);
   const [showHint, setShowHint] = useState(false);
@@ -70,10 +72,11 @@ export function PropertyMap({
       scrollWheelZoom: false, // faqat Ctrl bosilganda yoqiladi — pastga qarang
       attributionControl: true,
     });
-    L.tileLayer(tileUrl, { attribution: tileAttribution, maxZoom: 19 })
+    const tiles = L.tileLayer(tileUrl, { attribution: tileAttribution, maxZoom: 19 })
       .on("tileerror", () => setTileFailed(true))
       .addTo(map);
     mapRef.current = map;
+    tileRef.current = tiles;
 
     let hintTimer: ReturnType<typeof setTimeout> | undefined;
     const onWheel = (e: WheelEvent) => {
@@ -115,15 +118,37 @@ export function PropertyMap({
       box.removeEventListener("wheel", onWheel);
       map.remove();
       mapRef.current = null;
+      tileRef.current = null;
     };
   }, [tileUrl, tileAttribution]);
 
-  // To'liq ekran holatini kuzatamiz. O'lchamni qayta o'lchash yuqoridagi
-  // `ResizeObserver` zimmasida — bu yerda faqat tugma ko'rinishi yangilanadi.
+  // To'liq ekran holati.
+  //
+  // ⚠️ `invalidateSize()` YETARLI EMAS. To'liq ekranga o'tganda o'lcham
+  // keskin o'zgaradi va `GridLayer` yangi plitkalarni yaratadi, lekin ular
+  // `leaflet-tile-loaded` klassini olmay `visibility:hidden` da qotib qolishi
+  // mumkin — natijada vektor qatlamlar (klasterlar, doiralar) chiziladi-yu,
+  // FON OQ qoladi va hech qanday xato ham chiqmaydi (2026-09-06 da aynan shu
+  // bo'ldi). `redraw()` qatlamni butunlay qayta quradi va buni yopadi.
+  //
+  // ⚠️ Kechikish ham SHART: brauzer to'liq ekranga o'tishni animatsiya bilan
+  // bajaradi, ya'ni `fullscreenchange` paytida element hali yakuniy o'lchamiga
+  // yetmagan bo'ladi — bitta kadr yetmaydi.
   useEffect(() => {
-    const onFsChange = () => setIsFull(document.fullscreenElement === wrapRef.current);
+    let t: ReturnType<typeof setTimeout>;
+    const onFsChange = () => {
+      setIsFull(document.fullscreenElement === wrapRef.current);
+      clearTimeout(t);
+      t = setTimeout(() => {
+        mapRef.current?.invalidateSize();
+        tileRef.current?.redraw();
+      }, 250);
+    };
     document.addEventListener("fullscreenchange", onFsChange);
-    return () => document.removeEventListener("fullscreenchange", onFsChange);
+    return () => {
+      clearTimeout(t);
+      document.removeEventListener("fullscreenchange", onFsChange);
+    };
   }, []);
 
   const toggleFullscreen = () => {
@@ -203,7 +228,15 @@ export function PropertyMap({
   }, [mode, points, bubbles, basePath]);
 
   return (
-    <div ref={wrapRef} className={isFull ? "relative h-full bg-card" : "relative"}>
+    // ⚠️ To'liq ekranda o'lcham FOIZ emas, `vw`/`vh` bilan beriladi. `h-full`
+    // (height:100%) ota elementning aniq balandligini talab qiladi; to'liq ekran
+    // elementining balandligini brauzer o'z UA uslubi bilan beradi va bu zanjir
+    // ba'zan uzilib, quti nol balandlikda qolardi. Viewport birligi har doim aniq.
+    <div
+      ref={wrapRef}
+      className="relative"
+      style={isFull ? { width: "100vw", height: "100vh", background: "hsl(var(--card))" } : undefined}
+    >
       {tileFailed ? (
         <div
           className="absolute left-2 right-2 top-2 z-[500] rounded-lg border px-3 py-2 text-xs"
@@ -242,11 +275,8 @@ export function PropertyMap({
 
       <div
         ref={boxRef}
-        className={
-          isFull
-            ? "h-full w-full bg-slate-100"
-            : "h-[520px] w-full rounded-b-xl bg-slate-100 md:h-[620px]"
-        }
+        className={isFull ? "bg-slate-100" : "h-[520px] w-full rounded-b-xl bg-slate-100 md:h-[620px]"}
+        style={isFull ? { width: "100vw", height: "100vh" } : undefined}
       />
     </div>
   );
