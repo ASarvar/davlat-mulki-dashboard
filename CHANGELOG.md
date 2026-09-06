@@ -7,6 +7,19 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.12.1
+
+- **Nomlar soddalashtirildi.** Sidebarda «Rasmiy hisobot» → **«Hisobot»**
+  (sahifaning o'z sarlavhasi ham); obyekt sahifasida «Qo'lda kategoriya
+  biriktirish» → **«Kategoriya biriktirish»**.
+- **Hisobot sahifasidan «Sinxronizatsiya» tugmasi olib tashlandi** — u
+  sidebarda o'z bandida turibdi.
+- **Kategoriya taqsimoti halqasi** qalinroq bo'ldi, markazdagi son esa
+  kichraytirildi — halqa juda ingichka ko'rinayotgan edi.
+- **Ijara shartnomalari grafigida oy nomlari to'liq yoziladi** («Yan 26»
+  o'rniga «Yanvar»), yil esa sarlavha yonida, o'ng chetda alohida
+  ko'rsatiladi. (Yil bo'yicha tanlash keyingi versiyada.)
+
 ## 1.12.0
 
 - **Yangi bo'lim: «Auksion buyurtmalari»** (`/dashboard/auksion`). Auksion

@@ -4,7 +4,6 @@ import {
   Building2,
   TrendingDown,
   Percent,
-  RefreshCw,
   MapPin,
   Tags,
   ArrowUpRight,
@@ -17,7 +16,7 @@ import {
   Droplets,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
-import { isAdmin, userSourceScope } from "@/lib/authz";
+import { userSourceScope } from "@/lib/authz";
 import { requireSection } from "@/server/services/sectionAccess";
 import {
   getDashboardStats,
@@ -566,7 +565,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             className="text-xl font-bold tracking-tight"
             style={{ color: "var(--navy)" }}
           >
-            Rasmiy hisobot
+            Hisobot
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
             {soha
@@ -574,9 +573,12 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               : "Davlat mulki obyektlari bo'yicha umumiy holat"}
           </p>
         </div>
-        {/* SourceFilter + Sinxronizatsiya bitta guruh sifatida o'ng chetga tekislanadi —
-            aks holda soha o'zgarganda sarlavha ostidagi matn uzunligi o'zgarib,
-            `justify-between` bu ikkisini gorizontal siljitib qo'yardi. */}
+        {/* ⚠️ `ml-auto` — soha tanlagichi o'ng chetga tekislanadi. `justify-between`
+            ishlatilmaydi: soha o'zgarganda sarlavha ostidagi matn uzunligi o'zgarib,
+            tanlagichni gorizontal siljitib qo'yardi.
+            ⚠️ Bu yerda "Sinxronizatsiya" tugmasi bor edi — olib tashlandi
+            (foydalanuvchi qarori, 2026-09-07). Sinxronizatsiya o'z sahifasida,
+            sidebardagi bandda. */}
         <div className="ml-auto flex items-center gap-3">
           <SourceFilter
             names={sohaList}
@@ -584,16 +586,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             showOwn={showOwn}
             basePath="/dashboard/hisobot"
           />
-          {isAdmin(user.role) ? (
-            <Link
-              href="/dashboard/sync"
-              className="inline-flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
-              style={{ background: "var(--cobalt)" }}
-            >
-              <RefreshCw className="h-4 w-4" />
-              Sinxronizatsiya
-            </Link>
-          ) : null}
         </div>
       </div>
 

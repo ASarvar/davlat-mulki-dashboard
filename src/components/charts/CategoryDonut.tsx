@@ -34,8 +34,12 @@ export interface CategorySlice {
  *
  * `size` — halqa qutisining tomoni (px). ⚠️ Recharts'ga beriladigan `cx`/`cy` va
  * radiuslar ANIQ SON bo'lishi shart (pastdagi izohga qarang), shuning uchun ular
- * foiz emas, aynan SHU sondan hisoblanadi. Nisbatlar 200px dagi asl ko'rinishdan
- * olingan: ichki 0.29, tashqi 0.46.
+ * foiz emas, aynan SHU sondan hisoblanadi.
+ *
+ * ⚠️ Halqa qalinligi = tashqi − ichki radius. 2026-09-07 da qalinroq qilindi
+ * (0.29→0.25 ichki, 0.46→0.47 tashqi, ya'ni 0.17→0.22): foydalanuvchi halqa
+ * juda ingichka ko'rinayotganini aytdi. Ichki radiusni kichraytirish markazdagi
+ * matn joyini ham qisqartiradi — shuning uchun shrift ham kichraytirildi.
  */
 export function CategoryDonut({
   data,
@@ -76,8 +80,8 @@ export function CategoryDonut({
               // Konteyner tomoni `size` bilan QAT'IY belgilangani uchun bu xavfsiz.
               cx={size / 2}
               cy={size / 2}
-              innerRadius={size * 0.29}
-              outerRadius={size * 0.46}
+              innerRadius={size * 0.25}
+              outerRadius={size * 0.47}
               paddingAngle={1}
               // ⚠️ Animatsiya o'chirilgan: React 19 ning dev rejimidagi ikki marta
               // render qilishida Recharts 3.x da bo'lak radiusi 0 da qotib qolib,
@@ -102,15 +106,17 @@ export function CategoryDonut({
           </PieChart>
         </ResponsiveContainer>
         {/* Markazdagi jami — halqa ichida bo'sh joy behuda ketmasin.
-            Shrift ham `size` ga qarab o'sadi, aks holda katta halqada yo'qolib qolardi. */}
+            Shrift `size` ga qarab o'sadi, aks holda katta halqada yo'qolib qolardi.
+            ⚠️ 2026-09-07 da kichraytirildi (0.115→0.095 va 0.058→0.05): son juda
+            yirik ko'rinib, halqaning o'zini bosib turardi. */}
         <div className="pointer-events-none absolute inset-0 grid place-content-center text-center">
           <p
             className="font-bold leading-none tracking-tight"
-            style={{ color: "var(--navy)", fontSize: Math.round(size * 0.115) }}
+            style={{ color: "var(--navy)", fontSize: Math.round(size * 0.095) }}
           >
             {totalLabel}
           </p>
-          <p className="mt-1 text-muted-foreground" style={{ fontSize: Math.round(size * 0.058) }}>
+          <p className="mt-0.5 text-muted-foreground" style={{ fontSize: Math.round(size * 0.05) }}>
             obyekt
           </p>
         </div>

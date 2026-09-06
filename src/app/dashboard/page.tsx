@@ -160,10 +160,27 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   // ⚠️ Oy yorlig'i SERVERDA quriladi: `toLocaleString` Node va brauzerda turlicha
   // chiqib gidratsiyani buzardi (donutda aynan shu xato bo'lgan edi).
-  const OY = ["Yan", "Fev", "Mar", "Apr", "May", "Iyn", "Iyl", "Avg", "Sen", "Okt", "Noy", "Dek"];
+  //
+  // ⚠️ Yorliqda YIL YO'Q — grafik bitta yilni ko'rsatadi va yil sarlavha yonida,
+  // o'ng chetda turadi (foydalanuvchi qarori, 2026-09-07). Har bir ustunda "26"
+  // ni takrorlash 9 marta bir xil ma'lumot berardi.
+  const OY = [
+    "Yanvar",
+    "Fevral",
+    "Mart",
+    "Aprel",
+    "May",
+    "Iyun",
+    "Iyul",
+    "Avgust",
+    "Sentabr",
+    "Oktabr",
+    "Noyabr",
+    "Dekabr",
+  ];
   const trendRows = rentTrend.points.map((p) => {
-    const [y, m] = p.month.split("-");
-    return { label: `${OY[Number(m) - 1]} ${y.slice(2)}`, count: p.count, area: p.area / 1000 };
+    const [, m] = p.month.split("-");
+    return { label: OY[Number(m) - 1], count: p.count, area: p.area / 1000 };
   });
 
   // ── Kunlik snapshot (F6) ────────────────────────────────────────────────
@@ -425,7 +442,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <ChartCard
           title="Ijara shartnomalari — oylar kesimi"
-          subtitle={`${trendYear()}-yil, tuzilgan shartnomalar`}
+          subtitle="Tuzilgan shartnomalar"
+          // ⚠️ Yil o'ng chetda, alohida yorliq sifatida — oy yorliqlarida u
+          // takrorlanmasin (foydalanuvchi qarori, 2026-09-07).
+          //
+          // ⚠️ KELAJAKDA bu YIL TANLAGICHI (select) bo'ladi. Hozircha oddiy yorliq:
+          // `trends.ts` faqat JORIY yilni biladi (`yearWindow()` + `YEAR_START`
+          // SQL'da qattiq bog'langan), ya'ni ishlamaydigan select qo'yish
+          // foydalanuvchini chalg'itardi. Tanlagich qo'shilganda o'zgarishi
+          // kerak bo'lgan joylar: `trends.ts` (yilni argument qilish + kesh
+          // kalitiga qo'shish), shu yerdagi `?yil=` parametri va `RentTrendChart`
+          // ning bo'sh-yil holati.
+          action={
+            <span className="rounded-lg border border-border bg-muted/60 px-2.5 py-1 text-xs font-semibold tabular-nums text-slate-600">
+              {trendYear()}-yil
+            </span>
+          }
           footnote={
             <>
               Manba — <b>RentContract.contractDate</b>, haqiqiy hodisa sanasi.
