@@ -25,20 +25,39 @@ export interface TrendPoint {
   area: number;
 }
 
-const MONTHS = 24;
+/**
+ * ⚠️ Oyna — **JORIY KALENDAR YILI**, yanvardan shu oygacha (foydalanuvchi qarori,
+ * 2026-09-06). Ilgari "oxirgi 24 oy" edi, lekin ma'lumot amalda faqat joriy yildan
+ * boshlanadi: grafikning yarmidan ko'pi tep-tekis nol chiziq bo'lib, ustunlarni
+ * chapga siqib tashlardi.
+ *
+ * ⚠️ Kelasi oylar QO'SHILMAYDI — dekabrgacha nol bilan to'ldirilsa "shartnoma
+ * to'xtadi" degan yolg'on taassurot berardi.
+ */
+function yearWindow(): { year: number; months: string[] } {
+  // Oy chegarasi Toshkent vaqtida — SQL ham shu mintaqada guruhlaydi.
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tashkent" }));
+  const year = now.getFullYear();
+  const months: string[] = [];
+  for (let m = 0; m <= now.getMonth(); m++) months.push(`${year}-${String(m + 1).padStart(2, "0")}`);
+  return { year, months };
+}
+
+/** Joriy yilning boshi (Toshkent) — SQL filtri uchun. */
+const YEAR_START = Prisma.sql`(date_trunc('year', now() AT TIME ZONE 'Asia/Tashkent') AT TIME ZONE 'Asia/Tashkent')`;
 
 /** Bo'sh oylarni nol bilan to'ldiradi — aks holda grafik oyni butunlay tashlab ketardi. */
 function fillMonths(rows: { month: string; count: number; area: number }[]): TrendPoint[] {
   const byMonth = new Map(rows.map((r) => [r.month, r]));
-  const out: TrendPoint[] = [];
-  const now = new Date();
-  for (let i = MONTHS - 1; i >= 0; i--) {
-    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  return yearWindow().months.map((key) => {
     const hit = byMonth.get(key);
-    out.push({ month: key, count: hit?.count ?? 0, area: hit?.area ?? 0 });
-  }
-  return out;
+    return { month: key, count: hit?.count ?? 0, area: hit?.area ?? 0 };
+  });
+}
+
+/** Grafik sarlavhasida ko'rsatiladigan yil (`trends.ts` — yagona manba). */
+export function trendYear(): number {
+  return yearWindow().year;
 }
 
 export interface RentTrend {
@@ -59,7 +78,7 @@ async function computeRentContractTrend(scope: StatsScope = {}): Promise<RentTre
     FROM "RentContract" c
     JOIN "Property" p ON p.id = c."propertyId"
     WHERE c."contractDate" IS NOT NULL
-      AND c."contractDate" >= now() - (${MONTHS} || ' months')::interval
+      AND c."contractDate" >= ${YEAR_START}
       AND ${cond}
     GROUP BY 1
     ORDER BY 1
@@ -84,7 +103,7 @@ async function computeAuctionTrend(scope: StatsScope = {}): Promise<TrendPoint[]
     FROM "AuctionLot" l
     JOIN "Property" p ON p.id = l."propertyId"
     WHERE l."auctionDate" IS NOT NULL
-      AND l."auctionDate" >= now() - (${MONTHS} || ' months')::interval
+      AND l."auctionDate" >= ${YEAR_START}
       AND ${cond}
     GROUP BY 1
     ORDER BY 1
@@ -93,11 +112,11 @@ async function computeAuctionTrend(scope: StatsScope = {}): Promise<TrendPoint[]
 }
 
 // ⚠️ Doira argument sifatida uzatiladi — kesh kaliti rol doirasini ham qamraydi.
-export const getRentContractTrend = unstable_cache(computeRentContractTrend, ["rent-trend-v1"], {
+export const getRentContractTrend = unstable_cache(computeRentContractTrend, ["rent-trend-v2"], {
   tags: ["dashboard"],
   revalidate: 60,
 });
-export const getAuctionTrend = unstable_cache(computeAuctionTrend, ["auction-trend-v1"], {
+export const getAuctionTrend = unstable_cache(computeAuctionTrend, ["auction-trend-v2"], {
   tags: ["dashboard"],
   revalidate: 60,
 });

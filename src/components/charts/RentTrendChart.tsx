@@ -30,12 +30,12 @@ export interface TrendRow {
  */
 export function RentTrendChart({ data }: { data: TrendRow[] }) {
   // ⚠️ Oylar NOL bilan to'ldiriladi (`trends.ts` → `fillMonths`), ya'ni massiv hech
-  // qachon bo'sh bo'lmaydi. Lekin hammasi nol bo'lsa — 24 oylik tep-tekis nol chiziq
+  // qachon bo'sh bo'lmaydi. Lekin hammasi nol bo'lsa — tep-tekis nol chiziq
   // "shartnoma tuzilmagan" emas, "grafik buzuq" degan taassurot berardi.
   if (data.every((d) => d.count === 0)) {
     return (
       <p className="py-10 text-center text-sm text-muted-foreground">
-        Oxirgi 24 oyda sanasi ko&apos;rsatilgan shartnoma yo&apos;q
+        Bu yilda sanasi ko&apos;rsatilgan shartnoma yo&apos;q
       </p>
     );
   }

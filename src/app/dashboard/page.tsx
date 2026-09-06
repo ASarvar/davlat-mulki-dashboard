@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { canAccess, firstOpenSectionHref, requireSection } from "@/server/services/sectionAccess";
 import { getDashboardStats, getUtilityStats } from "@/server/services/stats";
-import { getRentContractTrend } from "@/server/services/trends";
+import { getRentContractTrend, trendYear } from "@/server/services/trends";
 import { getMapData } from "@/server/services/map";
 import { getKpiHistory, MIN_DAYS } from "@/server/services/snapshots";
 import { CATEGORIES } from "@/lib/categories";
@@ -454,7 +454,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <ChartCard
           title="Ijara shartnomalari — oylar kesimi"
-          subtitle="Oxirgi 24 oy, tuzilgan shartnomalar"
+          subtitle={`${trendYear()}-yil, tuzilgan shartnomalar`}
           footnote={
             <>
               Manba — <b>RentContract.contractDate</b>, haqiqiy hodisa sanasi.
