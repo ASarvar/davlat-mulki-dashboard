@@ -300,72 +300,10 @@ sozlanadi (`API3_PARAM`, `API4_PARAM`, `API5_PARAM`). API 1 da javobda `inn`, so
 
 ### Kommunal xizmatlar (suv/gaz/elektr) — `integrations/utilities.ts`
 
-Uchalasi ham API 3/4 bilan **bir xil serverda** (`/markaz/suvsoz_data`, `/markaz/hududgaz_data`,
-`/markaz/het_data`) va bir xil Basic juftlikda, lekin **uchta boshqa vendor** — javob
-tuzilmalari umuman o'xshamaydi:
-
-| | Topilganda | Topilmaganda |
-|---|---|---|
-| suv | `{pid, fio, saldo, saldo_sst}` | `{err_code: -425, err_msg: "Item not found"}` |
-| gaz | `{abonent: {customer_code, name, current_balance, interraction: [12 oy]}}` | `{abonent: null, result_code: 73}` |
-| elektr | `{transactionId, abonent: {soato[], customerType[], customerCode[]}}` | **AYNAN o'sha tuzilma**, massivlar bo'sh |
-
-⚠️ **Hech biri 404 qaytarmaydi** — "topilmadi" HTTP **200 + body ichida** keladi (API 2 ning
-`code: 90000` tuzog'i kabi). `NotFoundError` yo'liga tayanib bo'lmaydi, har biriga alohida
-`found` prediktati yozilgan.
-
-⚠️ **Faqat gaz sarf haqida ma'lumot beradi**, va u yerda uch daraja saqlanadi:
-- `hasGas` — abonent hisobi mavjud
-- `gasBilled` — oxirgi oylarda `accrual > 0`: hisob **faol**, to'lov hisoblanmoqda
-- `gasConsuming` — oxirgi oylarda `gas_consume > 0`: **hisoblagich** haqiqiy sarfni ko'rsatgan
-
-Ba'zi abonentda hisoblagich yo'q (`meter_number`/`reading_value` NULL) — u holda `gas_consume`
-12 oy davomida **0** bo'ladi, lekin `accrual` har oyda 19 800–22 000 so'm (gaz norma bo'yicha
-hisoblanadi). Ya'ni bunday obyektda `gas_consume = 0` "sarf yo'q" emas, "hisoblagich yo'q" degani.
-
-⚠️ **Lekin to'liq ma'lumotda bu holat KAM UCHRAYDI**: 2423 obyektlik to'liq sinxronizatsiyada
-21 ta gaz abonentidan **19 tasida `gasBilled` va `gasConsuming` bir xil** (ikkalasi ham true),
-2 tasida esa ikkalasi ham false. Ya'ni amalda uchala ustun deyarli ustma-ust tushadi.
-(Dastlab 3 obyektlik namunada hammasi hisoblagichsiz chiqqani uchun `gasBilled` "ancha kengroq"
-deb baholangan edi — **to'liq ma'lumot buni tasdiqlamadi**.) Ustunlar baribir alohida saqlanadi:
-farq mavjud va hisoblagichsiz obyektlar kelajakda ko'payishi mumkin.
-
-Suv faqat balansni, elektr esa **faqat abonent kodini** beradi (nom ham yo'q).
-
-⚠️ **Qamrov juda past, lekin hududlar bo'ylab TARQALGAN.** To'liq sinxronizatsiya
-(2423 obyekt, 14 hudud, 2026-08-17):
-
-| | topildi | % |
-|---|---|---|
-| elektr | 73 | 3.0% |
-| gaz | 21 | 0.9% |
-| suv | 15 | 0.6% |
-| **kamida bittasi** | **101** | **4.2%** |
-
-⚠️ **Qamrov Toshkent bilan CHEKLANMAGAN** — aksincha, Toshkent shahri eng past ko'rsatkichga
-ega (204 obyektdan **1 ta**). Eng ko'p: Toshkent v. 15, Qoraqalpog'iston 14, Jizzax 13,
-Qashqadaryo 13. Suv topilmalari 8 ta hududga tarqalgan va Toshkent shahrida **umuman yo'q**.
-(Dastlabki 84 obyektlik namuna "hamma topilma Toshkentda" degan xulosa bergan edi — u
-**noto'g'ri** bo'lib chiqdi, kichik sonlar tasodifiy tanlovda ko'rinmay qolgan. Bu API'lar
-haqida xulosa chiqarishda kichik namunaga tayanmaslik kerakligining aniq misoli.)
-
-Abonent nomi ko'pincha jismoniy shaxs (`"КАМАЛОВА ГУЛБАХОР"`) yoki begona tashkilot bo'lib
-chiqadi, manzil esa kvartirani ko'rsatadi — API'lar turar-joy abonentlari bazasiga ulangan.
-Shuning uchun "abonent bor" ≠ "davlat obyekti ishlatilmoqda".
-
-⚠️ **Shundan kelib chiqadigan ASOSIY qoida:** API "bu kadastrda abonent yo'q" va "bu hudud
-umuman qamralmagan" holatini **farqlay olmaydi**. Shuning uchun `Property.utilityCheckedAt`
-(NULL = **tekshirilmagan**) alohida saqlanadi va dashboardda "Hech biri" va "Tekshirilmagan"
-**alohida ustunlar**. `utility=none` va `utility=unchecked` filtrlari ham alohida.
-"Abonent topilmadi" ni "obyekt bo'sh turibdi" deb talqin qilish — xato xulosa.
-
-⚠️ Eski kadastr fallback bu yerda ham ishlaydi va **kerak**: jonli o'lchovda Buxorodagi
-gaz abonenti faqat eski kadastr orqali topilgan.
-
-Kommunal modul **kategoriyaga umuman ta'sir qilmaydi** — u mustaqil kuzatuv o'lchovi,
-`integrationCategoryCode` hisobiga kirmaydi. Shu sababli `AUCTION_RANGE`/`RENT_RANGE` kabi
-"yangilanmagan modul hissasini tiklash" mantig'i kerak emas: modul o'chirilgan bo'lsa,
-tegishli ustunlar `update`ga qo'shilmaydi va bazadagi qiymat o'z holicha qoladi.
+Uchta ALOHIDA vendor, javob tuzilmalari o'xshamaydi va "topilmadi" HTTP **200 +
+body ichida** keladi (404 emas). Qamrov ~4%, 14 hududga tarqalgan. **Kategoriyaga
+ta'sir qilmaydi.** To'liq hujjat — **`kommunal` skill'ida**
+(`.claude/skills/kommunal/SKILL.md`).
 
 ### Kadastr ma'lumotlari: `cad_data` — API 2 ning O'RNINI bosdi (2026-09-06)
 
@@ -575,101 +513,11 @@ o'zgartirasiz; SQL'ni takrorlab yozmang.
 sahifasida "Tuman" maydoni, Excel eksportida ustun. Tuman tanlagichi faqat **hudud tanlanganda**
 ko'rinadi — aks holda 205 ta variant bitta ro'yxatga tushib ketardi.
 
-### Kommunal jadvali (dashboardning 3-jadvali)
+### Kommunal jadvali va ro'yxat ko'rinishi
 
-`stats.ts` → `computeUtilityStats()` / `computeDistrictUtilityStats()` — kategoriyalar va
-ijara jadvallariga **tegmaydi**, alohida so'rov (`utilityRows()`). Ular bilan bir xil
-naqshlar saqlangan: `StatsScope` doirasi, `Prisma.sql` parametrlash, doira sharti **JOIN
-ichida** (`LEFT JOIN ... AND ${srcCond}`), respublika tashkilotlari alohida qatorda, va
-bir xil `?tuman=` parametri (bitta hududni ochsangiz **uchala jadval** ham ochiladi).
-
-⚠️ **Jadvaldagi BARCHA sonlar faqat "Bo'sh turgan" (kat 11) obyektlar bo'yicha.** Jadval
-bitta savolga javob beradi: *bo'sh deb hisoblanayotgan obyekt aslida foydalanilayaptimi?*
-Ilgari u barcha obyektlarni ham, bo'sh turganlarni ham bitta jadvalga sig'dirgan (13 ustun)
-va o'qib bo'lmas edi — foydalanuvchi soddalashtirishni so'radi (2026-08-17).
-
-Ustunlar: *Bo'sh turgan obyektlar* (soni · foydali maydoni, ming m²) · *Shundan kommunal
-abonenti bor* (suv · gaz · elektr) · *Jamlanma* (kamida bittasi · **yaqinda to'lov** ·
-tekshirilmagan).
-
-⚠️ **"Yaqinda to'lov" — eng kuchli signal.** `Property.gasLastPaymentAt` (gaz API'sining
-`abonent.last_payment_date`, `"DD.MM.YYYY"` formatida — ISO EMAS, `parseDotDate()` bilan
-o'qiladi) oxirgi `UTILITY_RECENT_PAYMENT_MONTHS` (standart 3) oy ichida bo'lsa.
-Sabab: "abonent bor" bayrog'i 2 yil oldin yopilgan hisobni ham, hozir faol hisobni ham
-bir xil ko'rsatardi — jonli ma'lumotda to'lov sanalari 2024-yildan 2026-yilgacha
-tarqalgan. `gasBilled` (hisob-kitob) ham yetarli emas: u abonent to'lamasa ham davom
-etadi va qarz to'planadi; TO'LOV esa kimdir obyektdan foydalanayotganini bildiradi.
-Faqat gazda mavjud (suv sana bermaydi, elektr umuman hech narsa bermaydi).
-⚠️ Chegara `stats.ts` → **`recentPaymentCutoff()`** dan — SQL, `buildWhere()` va so'rovlar
-sahifasi UCHALASI shu bitta funksiyani chaqiradi.
-
-⚠️ "Bo'sh turgan" sharti **har bir `FILTER (...)` ichida**, JOIN'da EMAS — JOIN'ga
-qo'yilsa kat 11 obyekti yo'q hudud qatori jadvaldan butunlay yo'qolardi (LEFT JOIN'ning
-maqsadi 0 li qatorlarni saqlash).
-
-⚠️ **`landSplit` sohalarda (Davlat aktivlari agentligi / Direksiya) FAQAT BINO sanaladi**
-(`AND NOT p."isLand"`) — kategoriyalar jadvalidagi 11-ustun va "Bo'sh turgan" kartasi
-bilan aynan bir xil mezon (`rentBreakdown.vacant.buildingCount`). Busiz kartada 606,
-kommunal jadvalda 2994 chiqqan edi (foydalanuvchi topdi, 2026-08-17). Drill-down
-havolalariga ham `&isLand=0` qo'shiladi — aks holda ro'yxatdagi son jadvaldagidan
-katta chiqardi.
-
-⚠️ **MAYDON YIG'INDISI BU XATONI YASHIRADI.** Yer uchastkasida `buildingArea = 0`,
-shuning uchun `SUM(buildingArea)` yer qo'shilgan-qo'shilmaganidan qat'i nazar BIR XIL
-chiqadi — faqat SONI farq qiladi. Ya'ni "maydon mos kelyapti" hech qachon to'g'rilikning
-dalili emas; yangi agregat qo'shganda **sonini alohida** solishtiring.
-
-⚠️ Gaz ustuni — `hasGas`, ya'ni **hisoblagichi yo'q (norma bo'yicha to'laydigan) abonent
-ham SHU songa kiradi**. "Gaz hisobi faol" alohida ustuni bo'lgan, foydalanuvchi olib
-tashlashni so'radi (2026-08-17): to'liq ma'lumotda u `gasConsuming` bilan deyarli aynan
-bir xil chiqdi. `gasBilled`/`gasConsuming` bayroqlari bazada va `?utility=` filtrida qoladi.
-
-**Havolalar:** hudud/tuman nomi, har bir son VA **J A M I qatoridagi sonlar** — hammasi
-ro'yxatga havola. ⚠️ Har birida **`category=11` MAJBURIY** (hudud nomida ham!) — usiz
-umumiy ro'yxat ochilib, jadvaldagi son bilan mos kelmasdi. JAMI qatori hududsiz havola
-beradi (butun doira bo'yicha). Va **`buildWhere()`dagi shartlar `utilityRows()`dagi
-`FILTER (...)` ifodalari bilan bir xil bo'lishi shart** (kategoriya jadvalidagi qoida).
-
-Excel eksporti: `/api/export/dashboard-utility` — ikki varaq (Hududlar · Tumanlar),
-ustunlar bitta `COLS` massividan (yangi ustun ikkala varaqda avtomatik paydo bo'ladi).
-
-Kommunal tekshiruv umuman o'tkazilmagan bo'lsa (bo'sh turganlarning hammasi
-"tekshirilmagan") jadval o'rniga tushuntirish ko'rsatiladi — 14 qator nol foydalanuvchini
-chalg'itardi.
-
-### Kommunal ro'yxat ko'rinishi va obyekt sahifasi
-
-**`/dashboard/objects?utility=...`** — `utility` parametri BO'LSA ro'yxat ixcham
-ko'rinishga o'tadi (`UtilityObjectsTable.tsx`, client komponent): faqat **Kadastr · Suv ·
-Gaz · Elektr**. Xizmat katakchasi bosilganda o'sha xizmatning asosiy ma'lumotlari qator
-ostida ochiladi (akkordeon, bir vaqtda bir nechtasi ochiq bo'lishi mumkin).
-⚠️ **Obyekt sahifasiga FAQAT kadastr raqami orqali o'tiladi** — shu sababli xizmat
-katakchasi `<button>`, kadastr esa `<Link>` (ichma-ich havola bo'lmasligi uchun).
-
-⚠️ Katakcha mazmuni SERVER tomonda tayyorlanadi (`properties.ts` → `listUtilityCells()`
-→ `UtilityCell`) va client'ga faqat oddiy tiplar boradi: `integrations/utilities.ts`
-→ `@/lib/env` ni import qiladi (server-only, zod validatsiyasi), uni client bundle'ga
-tortib kiritib bo'lmaydi.
-
-⚠️ `rawResponse` og'ir JSON — `listUtilityCells()` FAQAT ixcham ko'rinishda chaqiriladi,
-odatdagi ro'yxatda umuman so'ralmaydi.
-
-**Obyekt sahifasida** asosiy ma'lumotlardan darhol keyin "Kommunal xizmatlar" bo'limi
-(uchta karta). Kategoriyasi 11 bo'lgan obyektda abonent topilsa — sahifa tepasida sariq
-**ogohlantirish** chiqadi. Ogohlantirish matni ATAYIN yumshoq: abonent ijarachi yoki
-qo'shni bo'lishi mumkin, ya'ni bu dalil emas, tekshirish uchun signal.
-
-**So'rovlar oqimida** (`/dashboard/requests` — kutilayotganlar VA tarix) obyekt kadastri
-ostida kommunal ogohlantirish yorlig'i chiqadi (`RequestRow.tsx` → `UtilityWarning`):
-moderator/rahbariyat "Bo'sh turgan" obyektni Yaroqsiz/Chekka'ga o'tkazishni tasdiqlashdan
-OLDIN abonent borligini ko'radi. Yaqinda to'lov bo'lsa yorliq qizil, aks holda sariq.
-⚠️ Abonent topilmasa yorliq UMUMAN ko'rsatilmaydi — obyektlarning ~4% ida abonent bor,
-"topilmadi" yozuvi qolgan 96% da shovqin bo'lardi.
-
-⚠️ Ro'yxat ham, obyekt sahifasi ham `parseUtilityRaw()` ni ishlatadi — **yagona parser**,
-shuning uchun ikki joyda ko'rsatilgan qiymat hech qachon ajralmaydi (`lib/area.ts` bilan
-bir xil printsip). "Integratsiya tekshiruvlari" jadvalida manba nomi `UTILITY_LABEL`
-orqali o'zbekchalashtiriladi (`WATER`→Suv), kodda esa API bilan mos nom qoladi.
+Dashboardning 3-jadvali (`computeUtilityStats`, faqat kat 11 bo'yicha, `landSplit`
+sohalarda faqat bino) va `?utility=` ixcham ro'yxat ko'rinishi — to'liq hujjat
+**`kommunal` skill'ida** (`.claude/skills/kommunal/SKILL.md`).
 
 ### Obyektlar filtri (`ObjectFilters.tsx`) — uchta qoida
 
@@ -949,114 +797,11 @@ bilan ochilardi: Andijonda ustun **256**, ro'yxat **9** ta obyekt berardi.
 
 ## Ijara imtiyozi — ПҚ-3782 (`/dashboard/imtiyoz`) — 2026-09-02
 
-Alohida ilova edi (`github.com/ASarvar/Imtiyoz-API`, Express + SQLite + o'z auth'i), dashboardga
-**to'liq ko'chirildi**; mustaqil xizmat endi kerak emas. **Obyektlar/kategoriyalar bilan hech qanday
-aloqasi yo'q** — mustaqil quyi tizim, `Property` jadvaliga tegmaydi.
-
-**Qoida:** mehnat shartnomasi asosida ishlayotgan xodimlarning kamida **30%** ini nogironligi
-bo'lgan shaxslar tashkil etsa, ijara to'lovi auksion summasining **50%** i etib belgilanadi.
-
-```
-9 xonali (STIR)    → Soliq comp_workers ga JONLI so'rov (sahifalab)
-14 xonali (JSHSHIR)→ oldindan tayyorlangan YATT indeksidan o'qish
-har bir xodim      → TIEK minzdrav_pas (nogironlik reyestri), 15 parallel
-```
-
-### ⚠️ ISHONCH INVARIANTI — butun quyi tizimning maqsadi
-
-**Hech qanday tashqi tizim uzilishi ANIQ RAD JAVOBIGA aylanmaydi.** `isEligible: false` bo'lsa-yu,
-ayni vaqtda `soliqError` / `failedChecks` / `yattIndexIncomplete` / `!yattIndexReady` bo'lsa —
-`assertNoFalseNegative()` (`services/imtiyoz/evaluate.ts`) **xato tashlaydi**. Noto'g'ri rad
-javobidan ko'ra 500 qaytargan afzal: u logda darhol ko'rinadi. Yagona istisno — `NO_WORKERS`.
-Jonli sinovda tasdiqlangan: 5 xodimdan 0 tasi nogiron (0.0%) bo'lsa ham, 1 xodim tekshirilmagan
-bo'lsa natija `NOT_ELIGIBLE` emas, `INCONCLUSIVE_TIEK` bo'ladi.
-
-`resultCode` — javobning **yagona ishonchli maydoni**. UI (`lib/imtiyoz.ts` → `VERDICT`) faqat shunga
-tayanadi, xabar MATNI hech qachon solishtirilmaydi.
-
-| `resultCode` | `isEligible` | Ma'nosi |
-|---|---|---|
-| `ELIGIBLE` / `NOT_ELIGIBLE` | true / false | ma'lumot TO'LIQ, aniq xulosa |
-| `NO_WORKERS` | false | baza javob berdi, shartnoma yo'q — **haqiqiy fakt** |
-| `INCONCLUSIVE_SOLIQ` / `_TIEK` / `_YATT_INDEX` | **null** | aniqlab bo'lmadi |
-
-### YATT indeksi — ⚠️ asl ilovadan ENG KATTA farq
-
-`yatt_workers` endpoint tadbirkor bo'yicha **FILTRLAMAYDI**: har bir so'rov butun respublika
-shartnomalarini (~76 000+) qaytaradi. Ya'ni har bir tekshiruvda jonli filtrlash imkonsiz.
-
-Asl ilova indeksni **xotirada** (`Map`) saqlardi. Bu yerda **`ImtiyozYattWorker` jadvali** —
-sabab: web va worker **ikki alohida process**, xotiradagi Map worker'da qurilib web'da ko'rinmasdi.
-Yon foydasi: restartdan omon qoladi (asl ilovada har restart = 76k yozuvni qaytadan yuklash).
-
-- Sinxronlash — **faqat worker'da**, `QUEUE.IMTIYOZ_YATT_SYNC`, cron `0 */6 * * *`.
-  ⚠️ Jadval har 6 soatda ishga tushadi, lekin `isYattIndexFresh()` true bo'lsa ishlov beruvchi
-  **o'tkazib yuboradi** — bu asl ilovadagi adaptiv rejalashtirishning cron'dagi ko'rinishi
-  (to'liq sinxronlashdan keyin ~22 soat tinch; to'liqsiz bo'lsa keyingi urinishda darhol qayta).
-- ⚠️ `boss.ts` da bu queue'ga **alohida `expireInSeconds: 3600`** beriladi — umumiy 120s job'ni
-  yarmida uzib, indeks hech qachon yakunlanmasdi.
-- ⚠️ Jadval `deleteMany + createMany` bilan **butunlay almashtiriladi**, INTERAKTIV tranzaksiyada
-  (`timeout: 300_000`). Massiv shakli `timeout` qabul qilmaydi, standart 5s esa yetmaydi.
-  Tranzaksiyasiz almashtirish oralig'ida kelgan tekshiruv bo'sh jadvalni ko'rib "xodim yo'q"
-  degan yolg'on javob berardi.
-- ⚠️ To'liqsiz yuklash (`failedPages > 0`) oldingi to'liq indeksni ham yo'qotadi — **ataylab**:
-  eskirgan, lekin to'liq ko'rinadigan indeks yolg'on "xodim yo'q" berardi. Jonli sinovda
-  tasdiqlangan: 4 sahifadan 1 tasi yuklanmasa, ilgari `NO_WORKERS` bergan JSHSHIR ham,
-  `ELIGIBLE` bergan JSHSHIR ham `INCONCLUSIVE_YATT_INDEX` bo'ladi.
-- Web indeks tayyor bo'lmasa **kutmaydi** (asl ilova kutardi — bu yerda sinxronlash boshqa
-  processda): `enqueueYattIndexSync()` bilan qurishni so'raydi va "hozircha aniqlanmadi" javobini
-  beradi. `singletonKey` shart — usiz har bir tekshiruv yangi job qo'shib, shlyuzni ko'mib tashlardi.
-
-### Keshlar — ikkalasi ham Postgres'da
-
-- **`ImtiyozTiekCache`** (24 soat) — nogironlik holati kunlar davomida o'zgarmaydi.
-  ⚠️ **FAQAT aniq javob keshlanadi** (topildi / `result_code 1001`); TIZIM XATOSI keshlanmaydi —
-  aks holda vaqtinchalik uzilish 24 soatga "nogironligi yo'q" bo'lib muzlab qolardi. Aynan shu
-  sabab "Qayta tekshirish" **faqat muvaffaqiyatsiz PINFL'lar** uchun so'rov yuboradi (jonli
-  o'lchov: 5 xodimli tekshiruvda qayta urinishda TIEK'ga **1 ta** so'rov ketdi).
-  ⚠️ Kesh PINFL boshiga emas, bitta `findMany({ pinfl: { in: [...] } })` bilan o'qiladi —
-  400 xodimli korxonada 400 ta so'rov o'rniga 1 ta.
-- **`ImtiyozResultCache`** (60 daqiqa) — kalit `{subjectId}_{year}_{period}`.
-  ⚠️ `NO_WORKERS` va "aniqlanmadi" holatlari **KESHLANMAYDI** (xodim qo'shilishi mumkin;
-  uzilish o'tib ketishi mumkin).
-
-### Audit — `ImtiyozCheck` + `ImtiyozCheckWorker`
-
-⚠️ **FAQAT QO'SHILADI** — `services/imtiyoz/audit.ts` da UPDATE/DELETE yo'li ATAYLAB yo'q
-(yozuv pul qaroriga asos bo'ladi). Yangi funksiya qo'shsangiz shu qoidani buzmang.
-
-- Har bir **BERISH** alohida yozuv — **keshdan berilganda ham**. Audit "kimga qachon nima
-  aytilgan"ga javob beradi, "qachon hisoblangan"ga emas. Keshdan berilganda YANGI `requestId`
-  beriladi, asl hisoblash `sourceRequestId` orqali kuzatiladi.
-- `username` denormalizatsiya qilingan — hisob o'chirilsa ham "kim tekshirgan" javobi qoladi.
-- ⚠️ Audit yozuvining muvaffaqiyatsizligi foydalanuvchi javobini **TO'SMAYDI** (loglanadi, xolos).
-- Xodimlar jadvali **PII** saqlaydi: PINFL, F.I.Sh., nogironlik guruhi, ICD-10 kodi.
-
-### Ochiq endpoint — ⚠️ TEGMANG
-
-`GET /api/imtiyoz/check-discount/:tin` — **auth YO'Q, CORS ochiq**. Shartnoma formasidagi
-"Текшириш (3782)" tugmasi shu yerga murojaat qiladi.
-- `middleware.ts` matcher'ida **istisno qilingan** — usiz forma JSON o'rniga login HTML'ini olardi.
-- Javob shakli (`{ success, data }`) va `data.reason` / `data.tin` maydonlari deploy qilingan
-  forma kodiga bog'langan — **o'zgartirmang** (`lib/imtiyoz.ts` da izoh bilan belgilangan).
-- Bu yo'l bilan kelgan tekshiruvlar auditga **`forma`** nomi bilan yoziladi (`userId = null`).
-- Production URL: `https://davijara.uz/obyektlar/api/imtiyoz/check-discount/:tin`.
-
-### UI
-
-`ResultView.tsx` — natijani chizadigan **YAGONA komponent**: tekshirish sahifasi ham, tarixdagi
-arxiv nusxasi ham shuni ishlatadi, shuning uchun ular hech qachon ajralib qolmaydi. Ikkinchi
-"faqat tarix uchun" ko'rinish yozmang.
-⚠️ "Qayta tekshirish" tugmasi FAQAT `inconclusive` holatida chiqadi — rad javobida bo'lmasligi
-kerak, aks holda operator rad javobini "vaqtinchalik nosozlik" deb tushunishi mumkin.
-Menyu **hamma rolga** ochiq (tekshiruv hech narsani o'zgartirmaydi, faqat o'qiydi).
-
-### Sinov — mock shlyuz
-
-Haqiqiy shlyuz (`10.190.5.2:8675`) faqat serverdan yetadi. Uzilish yo'llarini sinash uchun
-`Imtiyoz-API` repozitoriyasidagi `mock-server.js` (5000-port) ishlatiladi: `IMTIYOZ_*_URL` ni
-`http://localhost:5000/markaz/...` ga o'zgartiring, so'ng `POST localhost:5000/__control` bilan
-uzilish rejimlarini boshqaring (`{"tiek":{"failPinfls":[...]}}`, `{"yatt":{"failPages":[2]}}`).
+⚠️ **Mustaqil quyi tizim** — obyektlar/kategoriyalar bilan aloqasi yo'q, `Property`
+jadvaliga tegmaydi. To'liq hujjat **`imtiyoz` skill'ida**
+(`.claude/skills/imtiyoz/SKILL.md`): ishonch invarianti (`assertNoFalseNegative`),
+YATT indeksi, TIEK/natija keshlari, audit va ochiq `check-discount` endpoint'i.
+Shu quyi tizimga tegsangiz o'sha skill'ni oching.
 
 ## Ishlash tartibi — MUHIM
 
