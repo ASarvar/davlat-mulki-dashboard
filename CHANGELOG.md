@@ -7,6 +7,21 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.11.2
+
+- **Boshqaruv paneli yangi ko'rinishda.** Asosiy ko'rsatkich kartalariga ikonka
+  qo'shildi va ular sichqoncha tegizilganda jonlanadi (ko'tarilish, rangli ramka,
+  yumshoq soya). Havolali kartalarda burchakda strelka chiqadi.
+- **"Manba" tanlagichi** tozaroq ko'rinishga keltirildi.
+- **"Rasmiy hisobot" tugmasi** boshqaruv panelidan olib tashlandi — rasmiy hisobot
+  o'z sahifasida (`Rasmiy hisobot` menyusi) qoladi.
+- **Sinxronizatsiya holati chizig'i** (sinxronlangan / kutilmoqda / xato) boshqaruv
+  panelidan olib tashlandi — bu ma'lumot `Sinxronizatsiya` sahifasida to'liq bor.
+- **"Kategoriya taqsimoti"** endi butun kenglikni egallaydi: halqa diagramma yonida
+  har bir kategoriya uchun alohida karta (nom · soni · ulushi), har biri o'sha
+  kategoriyaning obyektlar ro'yxatiga havola. "Hududlar reytingi" o'z qatoriga
+  ko'chdi va kengroq joy oldi.
+
 ## 1.11.1
 
 - **Tuzatildi: "Bo'sh maydon" ustuni noto'g'ri kamayib ketgan edi.** Yangi API'ga
