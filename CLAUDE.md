@@ -403,7 +403,7 @@ Maydon mosligi (jonli tasdiqlangan):
 | `cad_number_old` | `old_cad_number` |
 | `object_area_p` | `object.object_pl_obfull` |
 | `object_area` | `object.pl_obzd` |
-| `object_area_u` | `object.object_pl_polezfull` |
+| `object_area_u` | `object.object_pl_polezfull` → `outer[].outer_pl_polezfull` → `outer[].liters[].liter_pl_polezfull` |
 | `land_area` | `land.area` |
 | `object_rooms` | `object.rooms` |
 | `district_id` | **`address.district.soato`** |
@@ -460,9 +460,19 @@ yozmaydi, namunada qamrov va maydon mosligini o'lchaydi).
   bino emas, shuning uchun obyekt sahifasida **"Umumiy maydoni"** deb yoziladi (aks holda
   "Binoning umumiy maydoni"). Qoida `totalAreaLabel()` da; `totalBuildingAreaWithSource()`
   qiymat bilan birga manbani ham qaytaradi.
-  ⚠️ **Foydali maydonga (`object_area_u`) zanjir QO'LLANMAYDI** — atayin: `vacantArea`
+  ⚠️ **Foydali maydonga (`object_area_u`) YER zanjiri QO'LLANMAYDI** — atayin: `vacantArea`
   (= foydali − ijarada) shunga tayanadi, unga `land_area` qo'shilsa dashboarddagi
   "Bo'sh maydon" ustunlari ham o'zgarib ketadi. 2528 obyektda `object_area_u = 0`.
+  ⚠️ **Lekin YANGI shaklda bino ichidagi zanjir bor** (`newUsefulArea`, 2026-09-06):
+  `object.object_pl_polezfull` jamlanmasi `0` bo'lsa `outer[].outer_pl_polezfull` va
+  `outer[].liters[].liter_pl_polezfull` yig'indisiga tushiladi — bu YER emas, o'sha
+  foydali maydonning bino/liter darajasidagi nusxasi. Jonli o'lchov (2026-09-06):
+  jamlanma `0` bo'lgan 2981 obyektning hech birida bino bloklarida ham qiymat yo'q,
+  ya'ni bu real yer uchastkalari va `vacantArea = 0` to'g'ri (eski API 2 ~9% ida
+  soxta qiymat berardi — migratsiyada "Bo'sh maydon" shu sabab ~6% kamaydi).
+  ⚠️ **`isLandOnly` yangi shaklda** endi `object` bloki + `outer[]`/`liters[]` bo'sh
+  bo'lishi VA `land.{area,area_u,area_z,area_b}` dan birortasi > 0 bo'lishini talab
+  qiladi — binosi ham, yeri ham yo'q "bo'sh" obyekt yer uchastkasi deb belgilanmaydi.
   ⚠️ Shartnoma maydoni foydali maydondan katta bo'lsa (obyekt aslida yer uchastkasi) — ikkala ustun
   ham `land_area` dan olinadi. Real ma'lumotda 84 holatdan 81 tasi shu bilan tuzaldi, 13 tasida
   `land_area` ham yetarli emas. `Property.vacantArea` = `GREATEST(foydali − ijarada, 0)` ustun sifatida

@@ -1,6 +1,7 @@
 import { FileSearch, Search, AlertTriangle, ExternalLink } from "lucide-react";
 import { requireSection } from "@/server/services/sectionAccess";
 import { fetchBase, baseSourceLabel } from "@/server/integrations/propertyBase";
+import { fetchPropertyBase as fetchApi2 } from "@/server/integrations/api2";
 import { API2, isCadDataConfigured } from "@/server/integrations/config";
 import { objectHref } from "@/lib/cadastre";
 import { withBase } from "@/lib/basePath";
@@ -48,6 +49,19 @@ export default async function CadastreCheckPage({ searchParams }: { searchParams
         reason: e instanceof Error ? e.message : "Noma'lum xato",
       }))
     : null;
+
+  // ⚠️ DIAGNOSTIKA UCHUN ZAXIRA: `cad_data` STIR mos kelmasa `2108` ("bu tashkilotga
+  // tegishli emas"), balansdan chiqqan obyektga esa `404`/`2032` qaytaradi — bunday
+  // holatda admin obyektni umuman ko'ra olmay qolardi. Shu sahifada (faqat shu yerda —
+  // sinxronizatsiya zanjirida EMAS) eski API 2 ga tushib, kadastrning o'zi bilan
+  // xom javobni ko'rsatamiz. API 2 STIR talab qilmaydi.
+  const fallback =
+    cad && result && !result.ok && usedSource === "cad_data" && API2.baseUrl
+      ? await fetchApi2(cad).catch((e: unknown) => ({
+          ok: false as const,
+          reason: e instanceof Error ? e.message : "Noma'lum xato",
+        }))
+      : null;
 
   return (
     <div>
@@ -135,12 +149,32 @@ export default async function CadastreCheckPage({ searchParams }: { searchParams
         </p>
       ) : result.ok ? (
         <JsonView json={JSON.stringify(result.data.raw, null, 2)} />
+      ) : fallback?.ok ? (
+        <div className="space-y-4">
+          <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-medium">
+                cad_data javob bermadi — quyida eski API 2 ma&apos;lumoti ko&apos;rsatilgan
+              </p>
+              <p className="mt-0.5">{result.reason}</p>
+              <p className="mt-1 text-xs">
+                <code>2108</code> — obyekt so&apos;ralgan tashkilot balansida emas (balansdan
+                chiqqan bo&apos;lishi mumkin). API 2 kadastrning o&apos;zi bilan javob beradi.
+              </p>
+            </div>
+          </div>
+          <JsonView json={JSON.stringify(fallback.data.raw, null, 2)} />
+        </div>
       ) : (
         <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
             <p className="font-medium">Kadastr API&apos;si javob bermadi ({usedSource})</p>
             <p className="mt-0.5">{result.reason}</p>
+            {fallback && !fallback.ok ? (
+              <p className="mt-1 text-xs">Eski API 2 ham javob bermadi: {fallback.reason}</p>
+            ) : null}
           </div>
         </div>
       )}

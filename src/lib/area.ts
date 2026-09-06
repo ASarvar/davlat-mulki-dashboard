@@ -37,6 +37,52 @@ function positive(v: unknown): number | null {
 interface NewShape {
   object?: Record<string, unknown>;
   land?: Record<string, unknown>;
+  /** Uchastkadagi bino(lar) — har birida `liters[]` bo'lishi mumkin. */
+  outer?: Record<string, unknown>[];
+}
+
+/**
+ * Yangi shaklda FOYDALI maydon uch joyda saqlanadi va odatda bir xil bo'ladi:
+ *   `object.object_pl_polezfull`  — jamlanma (jonli o'lchov: 2714/2714 `sum(outer)` ga teng)
+ *   `outer[].outer_pl_polezfull`  — bino darajasi (15/15 jamlanmaga teng, eng ishonchli zaxira)
+ *   `outer[].liters[].liter_pl_polezfull` — liter darajasi (ba'zan kam chiqadi — bitta literda qiymat yo'q)
+ *
+ * ⚠️ Jamlanma `0` bo'lsa (jonli API bo'sh foydali maydonni shunday qaytaradi) bino
+ * bo'yicha yig'indiga tushamiz — foydalanuvchi qoidasi (2026-09-06): "object_pl_polezfull=0
+ * bo'lsa liter_pl_polezfull ni ham tekshir". `outer_pl_polezfull` uni qamrab oladi va
+ * liter yo'q bino uchun ham ishlaydi.
+ */
+function newUsefulArea(n: NewShape): number | null {
+  const direct = positive(n.object?.object_pl_polezfull);
+  if (direct != null) return direct;
+  const outer = n.outer ?? [];
+  const sum = (pick: (b: Record<string, unknown>) => number | null): number | null => {
+    let acc = 0;
+    let any = false;
+    for (const b of outer) {
+      const v = pick(b);
+      if (v != null) {
+        acc += v;
+        any = true;
+      }
+    }
+    return any ? acc : null;
+  };
+  const byOuter = sum((b) => positive(b.outer_pl_polezfull));
+  if (byOuter != null) return byOuter;
+  return sum((b) => {
+    const liters = Array.isArray(b.liters) ? (b.liters as Record<string, unknown>[]) : [];
+    let acc = 0;
+    let any = false;
+    for (const lt of liters) {
+      const v = positive(lt.liter_pl_polezfull);
+      if (v != null) {
+        acc += v;
+        any = true;
+      }
+    }
+    return any ? acc : null;
+  });
 }
 
 /**
@@ -52,6 +98,7 @@ function asNewShape(raw: Record<string, unknown> | null | undefined): NewShape |
   return {
     object: isObj(obj) ? (obj as Record<string, unknown>) : undefined,
     land: isObj(land) ? (land as Record<string, unknown>) : undefined,
+    outer: Array.isArray(raw.outer) ? (raw.outer as Record<string, unknown>[]) : undefined,
   };
 }
 
@@ -79,8 +126,9 @@ function normalize(raw: Record<string, unknown> | null | undefined): Record<stri
     object_area: o.pl_obzd,
     land_area: l.area,
     land_area_i: l.area_u,
-    // Foydali maydon
-    object_area_u: o.object_pl_polezfull ?? o.pl_polezzd,
+    // Foydali maydon: jamlanma → bino → liter (`newUsefulArea` izohiga qarang).
+    // ⚠️ `??` bilan berilsa `object_pl_polezfull = 0` da to'xtab qolardi (0 !== null).
+    object_area_u: newUsefulArea(n) ?? undefined,
     // Yer/bino mezoni uchun
     object_rooms: o.rooms,
   };
@@ -123,11 +171,15 @@ export function totalAreaLabel(source: AreaSource | null | undefined): string {
 }
 
 /**
- * "Foydali maydon" — `object_area_u`.
- * ⚠️ Bunga fallback zanjiri QO'LLANMAYDI (foydalanuvchi faqat umumiy maydon uchun
- * so'ragan). `vacantArea = foydali − ijarada` shu qiymatga tayanadi, shuning uchun
- * bu yerga fallback qo'shish dashboarddagi "bo'sh maydon" ustunlarini ham o'zgartiradi —
- * alohida qaror talab qiladi.
+ * "Foydali maydon" — `object_area_u` (eski shakl) yoki `object_pl_polezfull` (yangi shakl).
+ *
+ * ⚠️ ESKI shaklda umumiy maydon zanjiri (`land_area` va h.k.) QO'LLANMAYDI — foydalanuvchi
+ * faqat umumiy maydon uchun so'ragan.
+ * ⚠️ YANGI shaklda esa jamlanma `0` bo'lsa BINO bloklariga tushiladi
+ * (`newUsefulArea`): bu yer emas, aynan o'sha foydali maydonning boshqa joyda
+ * saqlangan nusxasi. Jonli o'lchov (2026-09-06): jamlanma `0` bo'lgan 2981 obyektning
+ * hech birida bino bloklarida ham qiymat yo'q — ya'ni bu real yer uchastkalari,
+ * `vacantArea = 0` to'g'ri (eski API 2 dagi qiymat noto'g'ri edi).
  */
 export function usefulArea(raw: Record<string, unknown> | null | undefined): number | null {
   const flat = normalize(raw);
@@ -184,6 +236,9 @@ const NEW_LAND_CHECK_FIELDS = [
   "rooms",
 ] as const;
 
+/** `land` blokidagi maydon maydonlari — birontasi > 0 bo'lsa uchastkada yer bor. */
+const NEW_LAND_AREA_FIELDS = ["area", "area_u", "area_z", "area_b"] as const;
+
 export function isLandOnly(raw: Record<string, unknown> | null | undefined): boolean {
   if (!raw) return false;
 
@@ -194,7 +249,21 @@ export function isLandOnly(raw: Record<string, unknown> | null | undefined): boo
   const n = asNewShape(raw);
   if (n) {
     const o = n.object ?? {};
-    return NEW_LAND_CHECK_FIELDS.every((f) => positive(o[f]) == null);
+    // Jamlanma `object` bloki VA har bir bino (`outer[]` + `liters[]`) bo'sh bo'lishi shart.
+    const objectEmpty = NEW_LAND_CHECK_FIELDS.every((f) => positive(o[f]) == null);
+    if (!objectEmpty) return false;
+    const outerEmpty = (n.outer ?? []).every((b) => {
+      if (positive(b.outer_pl_obfull) != null || positive(b.outer_pl_polezfull) != null) return false;
+      const liters = Array.isArray(b.liters) ? (b.liters as Record<string, unknown>[]) : [];
+      return liters.every(
+        (lt) => positive(lt.liter_pl_obfull) == null && positive(lt.liter_pl_polezfull) == null,
+      );
+    });
+    if (!outerEmpty) return false;
+    // ⚠️ Yer maydoni bo'lishi SHART (foydalanuvchi qoidasi, 2026-09-06): binosi ham,
+    // yeri ham yo'q "bo'sh" obyektni "yer uchastkasi" deb belgilash noto'g'ri bo'lardi.
+    const l = n.land ?? {};
+    return NEW_LAND_AREA_FIELDS.some((f) => positive(l[f]) != null);
   }
   return LAND_CHECK_FIELDS.every((f) => positive(raw[f]) == null);
 }

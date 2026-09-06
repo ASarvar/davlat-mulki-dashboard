@@ -7,6 +7,23 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.11.1
+
+- **Tuzatildi: "Bo'sh maydon" ustuni noto'g'ri kamayib ketgan edi.** Yangi API'ga
+  o'tishda yer maydoni bir joyda xom javobdan o'qilib, `lib/area.ts` ni chetlab
+  o'tardi — natijada butun bazada "Bo'sh maydon" ~25% ga tushib ketgan edi.
+  Tuzatildi. Tekshiruvdan keyin qolgan ~6% farq **haqiqiy** ma'lumot farqi: eski
+  API foydali maydoni yo'q obyektlarning ~9% iga qiymat qo'yib berardi, yangi API
+  esa ularni to'g'ri "yer uchastkasi" deb ko'rsatadi (binosi yo'q, faqat yeri bor).
+- **Foydali maydon endi bino/liter bloklaridan ham o'qiladi.** Yangi API'da jamlanma
+  foydali maydon `0` bo'lsa, obyektdagi ayrim binolar va ularning qismlari (liter)
+  bo'yicha qiymat qidiriladi. Hozircha barcha bunday obyektlarda u ham bo'sh chiqdi
+  (ular chindan ham yer uchastkasi), lekin kadastr ma'lumoti to'ldirilsa avtomatik
+  hisobga olinadi.
+- **Kadastrni tekshirish sahifasi** balansdan chiqqan obyekt uchun ham ma'lumot
+  ko'rsatadi: yangi API STIR talab qilgani uchun bunday obyektga javob bermaydi —
+  endi sahifa eski API'ga tushib xom javobni chiqaradi (faqat diagnostika sahifasida).
+
 ## 1.11.0
 
 - **Kadastr ma'lumotlari yangi API'dan olinadi.** Obyektning asosiy ma'lumoti
