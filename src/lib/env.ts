@@ -50,6 +50,14 @@ const schema = z.object({
   API6_PASSWORD: z.string().optional(),
   API6_PARAM: z.string().default("cad_number"),
 
+  // ── Kadastr ma'lumotlari (`cad_data`) — API 2 ning O'RNINI bosadi (2026-09-06) ──
+  // GET {CADDATA_BASE_URL}?tin={STIR}&cad_number={KADASTR}, Basic auth.
+  // ⚠️ API 2 dan farqli o'laroq STIR ham MAJBURIY — kadastrning o'zi yetarli emas.
+  // ⚠️ Sozlanmagan bo'lsa tizim eski API 2 ga qaytadi (`isCadDataConfigured()`).
+  CADDATA_BASE_URL: z.string().url().optional(),
+  CADDATA_USERNAME: z.string().optional(),
+  CADDATA_PASSWORD: z.string().optional(),
+
   API7_BASE_URL: z.string().url().optional(),
   API8_BASE_URL: z.string().url().optional(),
   API_STATUS_TOKEN: z.string().optional(),

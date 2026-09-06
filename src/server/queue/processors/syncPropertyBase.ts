@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { fetchPropertyBase } from "@/server/integrations/api2";
+import { fetchBase } from "@/server/integrations/propertyBase";
 import { STATUS_APIS } from "@/server/integrations/config";
 import { isAuctionConfigured } from "@/server/integrations/auction";
 import { isRentApiConfigured } from "@/server/integrations/rentApi";
@@ -15,7 +15,17 @@ import type { JobOutcome, PropertyBaseJob } from "../jobs";
 export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOutcome> {
   const { syncRunId, sourceId, regionId, cadNumber } = data;
 
-  const result = await fetchPropertyBase(cadNumber);
+  // ⚠️ Yangi `cad_data` API'si STIRni MAJBURIY qiladi. Odatda u job payloadida
+  // keladi (`syncSource.ts` fan-out'da qo'shadi); deploydan OLDIN navbatga tushgan
+  // eski joblarda esa yo'q — o'shanda bazadan olamiz, aks holda job jimgina
+  // eski API 2 ga tushib qolardi.
+  const stir =
+    data.stir ??
+    (await prisma.organizationSource.findUnique({ where: { id: sourceId }, select: { stir: true } }))
+      ?.stir ??
+    null;
+
+  const result = await fetchBase(cadNumber, stir);
 
   if (!result.ok) {
     // API 2 ma'lumot bermadi — obyektni FAILED belgilaymiz va API xabarini saqlaymiz.
@@ -39,6 +49,18 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
   const base = result.data;
   const districtId = await resolveDistrictId(base.districtCode, base.district, regionId);
 
+  // ⚠️ Koordinata FAQAT yangi qiymat bo'lganda yoziladi — `null` ga qaytarilmaydi.
+  // Bino kadastr javobi bir marta geometriyasiz kelgani uchun joyidan ko'chmaydi
+  // (auksion koordinatasi bilan bir xil printsip, `checkPropertyStatus.ts` ga qarang).
+  const coordFields = base.coords
+    ? {
+        lat: base.coords.lat,
+        lng: base.coords.lng,
+        coordSource: "CADASTRE",
+        coordsAt: new Date(),
+      }
+    : {};
+
   const property = await prisma.property.upsert({
     where: { cadNumber },
     create: {
@@ -53,6 +75,7 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
       buildingArea: base.buildingArea != null ? new Prisma.Decimal(base.buildingArea) : null,
       isLand: base.isLand,
       rawApi2: base.raw as Prisma.InputJsonValue,
+      ...coordFields,
       syncStatus: "SYNCING",
     },
     update: {
@@ -64,6 +87,7 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
       buildingArea: base.buildingArea != null ? new Prisma.Decimal(base.buildingArea) : null,
       isLand: base.isLand,
       rawApi2: base.raw as Prisma.InputJsonValue,
+      ...coordFields,
       syncStatus: "SYNCING",
     },
     select: {

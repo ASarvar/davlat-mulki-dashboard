@@ -1,6 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { fetchPropertyBase } from "@/server/integrations/api2";
+import { fetchBase } from "@/server/integrations/propertyBase";
 import { STATUS_APIS } from "@/server/integrations/config";
 import { makeStatusApiCall } from "@/server/integrations/statusApi";
 import { callWithCadFallback } from "@/server/integrations/withCadFallback";
@@ -138,6 +138,8 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
       hasRentLot: true,
       auctionTotalArea: true,
       rentTotalArea: true,
+      // Yangi `cad_data` API'si uchun STIR majburiy (API 2 da kerak emas edi).
+      source: { select: { stir: true } },
     },
   });
 
@@ -150,8 +152,14 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
   let baseBuildingArea = current.buildingArea != null ? Number(current.buildingArea) : 0;
   let baseRawApi2 = current.rawApi2;
   let baseError: string | null = null;
+  /**
+   * Kadastr poligonining markazi. ⚠️ Auksion nuqtasidan USTUN: qamrovi ancha keng
+   * (jonli o'lchov: 95% ↔ 28%) va u obyektning O'ZINING chegarasi, auksion lotining
+   * nuqtasi emas. Shuning uchun pastda avval shu, keyin auksion koordinatasi qo'llanadi.
+   */
+  let cadCoords: { lat: number; lng: number } | null = null;
   if (refreshBase) {
-    const base = await fetchPropertyBase(cadNumber);
+    const base = await fetchBase(cadNumber, current.source?.stir);
     if (base.ok) {
       const b = base.data;
       // Tuman API 2 bilan birga keladi — obyekt hududi bo'yicha District upsert qilamiz.
@@ -175,6 +183,7 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
       });
       baseBuildingArea = b.buildingArea ?? 0;
       baseRawApi2 = b.raw as typeof current.rawApi2;
+      cadCoords = b.coords ?? null;
     } else {
       baseError = base.reason;
     }
@@ -398,15 +407,19 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
         isInefficient,
         hasPrivatizationLot,
         hasRentLot,
-        // ⚠️ KOORDINATA `refreshAuction` blokidan TASHQARIDA va faqat YANGI qiymat
-        // bo'lganda yoziladi — hech qachon `null` ga qaytarilmaydi.
-        //
-        // Sabab: auksion maydonlari lot topilmasa ataylab tozalanadi (eski lot raqami
-        // qolib ketmasin), lekin bino auksion tugagani uchun joyidan KO'CHMAYDI.
-        // Blok ichiga qo'yilsa obyekt savdodan chiqishi bilan xaritadan yo'qolardi.
-        ...(auction?.coords
-          ? { lat: auction.coords.lat, lng: auction.coords.lng, coordSource: "AUCTION", coordsAt: new Date() }
-          : {}),
+        // ⚠️ USTUVORLIK: kadastr poligoni > auksion nuqtasi. Kadastr koordinatasi
+        // obyektning O'Z chegarasidan olinadi va qamrovi ancha keng (95% ↔ 28%),
+        // auksion nuqtasi esa faqat savdoga chiqqan obyektlarda bo'ladi.
+        // ⚠️ Ikkalasi ham blokdan TASHQARIDA va faqat YANGI qiymat bo'lganda
+        // yoziladi — hech qachon `null` ga qaytarilmaydi: auksion maydonlari lot
+        // topilmasa ataylab tozalanadi (eski lot raqami qolib ketmasin), lekin bino
+        // auksion tugagani uchun joyidan KO'CHMAYDI. Blok ichiga qo'yilsa obyekt
+        // savdodan chiqishi bilan xaritadan yo'qolardi.
+        ...(cadCoords
+          ? { lat: cadCoords.lat, lng: cadCoords.lng, coordSource: "CADASTRE", coordsAt: new Date() }
+          : auction?.coords
+            ? { lat: auction.coords.lat, lng: auction.coords.lng, coordSource: "AUCTION", coordsAt: new Date() }
+            : {}),
         ...(refreshAuction
           ? {
               // Auksion maydonlari (topilmasa tozalanadi — eski qiymat qolib ketmasin).

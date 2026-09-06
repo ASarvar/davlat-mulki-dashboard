@@ -7,6 +7,24 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.11.0
+
+- **Kadastr ma'lumotlari yangi API'dan olinadi.** Obyektning asosiy ma'lumoti
+  (nom, manzil, maydonlar, tuman, egasi, eski kadastr) endi `cad_data` xizmatidan
+  keladi. Jonli tekshiruvda barcha maydonlar eski API bilan **100% mos** chiqdi
+  (117 obyekt), shuning uchun ekrandagi sonlar o'zgarmaydi.
+- **Xaritadagi koordinata qamrovi 28% dan ~95% ga chiqdi.** Ilgari koordinata faqat
+  auksionga chiqarilgan obyektlarda bor edi va u auksion lotining nuqtasi edi. Endi
+  u **kadastrning o'z chegarasidan** olinadi — ya'ni deyarli har bir obyekt xaritada
+  o'z joyida ko'rinadi. Auksion koordinatasi zaxira sifatida qoladi.
+- **Yangi ma'lumot: obyektdagi cheklovlar (hibs/xatlov).** Kadastr javobi bilan birga
+  saqlanadi — obyektlarning yarmidan ko'pida mavjud. Hozircha xom holda saqlanmoqda,
+  keyingi versiyada ro'yxat va obyekt sahifasida ko'rsatiladi.
+- Manzil endi to'liqroq: hudud, tuman, mahalla, ko'cha va uy raqamidan quriladi.
+- ⚠️ Yangi API tashkilot STIRini talab qiladi, shuning uchun **balansdan chiqqan
+  obyektning yangi egasini aniqlash** eski API orqali ishlashda davom etadi —
+  `.env` dagi eski API sozlamalarini o'chirmang.
+
 ## 1.10.1
 
 - **Tuzatildi: yangi vizual panel serverga chiqarilgan zahoti hamma rolga ochilib

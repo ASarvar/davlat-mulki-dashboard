@@ -277,6 +277,7 @@ PDF siqish YO'Q — foydalanuvchi tanlovi (Ghostscript kerak bo'lardi).
 | API | So'rov | Auth |
 |---|---|---|
 | 1 | `GET {API1_BASE_URL}?num={STIR}` | yo'q |
+| **cad** | `GET {CADDATA_BASE_URL}?tin={STIR}&cad_number={CAD}` | Basic (`CADDATA_*`) |
 | 2 | `GET {API2_BASE_URL}?num={CAD}&token={API2_TOKEN}` | token **query'da**, headerda emas |
 | 3 | `POST {API3_BASE_URL}` body `{cad_number}` | Basic (`AUCTION_API_*`) |
 | 4 | `GET {API4_BASE_URL}?order={order_id}` | Basic (bir xil juftlik) |
@@ -365,6 +366,78 @@ Kommunal modul **kategoriyaga umuman ta'sir qilmaydi** — u mustaqil kuzatuv o'
 `integrationCategoryCode` hisobiga kirmaydi. Shu sababli `AUCTION_RANGE`/`RENT_RANGE` kabi
 "yangilanmagan modul hissasini tiklash" mantig'i kerak emas: modul o'chirilgan bo'lsa,
 tegishli ustunlar `update`ga qo'shilmaydi va bazadagi qiymat o'z holicha qoladi.
+
+### Kadastr ma'lumotlari: `cad_data` — API 2 ning O'RNINI bosdi (2026-09-06)
+
+Asosiy ma'lumot endi `cad_data` dan olinadi (`integrations/cadData.ts`). Yagona kirish
+nuqtasi — **`integrations/propertyBase.ts` → `fetchBase(cadNumber, tin)`**: `CADDATA_*`
+sozlangan bo'lsa yangi API, aks holda eski API 2. Chaqiruvchilar ikkalasini qo'lda
+tanlamaydi.
+
+**Nima uchun ko'chirildi** (jonli o'lchov, 200 obyekt): koordinata qamrovi
+**28% → 95%**, ustiga cheklov (hibs/xatlov) ma'lumoti qo'shildi. Maydon, tuman kodi,
+eski kadastr va nom mosligi — **100%** (117 obyektda tekshirilgan).
+
+⚠️ **STIR (`?tin=`) MAJBURIY va EGASIGA MOS kelishi shart.** Mos kelmasa
+`[2108] "Ushbu obyekt ko'rsatilgan tashkilotga tegishli emas"`. Uchta oqibati bor:
+1. Har bir chaqiruvchi obyektning tashkiloti STIRini bilishi kerak. `PropertyBaseJob`
+   ga `stir` qo'shilgan (`syncSource.ts` fan-out'da beradi); `checkPropertyStatus`
+   uni bazadan (`source.stir`) oladi.
+2. **Balansdan chiqqan obyektning YANGI egasini aniqlash yangi API bilan MUMKIN EMAS** —
+   biz u yerda aynan egani qidiramiz, ya'ni STIRni oldindan bilmaymiz. Shuning uchun
+   `syncSource.ts` dagi holder-lookup ATAYLAB eski API 2 da qoldirilgan. **API 2 ni
+   sozlamadan olib tashlamang.**
+3. `2108` amalda "balansdan chiqqan" signali, lekin unga qarab AVTOMATIK
+   `removedFromBalance` qilinmaydi — bu qaror API 1 ning ro'yxati bo'yicha qabul
+   qilinadi (yolg'on ijobiy natijaning oldini olish).
+
+⚠️ **Javob shakli BUTUNLAY boshqacha** — ichma-ich (`data.object` / `data.land` /
+`data.address`), API 2 esa yassi edi. `lib/area.ts` **IKKALA shaklni ham** tushunadi
+(`asNewShape()` + `normalize()`) va bu VAQTINCHALIK emas: yangi API obyektlarning
+~2–4% iga `404`/`2108` qaytaradi, ularning `rawApi2` si eski shaklda qoladi.
+
+Maydon mosligi (jonli tasdiqlangan):
+
+| API 2 (yassi) | `cad_data` (ichma-ich) |
+|---|---|
+| `cad_number_old` | `old_cad_number` |
+| `object_area_p` | `object.object_pl_obfull` |
+| `object_area` | `object.pl_obzd` |
+| `object_area_u` | `object.object_pl_polezfull` |
+| `land_area` | `land.area` |
+| `object_rooms` | `object.rooms` |
+| `district_id` | **`address.district.soato`** |
+| `subjects[0]` | `hosts[0]` (`tin`/`fname`) |
+| `address` (tayyor satr) | `address.{region,district,mahalla,street,house_number}` — qurish kerak |
+
+⚠️ **`address.district.code` ("10:04") EMAS, `soato` ("1726290")** — aynan `soato`
+API 2 ning `district_id` si bilan bir xil (117 obyektda 100%). `code` ni olsak
+`District` jadvalining butun kaliti buzilardi.
+⚠️ `land.area_z`/`area_b` MAPPING QILINMAYDI — ma'nosi hujjatlashtirilmagan
+(eski shakldagi `_i`/`_b`/`_z` suffikslari bilan bir xil sabab).
+
+⚠️ **`0` ham "qiymat yo'q"** — yangi shaklda ham. Birinchi o'lchovda `??`
+ishlatilgani uchun 17 ta "farq" chiqqan edi; `positive()` bilan 100% mos keldi.
+
+### Koordinata — `geometry` (kadastr poligoni)
+
+`cad_data` javobida **`geometry`** bor: `Polygon`, **EPSG:3857** (Web Mercator, metrda).
+`lib/geo.ts` → `pickCadastreCoords()` uni WGS84 ga o'giradi va poligonning markazini
+(centroid) qaytaradi. Kutubxona kerak emas — formula qisqa (`mercatorToWgs84`).
+
+⚠️ `crs.properties.name` TEKSHIRILADI: `EPSG:3857` bo'lmasa `null` qaytadi.
+Boshqa proyeksiyani "taxmin qilib" o'girish xaritaga jimgina tasodifiy nuqta chizardi.
+⚠️ **USTUVORLIK: kadastr poligoni > auksion nuqtasi** (`coordSource` ustuni:
+`CADASTRE` / `AUCTION`). Kadastr koordinatasi obyektning O'Z chegarasidan olinadi va
+qamrovi ancha keng; auksion nuqtasi esa faqat savdoga chiqqan obyektlarda bo'ladi.
+⚠️ Ikkalasi ham `refreshAuction` blokidan TASHQARIDA va faqat YANGI qiymat
+bo'lganda yoziladi — hech qachon `null` ga qaytarilmaydi (bino joyidan ko'chmaydi).
+⚠️ Xarita ostidagi izoh `MapData.bySource` ga qarab o'zgaradi — qattiq
+yozib qo'yilgan "faqat auksionga chiqqan obyektlarda" matni ko'chishdan keyin
+YOLG'ON bo'lib qolgan bo'lardi.
+
+Ko'chishdan oldin tekshirish: `prisma/probe-cad-data-2026-09-06.ts` (bazaga hech narsa
+yozmaydi, namunada qamrov va maydon mosligini o'lchaydi).
 
 ### API tuzoqlari (real ma'lumotdan)
 - **API 2:** `cad_number_old` yo'q bo'lsa `""` qaytadi, `null` emas — tozalanmasa fallback bo'sh

@@ -45,3 +45,22 @@ export const STATUS_APIS: StatusApiConfig[] = ALL_STATUS_APIS.filter((a) => isCo
 export const API1 = { baseUrl: env.API1_BASE_URL, path: env.API1_PATH };
 // API 2 — token QUERY parametr sifatida uzatiladi (?num=...&token=...), headerda emas.
 export const API2 = { baseUrl: env.API2_BASE_URL, path: env.API2_PATH, token: env.API2_TOKEN };
+
+/**
+ * Kadastr ma'lumotlari — API 2 ning o'rnini bosuvchi `cad_data` (2026-09-06).
+ *
+ * ⚠️ API 2 dan uchta farqi bor:
+ *   1. **STIR majburiy** (`?tin=`) — kadastr raqamining o'zi yetarli emas;
+ *   2. javob shakli ichma-ich (`data.object` / `data.land` / `data.address`);
+ *   3. javobda **`geometry`** (kadastr poligoni, EPSG:3857) bor — koordinata shundan.
+ */
+export const CADDATA = {
+  baseUrl: env.CADDATA_BASE_URL,
+  username: env.CADDATA_USERNAME,
+  password: env.CADDATA_PASSWORD,
+};
+
+/** Yangi kadastr API'si sozlanganmi — sozlanmagan bo'lsa eski API 2 ishlatiladi. */
+export function isCadDataConfigured(): boolean {
+  return Boolean(CADDATA.baseUrl && CADDATA.username && CADDATA.password);
+}

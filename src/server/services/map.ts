@@ -40,6 +40,17 @@ export interface MapData {
   withCoords: number;
   /** Respublika darajasidagi tashkilotlarning obyektlari — xaritada ko'rsatilmaydi. */
   nationalHidden: number;
+  /**
+   * Koordinata QAYSI manbadan kelgani (`Property.coordSource`).
+   *
+   * ⚠️ Xarita ostidagi izoh shunga qarab o'zgaradi — ikkalasi bir xil emas:
+   *   `CADASTRE` — kadastr poligonining markazi (obyektning O'Z chegarasi),
+   *   `AUCTION`  — auksion lotining nuqtasi (faqat savdoga chiqqanlarda).
+   * Izohni qattiq yozib qo'yish mumkin emas edi: 2026-09-06 dagi ko'chishdan keyin
+   * ustun manba almashdi va eski matn ("faqat auksionga chiqqan obyektlarda")
+   * jimgina YOLG'ON bo'lib qolardi.
+   */
+  bySource: { cadastre: number; auction: number; other: number };
 }
 
 async function computeMapData(scope: StatsScope = {}): Promise<MapData> {
@@ -56,6 +67,7 @@ async function computeMapData(scope: StatsScope = {}): Promise<MapData> {
         lng: true,
         name: true,
         regionId: true,
+        coordSource: true,
         integrationCategoryCode: true,
         manualCategoryCode: true,
       },
@@ -119,7 +131,14 @@ async function computeMapData(scope: StatsScope = {}): Promise<MapData> {
   }
   bubbles.sort((a, b) => b.total - a.total);
 
-  return { points, bubbles, total, withCoords: points.length, nationalHidden };
+  const bySource = { cadastre: 0, auction: 0, other: 0 };
+  for (const r of rows) {
+    if (r.coordSource === "CADASTRE") bySource.cadastre++;
+    else if (r.coordSource === "AUCTION") bySource.auction++;
+    else bySource.other++;
+  }
+
+  return { points, bubbles, total, withCoords: points.length, nationalHidden, bySource };
 }
 
 // ⚠️ Doira argument sifatida — kesh kaliti rol doirasini ham qamraydi.

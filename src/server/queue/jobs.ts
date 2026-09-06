@@ -38,6 +38,12 @@ export interface PropertyBaseJob {
   sourceId: string;
   regionId: string;
   cadNumber: string;
+  /**
+   * Tashkilot STIRi — yangi `cad_data` API'si uchun MAJBURIY parametr.
+   * ⚠️ Ixtiyoriy qilib qoldirilgan: eski (deploydan oldin navbatga tushgan)
+   * joblarda u yo'q, ishlov beruvchi bunday holatda `sourceId` orqali bazadan oladi.
+   */
+  stir?: string;
 }
 
 export interface StatusCheckJob {

@@ -410,9 +410,28 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                 {nf(mapData.withCoords)} / {nf(mapData.total)} obyektda koordinata bor (
                 {pct1(mapData.withCoords, mapData.total)}%).
               </b>{" "}
-              Koordinata faqat auksionga chiqarilgan obyektlarda mavjud va u{" "}
-              <b>auksion lotining nuqtasi</b>, kadastr chegarasi emas. Qolgan{" "}
-              {nf(mapData.nationalHidden)} obyekt xaritada ko&apos;rsatilmagan —{" "}
+              {/* ⚠️ Matn MANBAGA qarab o'zgaradi. Ilgari u qattiq "faqat auksionga
+                  chiqqan obyektlarda" deb yozilgan edi — kadastr API'siga ko'chgandan
+                  keyin (2026-09-06) bu YOLG'ON bo'lib qolardi. */}
+              {mapData.bySource.cadastre >= mapData.bySource.auction ? (
+                <>
+                  Asosiy manba — <b>kadastr chegarasining markazi</b>
+                  {mapData.bySource.auction > 0
+                    ? `; ${nf(mapData.bySource.auction)} tasida esa auksion lotining nuqtasi`
+                    : ""}
+                  .
+                </>
+              ) : (
+                <>
+                  Koordinata asosan auksionga chiqarilgan obyektlarda mavjud va u{" "}
+                  <b>auksion lotining nuqtasi</b>, kadastr chegarasi emas
+                  {mapData.bySource.cadastre > 0
+                    ? `; ${nf(mapData.bySource.cadastre)} tasida kadastr markazi`
+                    : ""}
+                  .
+                </>
+              )}{" "}
+              Qolgan {nf(mapData.nationalHidden)} obyekt xaritada ko&apos;rsatilmagan —{" "}
               <Link href={mapHref("hudud")} className="underline">
                 «Hududlar» rejimida
               </Link>{" "}

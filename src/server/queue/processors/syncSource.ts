@@ -82,6 +82,10 @@ async function reconcileRemovedFromBalance(opts: {
     );
   }
 
+  // ⚠️ Bu yerda ATAYLAB eski API 2 ishlatiladi (`fetchPropertyBase`), yangi
+  // `cad_data` EMAS: yangi API `?tin=` ni majburiy qiladi va u obyektning HOZIRGI
+  // egasiga mos kelishi kerak. Bu yerda esa biz aynan yangi egani QIDIRAMIZ —
+  // ya'ni STIRni oldindan bilmaymiz. O'z STIRimiz bilan chaqirsak `400` qaytadi.
   // Yangi egasini aniqlash (API 2 → `subjects[0]`). Yangi belgilanganlar + egasi
   // hali aniqlanmagan eskilar — ya'ni API bir marta javob bermasa, keyingi
   // sinxronizatsiyada qayta uriniladi.
@@ -135,7 +139,7 @@ export async function processSyncSource(data: SyncSourceJob): Promise<JobOutcome
 
   if (regionId) {
     // Hududiy manba — hamma obyekti o'sha hududga tegishli.
-    jobs = cadastres.map((cadNumber) => ({ syncRunId, sourceId, regionId, cadNumber }));
+    jobs = cadastres.map((cadNumber) => ({ syncRunId, sourceId, regionId, cadNumber, stir }));
   } else {
     // Respublika darajasidagi manba — hudud har bir kadastrdan alohida aniqlanadi.
     const byPrefix = await loadRegionByPrefix();
@@ -149,7 +153,7 @@ export async function processSyncSource(data: SyncSourceJob): Promise<JobOutcome
         unknown.push(cadNumber);
         continue;
       }
-      jobs.push({ syncRunId, sourceId, regionId: rid, cadNumber });
+      jobs.push({ syncRunId, sourceId, regionId: rid, cadNumber, stir });
     }
     if (unknown.length > 0) {
       console.warn(

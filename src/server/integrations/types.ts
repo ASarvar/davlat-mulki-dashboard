@@ -19,6 +19,12 @@ export interface PropertyBaseData {
   holderInn?: string | null; // uning STIR'i (subjects[0].inn)
   /** Yer uchastkasimi (rost) yoki bino (yolg'on) — src/lib/area.ts -> isLandOnly() */
   isLand: boolean;
+  /**
+   * Kadastr poligonining markazi (`cad_data` → `geometry`). Eski API 2 da YO'Q edi —
+   * u yerda koordinata faqat auksion javobidan (`api4.lat/lng`) kelardi.
+   * ⚠️ Yozishda auksion koordinatasidan USTUN (qamrov 95% ↔ 28%).
+   */
+  coords?: { lat: number; lng: number } | null;
   raw: unknown;
 }
 

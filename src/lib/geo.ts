@@ -44,6 +44,67 @@ export function pickAuctionCoords(raw: unknown): Coords | null {
 }
 
 /**
+ * Kadastr javobidagi `geometry` — poligonning MARKAZI (centroid).
+ *
+ * ⚠️ Manbadagi koordinatalar **EPSG:3857** (Web Mercator, metrda), WGS84 gradus EMAS —
+ * to'g'ridan-to'g'ri `lat`/`lng` deb yozib bo'lmaydi (7 719 126 kabi son chiqadi).
+ * `crs.properties.name` ni tekshiramiz: boshqa proyeksiya kelsa `null` qaytariladi,
+ * chunki noto'g'ri konvertatsiya xaritaga tasodifiy nuqta chizardi.
+ *
+ * ⚠️ Bu **auksion lotining nuqtasi emas, kadastr chegarasi** — jonli o'lchovda
+ * qamrov 95% (auksion koordinatasida 28% edi). Shuning uchun u ustuvor manba.
+ */
+export function pickCadastreCoords(raw: unknown): Coords | null {
+  if (!raw || typeof raw !== "object") return null;
+  const g = (raw as Record<string, unknown>).geometry as Record<string, unknown> | undefined;
+  if (!g) return null;
+
+  // Faqat Web Mercator qabul qilinadi — noma'lum proyeksiyani "taxmin qilib" o'girish
+  // xaritada jimgina noto'g'ri nuqta bo'lib chiqardi.
+  const crs = (g.crs as { properties?: { name?: unknown } } | undefined)?.properties?.name;
+  if (String(crs ?? "").toUpperCase() !== "EPSG:3857") return null;
+
+  const ring = firstRing(g.coordinates);
+  if (!ring.length) return null;
+
+  let sx = 0;
+  let sy = 0;
+  for (const [x, y] of ring) {
+    sx += x;
+    sy += y;
+  }
+  const c = mercatorToWgs84(sx / ring.length, sy / ring.length);
+  return isInUzbekistan(c.lat, c.lng) ? c : null;
+}
+
+/**
+ * Poligonning tashqi halqasi. GeoJSON'da `Polygon` uchun `coordinates[0]`,
+ * `MultiPolygon` uchun esa `coordinates[0][0]` — ikkalasini ham qo'llab-quvvatlaymiz
+ * (jonli javobda `Polygon` uchradi, lekin turi o'zgarsa jim buzilmasin).
+ */
+function firstRing(coords: unknown): [number, number][] {
+  if (!Array.isArray(coords) || coords.length === 0) return [];
+  const lvl1 = coords[0];
+  if (!Array.isArray(lvl1) || lvl1.length === 0) return [];
+  // `lvl1` — nuqtalar massivimi (Polygon) yoki halqalar massivimi (MultiPolygon)?
+  const ring = Array.isArray(lvl1[0]) && typeof lvl1[0][0] === "number" ? lvl1 : lvl1[0];
+  if (!Array.isArray(ring)) return [];
+  return ring.filter(
+    (p): p is [number, number] =>
+      Array.isArray(p) && p.length >= 2 && Number.isFinite(p[0]) && Number.isFinite(p[1]),
+  );
+}
+
+/** EPSG:3857 (metr) → WGS84 (gradus). Kutubxona kerak emas — formula qisqa. */
+export function mercatorToWgs84(x: number, y: number): Coords {
+  const R = 20037508.34;
+  const lng = (x / R) * 180;
+  const t = (y / R) * 180;
+  const lat = (180 / Math.PI) * (2 * Math.atan(Math.exp((t * Math.PI) / 180)) - Math.PI / 2);
+  return { lat, lng };
+}
+
+/**
  * Hudud markazlari — "Hududlar" rejimidagi pufakchalar uchun.
  *
  * ⚠️ Kalit — `Region.cadastrePrefix` ("10".."23"), `Region.code` EMAS: `code`

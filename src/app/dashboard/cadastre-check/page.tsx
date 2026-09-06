@@ -1,7 +1,7 @@
 import { FileSearch, Search, AlertTriangle, ExternalLink } from "lucide-react";
 import { requireSection } from "@/server/services/sectionAccess";
-import { fetchPropertyBase } from "@/server/integrations/api2";
-import { API2 } from "@/server/integrations/config";
+import { fetchBase, baseSourceLabel } from "@/server/integrations/propertyBase";
+import { API2, isCadDataConfigured } from "@/server/integrations/config";
 import { objectHref } from "@/lib/cadastre";
 import { withBase } from "@/lib/basePath";
 import { prisma } from "@/lib/prisma";
@@ -14,7 +14,7 @@ const inputCls =
   "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-cobalt focus:ring-2 focus:ring-cobalt/20";
 
 /**
- * Kadastrni tekshirish — API 2 (UZKAD) ga JONLI so'rov yuborib, xom javobni
+ * Kadastrni tekshirish — kadastr API'siga JONLI so'rov yuborib, xom javobni
  * JSON ko'rinishida ko'rsatadi. Faqat admin uchun: tashqi API'ga to'g'ridan-to'g'ri
  * murojaat qiladi va javobda ichki maydonlar bo'ladi.
  *
@@ -25,15 +25,28 @@ export default async function CadastreCheckPage({ searchParams }: { searchParams
   await requireSection("cadastre-check");
   const sp = await searchParams;
   const cad = str(sp.cad)?.trim() || undefined;
+  const tinInput = str(sp.tin)?.trim() || undefined;
 
-  const result = cad ? await fetchPropertyBase(cad).catch((e: unknown) => ({
-    ok: false as const,
-    reason: e instanceof Error ? e.message : "Noma'lum xato",
-  })) : null;
-
-  // Bazada shu kadastr bormi — bo'lsa obyekt sahifasiga havola beramiz.
+  // Bazada shu kadastr bormi — bo'lsa obyekt sahifasiga havola beramiz VA uning
+  // tashkiloti STIRini avtomatik ishlatamiz (yangi API uchun majburiy parametr).
   const existing = cad
-    ? await prisma.property.findUnique({ where: { cadNumber: cad }, select: { cadNumber: true } })
+    ? await prisma.property.findUnique({
+        where: { cadNumber: cad },
+        select: { cadNumber: true, source: { select: { stir: true, name: true } } },
+      })
+    : null;
+
+  // ⚠️ Yangi `cad_data` API'si STIRsiz ishlamaydi. Tartib: qo'lda kiritilgan →
+  // bazadagi obyektning tashkiloti. Ikkalasi ham bo'lmasa eski API 2 ga tushamiz
+  // (u kadastrning o'zi bilan ham javob beradi).
+  const tin = tinInput ?? existing?.source?.stir;
+  const usedSource = baseSourceLabel(tin);
+
+  const result = cad
+    ? await fetchBase(cad, tin).catch((e: unknown) => ({
+        ok: false as const,
+        reason: e instanceof Error ? e.message : "Noma'lum xato",
+      }))
     : null;
 
   return (
@@ -43,16 +56,22 @@ export default async function CadastreCheckPage({ searchParams }: { searchParams
         Kadastrni tekshirish
       </h1>
       <p className="mb-6 text-sm text-muted-foreground">
-        Kadastr raqami bo&apos;yicha API 2 (UZKAD) ga jonli so&apos;rov yuboriladi va xom javob
+        Kadastr raqami bo&apos;yicha kadastr API&apos;siga jonli so&apos;rov yuboriladi va xom javob
         to&apos;liq ko&apos;rsatiladi. Bazaga hech narsa yozilmaydi.
+        {cad ? (
+          <>
+            {" "}
+            Ishlatilgan manba: <strong>{usedSource}</strong>.
+          </>
+        ) : null}
       </p>
 
-      {!API2.baseUrl ? (
+      {!API2.baseUrl && !isCadDataConfigured() ? (
         <div className="mb-6 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <p>
-            <strong>API2_BASE_URL sozlanmagan.</strong> Tekshirish ishlashi uchun `.env` da API 2
-            manzilini ko&apos;rsating.
+            <strong>Kadastr API&apos;si sozlanmagan.</strong> Tekshirish ishlashi uchun `.env` da
+            `CADDATA_BASE_URL` (yoki eski `API2_BASE_URL`) manzilini ko&apos;rsating.
           </p>
         </div>
       ) : null}
@@ -71,6 +90,22 @@ export default async function CadastreCheckPage({ searchParams }: { searchParams
             autoFocus
             placeholder="17:15:40:01:02:0184"
             className={`${inputCls} w-72 font-mono`}
+          />
+        </div>
+        {/* ⚠️ Yangi API STIRni MAJBURIY qiladi. Bazadagi obyekt uchun u avtomatik
+            topiladi — maydon faqat bazada yo'q kadastrni tekshirish uchun kerak. */}
+        <div className="flex flex-col">
+          <label className="mb-1 text-xs font-medium text-muted-foreground">
+            Tashkilot STIRi{" "}
+            <span className="font-normal">
+              {existing?.source?.stir ? "(bazadan topildi)" : "(yangi API uchun)"}
+            </span>
+          </label>
+          <input
+            name="tin"
+            defaultValue={tinInput ?? ""}
+            placeholder={existing?.source?.stir ?? "201122696"}
+            className={`${inputCls} w-44 font-mono`}
           />
         </div>
         <button
@@ -104,7 +139,7 @@ export default async function CadastreCheckPage({ searchParams }: { searchParams
         <div className="flex items-start gap-3 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
-            <p className="font-medium">API 2 javob bermadi</p>
+            <p className="font-medium">Kadastr API&apos;si javob bermadi ({usedSource})</p>
             <p className="mt-0.5">{result.reason}</p>
           </div>
         </div>
