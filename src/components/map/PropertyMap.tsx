@@ -258,7 +258,7 @@ export function PropertyMap({
         className="absolute right-3 top-3 z-[1001] inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2.5 py-1.5 text-[12px] font-medium text-slate-600 shadow-sm backdrop-blur transition-colors hover:bg-muted"
       >
         {isFull ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-        {isFull ? "Chiqish" : "To'liq ekran"}
+        {isFull}
       </button>
 
       {/* Ctrl'siz g'ildirakda qisqa ko'rsatma — xarita nega kattalashmaganini tushuntiradi. */}
@@ -269,7 +269,7 @@ export function PropertyMap({
         }`}
       >
         <span className="rounded-lg bg-slate-900/75 px-4 py-2 text-[13px] font-medium text-white shadow-lg">
-          Kattalashtirish uchun <kbd className="font-semibold">Ctrl</kbd> + g&apos;ildirak
+          Kattalashtirish uchun <kbd className="font-semibold">Ctrl</kbd> +
         </span>
       </div>
 
