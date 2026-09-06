@@ -30,16 +30,23 @@ export interface CategorySlice {
  * Har bir qator — obyektlar ro'yxatiga havola (grafik bo'lagini bosish ham shunday).
  *
  * `showLegend={false}` — yonidagi ro'yxat ko'rsatilmaydi (raqamlar boshqa joyda,
- * masalan yuqoridagi kartalar ko'rinishida). U holda halqa markazlashadi.
+ * masalan yonidagi kartalar ko'rinishida). U holda halqa markazlashadi.
+ *
+ * `size` — halqa qutisining tomoni (px). ⚠️ Recharts'ga beriladigan `cx`/`cy` va
+ * radiuslar ANIQ SON bo'lishi shart (pastdagi izohga qarang), shuning uchun ular
+ * foiz emas, aynan SHU sondan hisoblanadi. Nisbatlar 200px dagi asl ko'rinishdan
+ * olingan: ichki 0.29, tashqi 0.46.
  */
 export function CategoryDonut({
   data,
   totalLabel,
   showLegend = true,
+  size = 200,
 }: {
   data: CategorySlice[];
   totalLabel: string;
   showLegend?: boolean;
+  size?: number;
 }) {
   const router = useRouter();
   const shown = data.filter((d) => d.count > 0);
@@ -56,7 +63,7 @@ export function CategoryDonut({
           : "flex justify-center py-1"
       }
     >
-      <div className="relative h-[200px] w-[200px] shrink-0">
+      <div className="relative shrink-0" style={{ width: size, height: size }}>
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie
@@ -66,11 +73,11 @@ export function CategoryDonut({
               // ⚠️ Markaz va radius ANIQ SON, foiz emas: Recharts 3.x da "50%"
               // qiymati bo'lak geometriyasiga yetib bormay, `<svg>` atributiga
               // o'tib ketadi va halqa umuman chizilmaydi (bo'sh `<g>` qoladi).
-              // Konteyner o'lchami qat'iy 200×200 bo'lgani uchun bu xavfsiz.
-              cx={100}
-              cy={100}
-              innerRadius={58}
-              outerRadius={92}
+              // Konteyner tomoni `size` bilan QAT'IY belgilangani uchun bu xavfsiz.
+              cx={size / 2}
+              cy={size / 2}
+              innerRadius={size * 0.29}
+              outerRadius={size * 0.46}
               paddingAngle={1}
               // ⚠️ Animatsiya o'chirilgan: React 19 ning dev rejimidagi ikki marta
               // render qilishida Recharts 3.x da bo'lak radiusi 0 da qotib qolib,
@@ -94,12 +101,18 @@ export function CategoryDonut({
             />
           </PieChart>
         </ResponsiveContainer>
-        {/* Markazdagi jami — halqa ichida bo'sh joy behuda ketmasin. */}
+        {/* Markazdagi jami — halqa ichida bo'sh joy behuda ketmasin.
+            Shrift ham `size` ga qarab o'sadi, aks holda katta halqada yo'qolib qolardi. */}
         <div className="pointer-events-none absolute inset-0 grid place-content-center text-center">
-          <p className="text-xl font-bold tracking-tight" style={{ color: "var(--navy)" }}>
+          <p
+            className="font-bold leading-none tracking-tight"
+            style={{ color: "var(--navy)", fontSize: Math.round(size * 0.115) }}
+          >
             {totalLabel}
           </p>
-          <p className="text-[11px] text-muted-foreground">obyekt</p>
+          <p className="mt-1 text-muted-foreground" style={{ fontSize: Math.round(size * 0.058) }}>
+            obyekt
+          </p>
         </div>
       </div>
 

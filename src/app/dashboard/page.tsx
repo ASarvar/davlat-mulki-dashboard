@@ -302,13 +302,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           subtitle={`Effektiv kategoriya bo'yicha, ${nf(t.total)} obyekt`}
           footnote="Har bir kartani yoki halqa bo'lagini bosganda o'sha kategoriyaning obyektlar ro'yxati ochiladi."
         >
-          {/* ⚠️ Kartalar CHAPDA, halqa O'NGDA (foydalanuvchi tanlovi, 2026-09-06). */}
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-8">
-            <div className="min-w-0 flex-1">
+          {/* ⚠️ Kartalar CHAPDA (2/3), halqa O'NGDA (1/3) — foydalanuvchi tanlovi, 2026-09-06.
+              Flex emas, GRID: `basis-2/3` + `basis-1/3` + gap yig'indisi 100% dan oshib
+              ketardi va nisbat buzilardi; grid'da ustunlar gap'dan keyin bo'linadi. */}
+          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-center lg:gap-8">
+            <div className="min-w-0 lg:col-span-2">
               <CategoryCards data={donut} />
             </div>
-            <div className="mx-auto shrink-0 lg:mx-0">
-              <CategoryDonut data={donut} totalLabel={nf(t.total)} showLegend={false} />
+            <div className="flex justify-center">
+              <CategoryDonut data={donut} totalLabel={nf(t.total)} showLegend={false} size={280} />
             </div>
           </div>
         </ChartCard>
