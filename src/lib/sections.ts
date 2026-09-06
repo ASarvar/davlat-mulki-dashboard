@@ -68,7 +68,7 @@ export const SECTIONS: SectionDef[] = [
   // uning o'rnini egallagach shu yerga ko'chirildi (2026-09-05). Panel yopiq bo'lgan
   // foydalanuvchi `/dashboard` dan SHU YERGA yo'naltiriladi — ya'ni u uchun hech narsa
   // o'zgarmaydi, eski ko'rinish o'z joyida qoladi.
-  { key: "hisobot",        href: "/dashboard/hisobot",            label: "Rasmiy hisobot",       exact: false, allowRoles: ALL_ROLES },
+  { key: "hisobot",        href: "/dashboard/hisobot",            label: "Hisobot",              exact: false, allowRoles: ALL_ROLES },
   { key: "objects",        href: "/dashboard/objects",            label: "Obyektlar",            exact: false, allowRoles: ALL_ROLES },
   { key: "requests",       href: "/dashboard/requests",           label: "Tasdiqlash so'rovlari", exact: false, allowRoles: ALL_ROLES },
   { key: "imtiyoz",        href: "/dashboard/imtiyoz",            label: "Ijara imtiyozi",       exact: false, allowRoles: ALL_ROLES },
