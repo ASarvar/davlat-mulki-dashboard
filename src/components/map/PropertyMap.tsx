@@ -258,7 +258,7 @@ export function PropertyMap({
         className="absolute right-3 top-3 z-[1001] inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2.5 py-1.5 text-[12px] font-medium text-slate-600 shadow-sm backdrop-blur transition-colors hover:bg-muted"
       >
         {isFull ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-        {isFull}
+        {isFull ? "Chiqish" : "To'liq ekran"}
       </button>
 
       {/* Ctrl'siz g'ildirakda qisqa ko'rsatma — xarita nega kattalashmaganini tushuntiradi. */}
@@ -269,15 +269,28 @@ export function PropertyMap({
         }`}
       >
         <span className="rounded-lg bg-slate-900/75 px-4 py-2 text-[13px] font-medium text-white shadow-lg">
-          Kattalashtirish uchun <kbd className="font-semibold">Ctrl</kbd> +
+          Kattalashtirish uchun <kbd className="font-semibold">Ctrl</kbd> + g&apos;ildirak
         </span>
       </div>
 
+      {/* O'LCHAM shu tashqi divda — uni React boshqaradi. */}
       <div
-        ref={boxRef}
-        className={isFull ? "bg-slate-100" : "h-[520px] w-full rounded-b-xl bg-slate-100 md:h-[620px]"}
-        style={isFull ? { width: "100vw", height: "100vh" } : undefined}
-      />
+        className={isFull ? "h-full w-full" : "h-[520px] w-full rounded-b-xl md:h-[620px]"}
+      >
+        {/*
+          ⚠️ ⚠️ BU DIVNING `className` I O'ZGARMAS BO'LISHI SHART.
+          Leaflet `L.map()` chaqirilganda shu elementga O'Z klasslarini qo'shadi
+          (`leaflet-container`, `leaflet-touch`, `leaflet-fade-anim`…). React esa
+          `className` propi o'zgarganda `class` atributini BUTUNLAY ustidan yozadi
+          va Leaflet qo'shganlari o'chib ketadi. Natijada `.leaflet-container`
+          yo'qoladi → `position:relative`/`overflow:hidden` yo'qoladi → plitkalar
+          joylashuv kontekstini yo'qotib, fon oq bo'lib qoladi; klasterlar esa
+          React tegmaydigan bola elementlar bo'lgani uchun chizilaveradi.
+          (2026-09-06 da aynan shu bo'ldi: konsolda `.leaflet-container` === null.)
+          Shu sabab o'lcham TASHQI divda, bu yerda esa doimiy klass.
+        */}
+        <div ref={boxRef} className="h-full w-full bg-slate-100" />
+      </div>
     </div>
   );
 }
