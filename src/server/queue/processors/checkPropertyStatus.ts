@@ -1,5 +1,6 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { landArea as landAreaOf } from "@/lib/area";
 import { fetchBase } from "@/server/integrations/propertyBase";
 import { STATUS_APIS } from "@/server/integrations/config";
 import { makeStatusApiCall } from "@/server/integrations/statusApi";
@@ -389,7 +390,10 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
     // demak obyekt aslida yer uchastkasi. Bunday holatda maydonni `land_area` dan olamiz
     // (real ma'lumotda 84 holatdan 71 tasida land_area shartnoma maydonini qoplaydi).
     const raw = baseRawApi2 as Record<string, unknown> | null;
-    const landArea = raw?.land_area != null ? Number(raw.land_area) : null;
+    // ⚠️ `lib/area.ts` orqali — xom maydonni to'g'ridan-to'g'ri o'qish MUMKIN EMAS:
+    // yangi (`cad_data`) shaklda u `land.area` ichida va eski `raw.land_area`
+    // o'qish jimgina `null` beradi (butun bazada "Bo'sh maydon" 25% ga kamaygan edi).
+    const landArea = landAreaOf(raw as Record<string, unknown> | null);
     const usefulRaw = baseBuildingArea;
     const rentedArea = refreshRent ? (rent!.found ? rent!.totalArea : 0) : Number(current.rentTotalArea ?? 0);
 

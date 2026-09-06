@@ -135,6 +135,26 @@ export function usefulArea(raw: Record<string, unknown> | null | undefined): num
 }
 
 /**
+ * FAQAT yer uchastkasi maydoni (`land_area` / yangi shaklda `land.area`).
+ *
+ * ⚠️ `totalBuildingArea()` bilan ARALASHTIRMANG: u zanjir bo'yicha yuradi va
+ * bino maydonini ustuvor oladi. Bu esa aynan YER maydonini beradi — u
+ * `checkPropertyStatus.ts` dagi "shartnoma maydoni foydali maydondan katta"
+ * tuzatishi uchun kerak (obyekt aslida yer uchastkasi bo'lgan holat).
+ *
+ * ⚠️ Ilgari bu qiymat xom javobdan TO'G'RIDAN-TO'G'RI o'qilardi
+ * (`raw.land_area`) va shakl o'zgarganda (2026-09-06) jimgina `null` bo'lib
+ * qoldi — natijada butun bazada "Bo'sh maydon" 25% ga kamayib ketdi. Xom
+ * maydonni hech qachon shu fayldan tashqarida o'qimang.
+ */
+export function landArea(raw: Record<string, unknown> | null | undefined): number | null {
+  if (!raw) return null;
+  const n = asNewShape(raw);
+  if (n) return positive(n.land?.area);
+  return positive(raw.land_area);
+}
+
+/**
  * Yer uchastkasimi yoki bino — quyidagi 11 ta maydonning HAMMASI 0/bo'sh bo'lsa
  * YER (rost), aks holda BINO (yolg'on). Foydalanuvchi qoidasi, 2026-08-05.
  * `positive()` bilan bir xil "0 ham bo'sh" mezoni ishlatiladi.
