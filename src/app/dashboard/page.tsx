@@ -295,19 +295,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         />
       </div>
 
-      {/* Kategoriya taqsimoti — to'liq kenglik: halqa chapda, kartalar yonida */}
+      {/* Kategoriya taqsimoti — to'liq kenglik: kartalar chapda, halqa o'ngda */}
       <div className="mt-4">
         <ChartCard
           title="Kategoriya taqsimoti"
           subtitle={`Effektiv kategoriya bo'yicha, ${nf(t.total)} obyekt`}
           footnote="Har bir kartani yoki halqa bo'lagini bosganda o'sha kategoriyaning obyektlar ro'yxati ochiladi."
         >
+          {/* ⚠️ Kartalar CHAPDA, halqa O'NGDA (foydalanuvchi tanlovi, 2026-09-06). */}
           <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:gap-8">
-            <div className="mx-auto shrink-0 lg:mx-0">
-              <CategoryDonut data={donut} totalLabel={nf(t.total)} showLegend={false} />
-            </div>
             <div className="min-w-0 flex-1">
               <CategoryCards data={donut} />
+            </div>
+            <div className="mx-auto shrink-0 lg:mx-0">
+              <CategoryDonut data={donut} totalLabel={nf(t.total)} showLegend={false} />
             </div>
           </div>
         </ChartCard>

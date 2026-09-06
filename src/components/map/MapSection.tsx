@@ -14,7 +14,9 @@ import type { PropertyMapProps } from "./PropertyMap";
 const PropertyMap = dynamic(() => import("./PropertyMap").then((m) => m.PropertyMap), {
   ssr: false,
   loading: () => (
-    <div className="grid h-[440px] w-full place-items-center rounded-b-xl bg-slate-100 text-sm text-muted-foreground">
+    // ⚠️ Balandlik `PropertyMap` dagi xarita qutisi bilan bir xil bo'lishi kerak —
+    // aks holda yuklanish tugagach sahifa sakrab qoladi.
+    <div className="grid h-[520px] w-full place-items-center rounded-b-xl bg-slate-100 text-sm text-muted-foreground md:h-[620px]">
       Xarita yuklanmoqda…
     </div>
   ),

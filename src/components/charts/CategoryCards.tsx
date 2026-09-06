@@ -1,14 +1,15 @@
-import type { CSSProperties } from "react";
 import { categoryColor } from "@/lib/chartColors";
+import { categoryIcon } from "@/lib/categoryIcons";
 import type { CategorySlice } from "./CategoryDonut";
 
 /**
- * Kategoriya taqsimotining KARTA ko'rinishi — halqa diagramma YONIDA turadi
+ * Kategoriya taqsimotining KARTA ko'rinishi — halqa diagrammaning YONIDA turadi
  * (halqadagi yorliqlar ro'yxati o'rniga).
  *
- * ⚠️ Dizayn ATAYLAB yuqoridagi asosiy KPI kartalaridan farqli: ramka/soya/ikonka yo'q,
- * faqat kategoriya rangining yengil foni + nuqta. Shu bilan "asosiy ko'rsatkich" va
- * "taqsimot bo'lagi" vizual ravishda ajraladi.
+ * ⚠️ Dizayn ATAYLAB yuqoridagi asosiy KPI kartalaridan farqli: oq fon, ramka va
+ * soya yo'q. Rang faqat ikonka chipida — halqadagi bo'lak rangi bilan bir xil
+ * (`categoryColor`), ikonkasi esa `categoryIcon` dan. Shu bilan "asosiy
+ * ko'rsatkich" va "taqsimot bo'lagi" vizual ravishda ajraladi.
  *
  * Har bir karta obyektlar ro'yxatiga havola (`href` — `effectiveCategory=N`, halqa
  * bo'lagini bosish bilan bir xil mezon).
@@ -21,42 +22,38 @@ export function CategoryCards({ data }: { data: CategorySlice[] }) {
   if (shown.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
       {shown.map((d) => {
         const color = categoryColor(d.code);
+        const Icon = categoryIcon(d.code);
         return (
           <a
             key={d.code}
             href={d.href}
-            style={
-              {
-                "--ct": `${color}14`,
-                "--ct-hover": `${color}26`,
-                "--cd": color,
-              } as CSSProperties
-            }
-            className="rounded-lg bg-[color:var(--ct)] px-3 py-2 transition-colors duration-150 hover:bg-[color:var(--ct-hover)]"
+            className="group/cc flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-2.5 transition-colors duration-150 hover:bg-muted"
           >
-            <div className="flex items-center gap-1.5">
-              <span
-                aria-hidden
-                className="h-2 w-2 shrink-0 rounded-full"
-                style={{ background: "var(--cd)" }}
-              />
-              <span className="truncate text-[11px] font-medium text-slate-600" title={d.label}>
+            <span
+              aria-hidden
+              className="grid size-9 shrink-0 place-items-center rounded-lg text-white shadow-sm transition-transform duration-150 group-hover/cc:scale-105"
+              style={{ background: color }}
+            >
+              <Icon className="size-[18px]" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-[11.5px] font-medium text-slate-600" title={d.label}>
                 {d.label}
-              </span>
-            </div>
-            <div className="mt-1 flex items-baseline gap-1.5 pl-3.5">
-              <span
-                className="text-base font-bold leading-none tabular-nums"
-                style={{ color: "var(--navy)" }}
-              >
-                {d.countLabel}
-              </span>
-              <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
-                {d.pctLabel}%
-              </span>
+              </p>
+              <p className="mt-0.5 flex items-baseline gap-1.5">
+                <span
+                  className="text-lg font-bold leading-none tabular-nums"
+                  style={{ color: "var(--navy)" }}
+                >
+                  {d.countLabel}
+                </span>
+                <span className="text-[11px] font-medium tabular-nums text-muted-foreground">
+                  {d.pctLabel}%
+                </span>
+              </p>
             </div>
           </a>
         );
