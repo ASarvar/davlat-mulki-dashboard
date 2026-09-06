@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Maximize2, Minimize2 } from "lucide-react";
 import L from "leaflet";
-import "leaflet/dist/leaflet.css";
+// ⚠️ Leaflet CSS'i bu yerda EMAS — `app/globals.css` da (sababi o'sha faylda yozilgan:
+// lazy chunk bilan kelgan CSS xaritadan kechikib, uni buzib qo'yardi).
 import "leaflet.markercluster";
-import "leaflet.markercluster/dist/MarkerCluster.css";
 import { categoryColor, BRAND } from "@/lib/chartColors";
 import { UZ_CENTER, UZ_ZOOM } from "@/lib/geo";
 import { objectHref } from "@/lib/cadastre";
@@ -91,7 +91,26 @@ export function PropertyMap({
     };
     box.addEventListener("wheel", onWheel, { passive: false });
 
+    // ⚠️ **O'LCHAMNI KUZATISH — MAJBURIY.** Leaflet konteyner o'lchamini FAQAT
+    // yaratilganda o'lchaydi va keshlaydi. Komponent `dynamic({ssr:false})` bilan
+    // yuklangani uchun `L.map()` ba'zan layout tugagunicha ishga tushadi va nolga
+    // yaqin o'lchamni o'lchab oladi — natijada xarita faqat o'sha kichik maydon
+    // uchun plitka so'raydi: ekranda bitta plitka, atrofi bo'sh (2026-09-06 da
+    // aynan shu bo'ldi). `ResizeObserver` konteyner o'lchami har o'zgarganda
+    // qayta o'lchatadi — bu dastlabki poygani ham, to'liq ekranga o'tishni ham,
+    // yon panel/oyna o'zgarishini ham bir yo'la yopadi.
+    let raf = 0;
+    const remeasure = () => {
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => mapRef.current?.invalidateSize());
+    };
+    remeasure(); // birinchi kadrdan keyin — dastlabki poyga uchun
+    const ro = new ResizeObserver(remeasure);
+    ro.observe(box);
+
     return () => {
+      cancelAnimationFrame(raf);
+      ro.disconnect();
       clearTimeout(hintTimer);
       box.removeEventListener("wheel", onWheel);
       map.remove();
@@ -99,13 +118,10 @@ export function PropertyMap({
     };
   }, [tileUrl, tileAttribution]);
 
-  // To'liq ekran holatini kuzatamiz — o'lchamni Leaflet'ga qayta o'lchatish shart.
+  // To'liq ekran holatini kuzatamiz. O'lchamni qayta o'lchash yuqoridagi
+  // `ResizeObserver` zimmasida — bu yerda faqat tugma ko'rinishi yangilanadi.
   useEffect(() => {
-    const onFsChange = () => {
-      setIsFull(document.fullscreenElement === wrapRef.current);
-      // Bir kadr kutamiz: konteyner yangi o'lchamini olib bo'lgan bo'lsin.
-      requestAnimationFrame(() => mapRef.current?.invalidateSize());
-    };
+    const onFsChange = () => setIsFull(document.fullscreenElement === wrapRef.current);
     document.addEventListener("fullscreenchange", onFsChange);
     return () => document.removeEventListener("fullscreenchange", onFsChange);
   }, []);
@@ -209,7 +225,7 @@ export function PropertyMap({
         className="absolute right-3 top-3 z-[1001] inline-flex items-center gap-1.5 rounded-lg border border-border bg-card/95 px-2.5 py-1.5 text-[12px] font-medium text-slate-600 shadow-sm backdrop-blur transition-colors hover:bg-muted"
       >
         {isFull ? <Minimize2 className="h-3.5 w-3.5" /> : <Maximize2 className="h-3.5 w-3.5" />}
-        {isFull ? "Chiqish" : "To'liq ekran"}
+        {isFull}
       </button>
 
       {/* Ctrl'siz g'ildirakda qisqa ko'rsatma — xarita nega kattalashmaganini tushuntiradi. */}
@@ -220,7 +236,7 @@ export function PropertyMap({
         }`}
       >
         <span className="rounded-lg bg-slate-900/75 px-4 py-2 text-[13px] font-medium text-white shadow-lg">
-          Kattalashtirish uchun <kbd className="font-semibold">Ctrl</kbd> + g&apos;ildirak
+          Kattalashtirish uchun <kbd className="font-semibold">Ctrl</kbd> +
         </span>
       </div>
 

@@ -1,3 +1,15 @@
+/* ⚠️ Leaflet uslublari ATAYLAB shu yerda — global qatlamda (2026-09-06).
+   Ilgari ular `PropertyMap.tsx` ichida import qilinardi, ya'ni `dynamic({ssr:false})`
+   chunk'i bilan birga KECHROQ yuklanardi. Natijada Leaflet o'z CSS'idan oldin ishga
+   tushib qolishi mumkin edi: `.leaflet-container` da `overflow:hidden`/`position`
+   bo'lmaydi, `.leaflet-tile` da `position:absolute` bo'lmaydi — xarita "bitta plitka,
+   atrofi bo'sh" holatida chiqadi (jonli o'lchov: /dashboard sahifasining
+   `app-build-manifest.json` dagi CSS ro'yxati BO'SH edi).
+   Narxi ~11 KB, lekin poyga butunlay yopiladi. @import Tailwind'dan OLDIN turishi
+   shart — CSS qoidasi: @import boshqa qoidalardan keyin kelolmaydi. */
+@import "leaflet/dist/leaflet.css";
+@import "leaflet.markercluster/dist/MarkerCluster.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
