@@ -11,7 +11,7 @@ import {
   Banknote,
 } from "lucide-react";
 import { canAccess, firstOpenSectionHref, requireSection } from "@/server/services/sectionAccess";
-import { getDashboardStats, getUtilityStats } from "@/server/services/stats";
+import { getDashboardStats } from "@/server/services/stats";
 import { getRentContractTrend, trendYear } from "@/server/services/trends";
 import { getMapData } from "@/server/services/map";
 import { getKpiHistory, MIN_DAYS } from "@/server/services/snapshots";
@@ -25,7 +25,6 @@ import { CategoryDonut } from "@/components/charts/CategoryDonut";
 import { CategoryCards } from "@/components/charts/CategoryCards";
 import { RegionRanking } from "@/components/charts/RegionRanking";
 import { AreaBalance } from "@/components/charts/AreaBalance";
-import { UtilityCoverage } from "@/components/charts/UtilityCoverage";
 import { RentTrendChart } from "@/components/charts/RentTrendChart";
 import { KpiHistoryChart } from "@/components/charts/KpiHistoryChart";
 import { EmptyState } from "@/components/ui/EmptyState";
@@ -60,9 +59,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     user,
     str(sp.soha) || undefined,
   );
-  const [s, utility, rentTrend, mapData, kpiHistory] = await Promise.all([
+  const [s, rentTrend, mapData, kpiHistory] = await Promise.all([
     getDashboardStats(scope),
-    getUtilityStats(scope),
     getRentContractTrend(scope),
     getMapData(scope),
     getKpiHistory(scope),
@@ -160,21 +158,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     .filter((d) => d.rented > 0 || d.vacant > 0)
     .sort((a, b) => b.rented + b.vacant - (a.rented + a.vacant));
 
-  // ⚠️ Kommunal — FAQAT kat 11 bo'yicha, shuning uchun har bir havolada
-  // `category=11` MAJBURIY (kommunal jadvaldagi qoida bilan bir xil).
-  const u = utility.reduce(
-    (a, r) => ({
-      count: a.count + r.count,
-      water: a.water + r.water,
-      gas: a.gas + r.gas,
-      electric: a.electric + r.electric,
-      any: a.any + r.anyUtility,
-      recent: a.recent + r.recentlyPaid,
-      unchecked: a.unchecked + r.unchecked,
-    }),
-    { count: 0, water: 0, gas: 0, electric: 0, any: 0, recent: 0, unchecked: 0 },
-  );
-  const utilQs = (extra: string) => objHref(`category=11${landSplit ? "&isLand=0" : ""}&${extra}`);
   // ⚠️ Oy yorlig'i SERVERDA quriladi: `toLocaleString` Node va brauzerda turlicha
   // chiqib gidratsiyani buzardi (donutda aynan shu xato bo'lgan edi).
   const OY = ["Yan", "Fev", "Mar", "Apr", "May", "Iyn", "Iyl", "Avg", "Sen", "Okt", "Noy", "Dek"];
@@ -197,15 +180,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     rented: p.rentedObjects,
   }));
   const firstDay = kpiHistory[0] ? dayLabel(kpiHistory[0].day) : null;
-
-  const utilityBars = [
-    { name: "Suv", value: u.water, color: "#4a90a4", href: utilQs("utility=water") },
-    { name: "Gaz", value: u.gas, color: BRAND.gold, href: utilQs("utility=gas") },
-    { name: "Elektr", value: u.electric, color: "#3b5fa8", href: utilQs("utility=electric") },
-    { name: "Kamida bittasi", value: u.any, color: BRAND.navyMid, href: utilQs("utility=any") },
-    { name: "Yaqinda to'lov", value: u.recent, color: "#b45309", href: utilQs("utility=recentlyPaid") },
-    { name: "Tekshirilmagan", value: u.unchecked, color: "#94a3b8", href: utilQs("utility=unchecked") },
-  ];
 
   return (
     <div>
@@ -342,28 +316,25 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </ChartCard>
       </div>
 
-      {/* Maydon balansi + kommunal qamrov */}
+      {/* Ijaradagi va bo'sh maydon — ALOHIDA ikki grafik.
+          ⚠️ Ataylab taxlanmagan (foydalanuvchi qarori, 2026-09-06): taxlangan
+          ustunda bo'sh maydon ijara ustidan boshlanib, hududlarni bir-biri bilan
+          solishtirib bo'lmasdi. Har biri o'z qiymati bo'yicha saralanadi. */}
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <ChartCard
-          title="Maydon balansi"
-          subtitle="Ijaradagi va bo'sh maydon, ming m²"
+          title="Ijaradagi maydon"
+          subtitle={`Hududlar kesimida, ming m² — jami ${nf(areaBalance.reduce((a, r) => a + r.rented, 0), 1)}`}
           footnote="Maydon bir nechta kategoriyaga tarqalgani uchun bu grafikda ro'yxatga havola yo'q — mos keladigan yagona filtr mavjud emas."
         >
-          <AreaBalance data={areaBalance} />
+          <AreaBalance data={areaBalance} series="rented" />
         </ChartCard>
 
         <ChartCard
-          title="Kommunal qamrov"
-          subtitle={`Faqat "Bo'sh turgan" ${nf(u.count)} obyekt bo'yicha`}
-          footnote={
-            <>
-              Abonent topilgan {nf(u.any)} obyekt ({pct1(u.any, u.count)}%) — &laquo;bo&apos;sh&raquo; deb
-              belgilangan bo&apos;lsa-da, kommunal hisobi bor. Bu dalil emas, tekshirish uchun signal:
-              abonent ijarachi yoki qo&apos;shni bo&apos;lishi mumkin.
-            </>
-          }
+          title="Bo'sh maydon"
+          subtitle={`Hududlar kesimida, ming m² — jami ${nf(areaBalance.reduce((a, r) => a + r.vacant, 0), 1)}`}
+          footnote="&laquo;Bo'sh turgan&raquo; obyektlarning foydali maydoni. Havola yo'q — yuqoridagi grafik bilan bir xil sabab."
         >
-          <UtilityCoverage data={utilityBars} vacantTotal={u.count} />
+          <AreaBalance data={areaBalance} series="vacant" />
         </ChartCard>
       </div>
 
