@@ -741,14 +741,14 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
             <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
               <div className="mb-3">
                 <SectionTitle icon={Tag}>
-                  {isRequest ? "Kategoriya biriktirish so'rovi" : "Qo'lda kategoriya biriktirish"}
+                  {isRequest ? "Kategoriya biriktirish so'rovi" : "Kategoriya biriktirish"}
                 </SectionTitle>
               </div>
               <AssignCategoryForm cadNumber={p.cadNumber} isRequest={isRequest} />
             </div>
           ) : !canAssign && (user.role === "IJROCHI" || isAdmin(user.role)) && !pendingRequest ? (
             <div className="rounded-xl border border-border bg-card p-5 text-sm text-muted-foreground shadow-sm">
-              Faqat "Bo'sh turgan" obyektga qo'lda kategoriya biriktirish mumkin.
+              Faqat "Bo'sh turgan" obyektga kategoriya biriktirish mumkin.
             </div>
           ) : null}
 
