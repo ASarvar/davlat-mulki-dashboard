@@ -22,6 +22,7 @@ import { BRAND, categoryColor } from "@/lib/chartColors";
 import { KpiCard, Tag } from "@/components/ui/KpiCard";
 import { Card, ChartCard } from "@/components/ui/Card";
 import { CategoryDonut } from "@/components/charts/CategoryDonut";
+import { CategoryCards } from "@/components/charts/CategoryCards";
 import { RegionRanking } from "@/components/charts/RegionRanking";
 import { AreaBalance } from "@/components/charts/AreaBalance";
 import { UtilityCoverage } from "@/components/charts/UtilityCoverage";
@@ -294,16 +295,22 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         />
       </div>
 
-      {/* Kategoriya taqsimoti + hududlar reytingi */}
-      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.35fr)]">
+      {/* Kategoriya taqsimoti — to'liq kenglik: avval kartalar, keyin halqa diagramma */}
+      <div className="mt-4">
         <ChartCard
           title="Kategoriya taqsimoti"
           subtitle={`Effektiv kategoriya bo'yicha, ${nf(t.total)} obyekt`}
-          footnote="Har bir bo'lakni bosganda o'sha kategoriyaning obyektlar ro'yxati ochiladi."
+          footnote="Har bir kartani yoki halqa bo'lagini bosganda o'sha kategoriyaning obyektlar ro'yxati ochiladi."
         >
-          <CategoryDonut data={donut} totalLabel={nf(t.total)} />
+          <CategoryCards data={donut} />
+          <div className="mt-5 border-t border-dashed border-border pt-5">
+            <CategoryDonut data={donut} totalLabel={nf(t.total)} showLegend={false} />
+          </div>
         </ChartCard>
+      </div>
 
+      {/* Hududlar reytingi — to'liq kenglik */}
+      <div className="mt-4">
         <ChartCard
           title="Hududlar reytingi"
           subtitle={

@@ -28,8 +28,19 @@ export interface CategorySlice {
  * ⚠️ Yorliqlar ro'yxati ATAYLAB alohida ustunda: 11 (Bo'sh turgan) va 12 (Bo'sh maydoni
  * bor) oltinlari bir-biriga juda yaqin, faqat rangga tayanib ularni ajratib bo'lmasdi.
  * Har bir qator — obyektlar ro'yxatiga havola (grafik bo'lagini bosish ham shunday).
+ *
+ * `showLegend={false}` — yonidagi ro'yxat ko'rsatilmaydi (raqamlar boshqa joyda,
+ * masalan yuqoridagi kartalar ko'rinishida). U holda halqa markazlashadi.
  */
-export function CategoryDonut({ data, totalLabel }: { data: CategorySlice[]; totalLabel: string }) {
+export function CategoryDonut({
+  data,
+  totalLabel,
+  showLegend = true,
+}: {
+  data: CategorySlice[];
+  totalLabel: string;
+  showLegend?: boolean;
+}) {
   const router = useRouter();
   const shown = data.filter((d) => d.count > 0);
 
@@ -38,7 +49,13 @@ export function CategoryDonut({ data, totalLabel }: { data: CategorySlice[]; tot
   }
 
   return (
-    <div className="flex flex-col items-center gap-5 sm:flex-row sm:items-start">
+    <div
+      className={
+        showLegend
+          ? "flex flex-col items-center gap-5 sm:flex-row sm:items-start"
+          : "flex justify-center py-1"
+      }
+    >
       <div className="relative h-[200px] w-[200px] shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
@@ -86,24 +103,28 @@ export function CategoryDonut({ data, totalLabel }: { data: CategorySlice[]; tot
         </div>
       </div>
 
-      <ul className="w-full min-w-0 flex-1 space-y-0.5 text-[12px]">
-        {shown.map((d) => (
-          <li key={d.code}>
-            <a
-              href={d.href}
-              className="flex items-center gap-2 rounded px-1.5 py-1 transition-colors hover:bg-muted"
-            >
-              <span
-                className="h-2.5 w-2.5 shrink-0 rounded-sm"
-                style={{ background: categoryColor(d.code) }}
-              />
-              <span className="min-w-0 flex-1 truncate text-slate-600">{d.label}</span>
-              <b className="font-semibold tabular-nums">{d.countLabel}</b>
-              <span className="w-11 text-right tabular-nums text-muted-foreground">{d.pctLabel}%</span>
-            </a>
-          </li>
-        ))}
-      </ul>
+      {showLegend ? (
+        <ul className="w-full min-w-0 flex-1 space-y-0.5 text-[12px]">
+          {shown.map((d) => (
+            <li key={d.code}>
+              <a
+                href={d.href}
+                className="flex items-center gap-2 rounded px-1.5 py-1 transition-colors hover:bg-muted"
+              >
+                <span
+                  className="h-2.5 w-2.5 shrink-0 rounded-sm"
+                  style={{ background: categoryColor(d.code) }}
+                />
+                <span className="min-w-0 flex-1 truncate text-slate-600">{d.label}</span>
+                <b className="font-semibold tabular-nums">{d.countLabel}</b>
+                <span className="w-11 text-right tabular-nums text-muted-foreground">
+                  {d.pctLabel}%
+                </span>
+              </a>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </div>
   );
 }
