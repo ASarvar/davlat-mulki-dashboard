@@ -51,16 +51,16 @@ model User {
   allSources       Boolean      @default(false)
   moderatorSources UserSource[]
 
-  documents        Document[]                   @relation("UploadedBy")
-  assignments      PropertyCategoryAssignment[] @relation("AssignedBy")
-  syncRuns         SyncRun[]                    @relation("TriggeredBy")
-  auditLogs        AuditLog[]
-  requestedChanges CategoryChangeRequest[]      @relation("RequestedBy")
-  moderatedChanges CategoryChangeRequest[]      @relation("ModeratorReview")
-  approvedChanges  CategoryChangeRequest[]      @relation("RahbarReview")
-  notifications    Notification[]
-  imtiyozChecks    ImtiyozCheck[]
-  sectionAccessUpdates SectionAccess[]  @relation("SectionAccessUpdatedBy")
+  documents            Document[]                   @relation("UploadedBy")
+  assignments          PropertyCategoryAssignment[] @relation("AssignedBy")
+  syncRuns             SyncRun[]                    @relation("TriggeredBy")
+  auditLogs            AuditLog[]
+  requestedChanges     CategoryChangeRequest[]      @relation("RequestedBy")
+  moderatedChanges     CategoryChangeRequest[]      @relation("ModeratorReview")
+  approvedChanges      CategoryChangeRequest[]      @relation("RahbarReview")
+  notifications        Notification[]
+  imtiyozChecks        ImtiyozCheck[]
+  sectionAccessUpdates SectionAccess[]              @relation("SectionAccessUpdatedBy")
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -82,24 +82,24 @@ model UserSource {
 
 // ─────────────────────── Hudud & Manba (source) ──────────────────────
 model Region {
-  id         String               @id @default(cuid())
-  code       String               @unique // masalan "TAS", "SAM"
-  name       String // "Toshkent shahri" ...
-  sortOrder  Int                  @default(0) // rasmiy hisobot shaklidagi tartib
+  id               String               @id @default(cuid())
+  code             String               @unique // masalan "TAS", "SAM"
+  name             String // "Toshkent shahri" ...
+  sortOrder        Int                  @default(0) // rasmiy hisobot shaklidagi tartib
   // Kadastr raqamining birinchi bo'lagi ("10".."23") — masalan 17:15:40:01:02:0184 => Andijon.
   // Hududga biriktirilmagan (respublika darajasidagi) manbaning obyektlari SHU orqali
   // to'g'ri hududga joylashtiriladi. 2419 ta jonli obyektda tekshirilgan: har bir hududda
   // aynan bitta prefiks, hech qanday chalkashish yo'q.
-  cadastrePrefix String?           @unique
-  properties      Property[]
-  sources         OrganizationSource[] @relation("OrgRegion")
+  cadastrePrefix   String?              @unique
+  properties       Property[]
+  sources          OrganizationSource[] @relation("OrgRegion")
   // Respublika darajasidagi manbani shu hududga cheklaydi (masalan Direksiya →
   // faqat Toshkent sh.) — `OrganizationSource.restrictedRegionId` ga qarang.
   restrictedByOrgs OrganizationSource[] @relation("OrgRestrictedRegion")
-  districts       District[]
-  snapshots       DashboardSnapshot[]
-  createdAt       DateTime             @default(now())
-  updatedAt       DateTime             @updatedAt
+  districts        District[]
+  snapshots        DashboardSnapshot[]
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
 }
 
 // Tuman/shahar — API 2 javobidagi `district_id` + `district` dan keladi.
@@ -123,36 +123,36 @@ model District {
 
 // Har bir hudud+organizatsiya uchun STIR va API config (kelajakda kengayadi)
 model OrganizationSource {
-  id String @id @default(cuid())
+  id                 String              @id @default(cuid())
   // SOHA (guruh) nomi — "Ijara markazi", "Davlat aktivlari agentligi"...
   // Dashboard/ro'yxat filtrlari SHU maydon bo'yicha guruhlaydi, shuning uchun bitta
   // sohaning barcha yozuvlarida u AYNAN bir xil bo'lishi shart.
-  name String
+  name               String
   // To'liq rasmiy tashkilot nomi — faqat ko'rsatish uchun ("Andijon viloyati Davlat
   // aktivlarini boshqarish boshqarmasi"). `name` bilan aralashtirmang: ilgari ikkalasi
   // bitta maydon edi va seed uzun nomlarni yozgani uchun soha guruhlash buzilardi.
-  orgName    String?
-  stir       String     @unique // API 1 uchun kalit; tashkilotga xos, global unikal
+  orgName            String?
+  stir               String              @unique // API 1 uchun kalit; tashkilotga xos, global unikal
   // Hududga biriktirilmagan (respublika darajasidagi) manba uchun null — masalan
   // Agentlikning o'zi yoki Direksiya. Ularning obyektlari kadastr prefiksi orqali
   // tegishli hududga taqsimlanadi (`Region.cadastrePrefix`).
-  regionId   String?
-  region     Region?    @relation("OrgRegion", fields: [regionId], references: [id])
+  regionId           String?
+  region             Region?             @relation("OrgRegion", fields: [regionId], references: [id])
   // ⚠️ `regionId`dan farqli: bu "ko'r-ko'rona ishonch" EMAS. Faqat regionId=null
   // (respublika darajasidagi) manba uchun ma'noli — fan-out bosqichida kadastr
   // PREFIKSI baribir tekshiriladi, natija shu hududga mos kelmasa obyekt olib
   // tashlanadi (yozilmaydi ham, boshqa hududga ham yozilmaydi). Masalan Direksiya
   // → faqat Toshkent sh. (2026-08-05, foydalanuvchi qarori). Bo'sh bo'lsa cheklov yo'q.
   restrictedRegionId String?
-  restrictedRegion   Region? @relation("OrgRestrictedRegion", fields: [restrictedRegionId], references: [id])
-  isActive   Boolean    @default(true)
-  properties Property[]
+  restrictedRegion   Region?             @relation("OrgRestrictedRegion", fields: [restrictedRegionId], references: [id])
+  isActive           Boolean             @default(true)
+  properties         Property[]
   // Foydalanuvchi doirasi shu tashkilotga bog'lanadi (IJROCHI — bitta, MODERATOR — ko'p).
-  ijrochilar User[]       @relation("UserSource1")
-  moderatorLinks UserSource[] @relation("UserSourceMany")
-  snapshots  DashboardSnapshot[]
-  createdAt  DateTime   @default(now())
-  updatedAt  DateTime   @updatedAt
+  ijrochilar         User[]              @relation("UserSource1")
+  moderatorLinks     UserSource[]        @relation("UserSourceMany")
+  snapshots          DashboardSnapshot[]
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
 
   @@index([stir])
   @@index([name])
@@ -192,13 +192,13 @@ model Property {
   cadNumber    String  @unique // yangi kadastr (API 2)
   cadNumberOld String? // eski kadastr (API 2 javobidan, fallback uchun)
 
-  regionId String
-  region   Region             @relation(fields: [regionId], references: [id])
+  regionId   String
+  region     Region             @relation(fields: [regionId], references: [id])
   // Tuman — API 2 `district_id` orqali (ixtiyoriy: 5443 obyektdan 2 tasida yo'q).
   districtId String?
-  district   District? @relation(fields: [districtId], references: [id])
-  sourceId String
-  source   OrganizationSource @relation(fields: [sourceId], references: [id])
+  district   District?          @relation(fields: [districtId], references: [id])
+  sourceId   String
+  source     OrganizationSource @relation(fields: [sourceId], references: [id])
 
   // API 2 dan keladigan asosiy ma'lumotlar
   name         String?
@@ -225,7 +225,9 @@ model Property {
   // "Balansdan chiqarilgan" kategoriyasini tanlaganda chiqadi (`properties.ts`).
   removedFromBalance Boolean   @default(false)
   removedAt          DateTime?
-  /** Yangi egasi — API 2 `subjects[0]` dan (aniqlanmasa null: API javob bermagan bo'lishi mumkin). */
+  /**
+   * Yangi egasi — API 2 `subjects[0]` dan (aniqlanmasa null: API javob bermagan bo'lishi mumkin).
+   */
   removedToStir      String?
   removedToName      String?
 
@@ -237,39 +239,43 @@ model Property {
   isInefficient           Boolean   @default(false) // 1–8 dan tashqarida => true
 
   // ── Auksion ma'lumotlari (API 3 + API 4) ──
-  lotNumber          String? // e-auksion lot raqami (havola shu bo'yicha quriladi)
-  lotStatus          String? // "Lot yakunlandi", "Савдода" ...
-  auctionOrderId     Int? // API 4 dagi order_id
-  auctionStatusId    Int? // order_statuses_id (6 => sotilgan)
-  auctionStatus      String? // "Auksion muvaffaqiyatli yakunlandi" ...
-  termPayment        Int? // order.term_payment (1 => BO'LIB TO'LASH — asosiy mezon)
-  paymentTermMonths  Int? // order.term_month / details "tulov_muddati" (faqat ko'rsatish uchun)
-  auctionCheckedAt   DateTime?
-  auctionGroupName   String? // API 4 group_name (ijara savdosi / xususiylashtirish)
+  lotNumber         String? // e-auksion lot raqami (havola shu bo'yicha quriladi)
+  lotStatus         String? // "Lot yakunlandi", "Савдода" ...
+  auctionOrderId    Int? // API 4 dagi order_id
+  auctionStatusId   Int? // order_statuses_id (6 => sotilgan)
+  auctionStatus     String? // "Auksion muvaffaqiyatli yakunlandi" ...
+  termPayment       Int? // order.term_payment (1 => BO'LIB TO'LASH — asosiy mezon)
+  paymentTermMonths Int? // order.term_month / details "tulov_muddati" (faqat ko'rsatish uchun)
+  auctionCheckedAt  DateTime?
+  auctionGroupName  String? // API 4 group_name (ijara savdosi / xususiylashtirish)
 
   // Bitta obyekt bir vaqtda HAM xususiylashtirish, HAM ijara savdosida bo'lishi mumkin
   // (real ma'lumotda 46 ta shunday). Shuning uchun ikkita alohida bayroq —
   // "bitta obyekt = bitta kategoriya" modeli bu yerda yetarli emas.
-  hasPrivatizationLot Boolean @default(false)
-  hasRentLot          Boolean @default(false)
-  /** Auksionga chiqarilgan jami maydon (barcha lotlar bo'yicha, kv.m) */
-  auctionTotalArea    Decimal? @db.Decimal(14, 2)
+  hasPrivatizationLot Boolean      @default(false)
+  hasRentLot          Boolean      @default(false)
+  /**
+   * Auksionga chiqarilgan jami maydon (barcha lotlar bo'yicha, kv.m)
+   */
+  auctionTotalArea    Decimal?     @db.Decimal(14, 2)
   auctionLots         AuctionLot[]
 
   // ── Ijara shartnomalari (API 5) — tafsilotlar RentContract jadvalida ──
-  rentContractCount  Int? // nechta ijara shartnomasi bor
-  rentTotalSum       Decimal? @db.Decimal(18, 2) // jami summa (0 => tekin foydalanish)
-  rentTotalArea      Decimal? @db.Decimal(14, 2) // jami ijara maydoni (kv.m)
+  rentContractCount   Int? // nechta ijara shartnomasi bor
+  rentTotalSum        Decimal?       @db.Decimal(18, 2) // jami summa (0 => tekin foydalanish)
+  rentTotalArea       Decimal?       @db.Decimal(14, 2) // jami ijara maydoni (kv.m)
   /**
    * Bo'sh maydon = foydali maydon − ijaraga berilgan (manfiy bo'lsa 0).
    * Ustun sifatida saqlanadi: Prisma ikki ustunni o'zaro solishtira olmaydi,
    * shuning uchun filtr/aggregat uchun oldindan hisoblab qo'yamiz.
    */
-  vacantArea         Decimal? @db.Decimal(14, 2)
-  /** Ijara ma'lumoti ESKI kadastr raqami orqali topilganmi. */
-  rentMatchedByOldCad Boolean @default(false)
-  rentCheckedAt      DateTime?
-  rentContracts      RentContract[]
+  vacantArea          Decimal?       @db.Decimal(14, 2)
+  /**
+   * Ijara ma'lumoti ESKI kadastr raqami orqali topilganmi.
+   */
+  rentMatchedByOldCad Boolean        @default(false)
+  rentCheckedAt       DateTime?
+  rentContracts       RentContract[]
 
   // ── Kommunal xizmatlar (suv/gaz/elektr API'lari) ──
   // Xom javoblar `ObjectStatusCheck` da (apiSource = "WATER"/"GAS"/"ELECTRIC"), bu yerda
@@ -302,13 +308,11 @@ model Property {
   gasBilled        Boolean   @default(false)
   /**
    * Gaz abonentining OXIRGI TO'LOV sanasi (API `abonent.last_payment_date`).
-   *
    * ⚠️ Bu `gasBilled` dan KUCHLIROQ dalil: hisob-kitob (`accrual`) abonent to'lamasa ham
    * davom etaveradi va qarz to'planadi, TO'LOV esa kimdir obyektdan foydalanayotganini
    * bildiradi. Jonli ma'lumotda sanalar 2024-yildan 2026-yilgacha tarqalgan — ya'ni
    * "abonenti bor" degan bayroq yopilgan eski hisobni ham, faol hisobni ham bir xil
    * ko'rsatardi (foydalanuvchi shu farqni so'radi, 2026-08-17).
-   *
    * Suv API'si `saldo` beradi lekin sana bermaydi. Elektr uchun ayni shu ma'no
    * `electricLastPaymentAt` da (2-bosqich `het_data_detail` dan).
    */
@@ -319,17 +323,19 @@ model Property {
   // "shu kadastr bo'yicha kod topildi"dan boshqa hech narsani bildirmasdi. Tafsilot
   // chaqiruvi ism, manzil, balans, oylik sarf va to'lov tarixini beradi.
   /**
+   * /**
    * Oxirgi `ELECTRIC_CONSUMING_MONTHS` oyda `SALDO_PERIOD.CURRENT_EE_KWH > 0` —
    * ya'ni hisoblagich bo'yicha HAQIQIY elektr sarfi qayd etilgan. Gazdagi
    * `gasConsuming` ning elektr muqobili, lekin ishonchliroq: elektrda hisoblagichsiz
    * abonent deyarli uchramaydi.
    */
-  electricConsuming Boolean @default(false)
-  /** Elektr abonentining oxirgi to'lov sanasi (`LAST_PAYMENT_DATE`). */
+  electricConsuming     Boolean   @default(false)
+  /**
+   * Elektr abonentining oxirgi to'lov sanasi (`LAST_PAYMENT_DATE`).
+   */
   electricLastPaymentAt DateTime?
   /**
    * Tafsilotdagi `KADASTR_CODE` obyektning o'z kadastri bilan MOS kelganmi.
-   *
    * ⚠️ Bu — qamrov sifatining asosiy o'lchovi. Elektr API'si turar-joy abonentlari
    * bazasiga ulangan va 1-bosqich kadastrni TAXMINAN moslashtiradi: jonli sinovda
    * `20:08:41:01:01:0019` so'rovi `KADASTR_CODE = 20:08:09:01:01:0024` bo'lgan
@@ -337,20 +343,18 @@ model Property {
    * BOSHQA obyektning uy xo'jaligini ko'rsatadi. Shu ustun bilan haqiqiy moslik
    * soxta moslikdan ajratiladi.
    */
-  electricCadastreMatch Boolean @default(false)
-  utilityCheckedAt DateTime?
+  electricCadastreMatch Boolean   @default(false)
+  utilityCheckedAt      DateTime?
 
   // Sinxronizatsiya holati
-  syncStatus    SyncStatus @default(PENDING)
-  lastSyncedAt  DateTime?
+  syncStatus   SyncStatus @default(PENDING)
+  lastSyncedAt DateTime?
 
   /**
    * Xaritadagi joylashuv.
-   *
    * ⚠️ Manba — AUKSION LOTI (API 4 `order.lat/lng`), kadastr chegarasi EMAS. Shuning
    * uchun qamrov qisman: faqat auksionga chiqarilgan obyektlarda mavjud (~31%).
    * `coordSource` shuni yozib qo'yadi, UI esa buni ochiq ko'rsatadi.
-   *
    * ⚠️ `Float`, `Decimal` EMAS: `Decimal` RSC chegarasidan va `unstable_cache`
    * serializatsiyasidan o'tmaydi. API 6 xonagacha aniqlik beradi (≈11 sm) — `double`
    * yetarli. PostGIS ataylab rad etildi: `postgres:15` image'ni almashtirish 1800 ta
@@ -358,18 +362,21 @@ model Property {
    */
   lat           Float?
   lng           Float?
-  /** Koordinata qayerdan olingani ("AUCTION") — kelajakda boshqa manba qo'shilishi mumkin. */
+  /**
+   * Koordinata qayerdan olingani ("AUCTION") — kelajakda boshqa manba qo'shilishi mumkin.
+   */
   coordSource   String?
   coordsAt      DateTime?
   lastSyncError String?
 
-  statusChecks ObjectStatusCheck[]
+  statusChecks   ObjectStatusCheck[]
   assignments    PropertyCategoryAssignment[]
   documents      Document[]
   changeRequests CategoryChangeRequest[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  // pg_trgm GIN indekslari migratsiyada qo'lda qo'shiladi (prisma/migrations/*_pg_trgm)
 
   // ── Indekslar (80k+ uchun) ──
   @@index([cadNumberOld])
@@ -389,7 +396,6 @@ model Property {
   // Balansdan chiqarilganlar HAR BIR ro'yxat/statistika so'roviga shart sifatida
   // qo'shiladi (deyarli hamma joyda `= false`), shuning uchun indeks kerak.
   @@index([removedFromBalance])
-  // pg_trgm GIN indekslari migratsiyada qo'lda qo'shiladi (prisma/migrations/*_pg_trgm)
 }
 
 enum AuctionLotType {
@@ -400,22 +406,26 @@ enum AuctionLotType {
 // Auksion lotlari. Bitta kadastr obyekti bo'lib-bo'lib bir nechta lotga chiqarilishi
 // mumkin (real ma'lumotda bitta obyektda 13 tagacha ijara loti uchradi).
 model AuctionLot {
-  id           String         @id @default(cuid())
-  propertyId   String
-  property     Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  type         AuctionLotType
-  lotNumber    String?
-  orderId      Int?
-  /** Shu lotga chiqarilgan maydon (kv.m) */
-  area         Decimal?       @db.Decimal(14, 2)
-  startPrice   Decimal?       @db.Decimal(18, 2)
-  auctionDate  DateTime?
-  lotStatus    String?
-  orderStatus  String?
-  /** Lot nomi (API 6 dagi `name`) */
-  name         String?
-  matchedByOldCad Boolean     @default(false)
-  createdAt    DateTime       @default(now())
+  id              String         @id @default(cuid())
+  propertyId      String
+  property        Property       @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  type            AuctionLotType
+  lotNumber       String?
+  orderId         Int?
+  /**
+   * Shu lotga chiqarilgan maydon (kv.m)
+   */
+  area            Decimal?       @db.Decimal(14, 2)
+  startPrice      Decimal?       @db.Decimal(18, 2)
+  auctionDate     DateTime?
+  lotStatus       String?
+  orderStatus     String?
+  /**
+   * Lot nomi (API 6 dagi `name`)
+   */
+  name            String?
+  matchedByOldCad Boolean        @default(false)
+  createdAt       DateTime       @default(now())
 
   @@index([propertyId])
   @@index([lotNumber])
@@ -427,23 +437,25 @@ model AuctionLot {
 // Ijara shartnomalari (API 5). Bitta kadastrda bir nechta shartnoma bo'lishi mumkin
 // (real ma'lumotda maksimal 18 tagacha uchradi).
 model RentContract {
-  id             String    @id @default(cuid())
-  propertyId     String
-  property       Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  contractNumber String?
-  contractDate   DateTime?
-  contractSum    Decimal?  @db.Decimal(18, 2)
-  rentalArea     Decimal?  @db.Decimal(14, 2)
-  ownerTin       String?
-  ownerName      String?
-  tenantTin      String?
-  tenantName     String?
-  docLink        String?
-  regionName     String?
-  districtName   String?
-  /** Shu shartnoma ESKI kadastr raqami orqali topilganmi. */
-  matchedByOldCad Boolean  @default(false)
-  createdAt      DateTime  @default(now())
+  id              String    @id @default(cuid())
+  propertyId      String
+  property        Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  contractNumber  String?
+  contractDate    DateTime?
+  contractSum     Decimal?  @db.Decimal(18, 2)
+  rentalArea      Decimal?  @db.Decimal(14, 2)
+  ownerTin        String?
+  ownerName       String?
+  tenantTin       String?
+  tenantName      String?
+  docLink         String?
+  regionName      String?
+  districtName    String?
+  /**
+   * Shu shartnoma ESKI kadastr raqami orqali topilganmi.
+   */
+  matchedByOldCad Boolean   @default(false)
+  createdAt       DateTime  @default(now())
 
   @@index([propertyId])
   @@index([contractNumber])
@@ -487,18 +499,18 @@ model PropertyCategoryAssignment {
 
 // PDF hujjatlar (local filesystem'da saqlanadi, DB'da faqat metadata)
 model Document {
-  id           String                       @id @default(cuid())
-  propertyId   String
-  property     Property                     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
-  uploadedById String
-  uploadedBy   User                         @relation("UploadedBy", fields: [uploadedById], references: [id])
-  storageKey   String // nisbiy yo'l: region/<id>/property/<cad>/<uuid>.pdf
-  fileName     String
-  fileSize     Int
-  mimeType     String                       @default("application/pdf")
-  assignments  PropertyCategoryAssignment[]
+  id             String                       @id @default(cuid())
+  propertyId     String
+  property       Property                     @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  uploadedById   String
+  uploadedBy     User                         @relation("UploadedBy", fields: [uploadedById], references: [id])
+  storageKey     String // nisbiy yo'l: region/<id>/property/<cad>/<uuid>.pdf
+  fileName       String
+  fileSize       Int
+  mimeType       String                       @default("application/pdf")
+  assignments    PropertyCategoryAssignment[]
   changeRequests CategoryChangeRequest[]
-  createdAt    DateTime                     @default(now())
+  createdAt      DateTime                     @default(now())
 
   // Ilova rasmlari (ixtiyoriy, 4tagacha) asosiy PDF hujjatning "bolalari" sifatida
   // saqlanadi — shunda so'rov ham, darhol biriktirish ham bitta FK bilan ishlaydi
@@ -587,26 +599,25 @@ enum SyncRunStatus {
 }
 
 model SyncRun {
-  id            String        @id @default(cuid())
-  type          SyncRunType
-  status        SyncRunStatus @default(QUEUED)
-  triggeredById String?
-  triggeredBy   User?         @relation("TriggeredBy", fields: [triggeredById], references: [id])
-  regionId      String?
+  id             String        @id @default(cuid())
+  type           SyncRunType
+  status         SyncRunStatus @default(QUEUED)
+  triggeredById  String?
+  triggeredBy    User?         @relation("TriggeredBy", fields: [triggeredById], references: [id])
+  regionId       String?
   // Soha (OrganizationSource.name) bo'yicha kesim — hudud bilan birga qo'llanadi.
-  sourceName    String?
+  sourceName     String?
   // STATUS_REFRESH uchun: qaysi modullar tashqi API'dan qayta so'raladi.
   // FULL_ALL/REGION/SINGLE uchun uchalasi ham true (to'liq zanjir, o'zgarmagan xulq-atvor).
-  refreshBase    Boolean @default(true) // API2 — asosiy ma'lumot
-  refreshAuction Boolean @default(true) // API3/4 + API6 — auksion va ijara loti (birga, AuctionLot bitta jadval)
-  refreshRent    Boolean @default(true) // API5 — ijara shartnomalari
-  refreshUtility Boolean @default(true) // suv/gaz/elektr — kommunal abonent tekshiruvi
-  totalCount    Int           @default(0)
-  successCount  Int           @default(0)
-  failCount     Int           @default(0)
+  refreshBase    Boolean       @default(true) // API2 — asosiy ma'lumot
+  refreshAuction Boolean       @default(true) // API3/4 + API6 — auksion va ijara loti (birga, AuctionLot bitta jadval)
+  refreshRent    Boolean       @default(true) // API5 — ijara shartnomalari
+  refreshUtility Boolean       @default(true) // suv/gaz/elektr — kommunal abonent tekshiruvi
+  totalCount     Int           @default(0)
+  successCount   Int           @default(0)
+  failCount      Int           @default(0)
   /**
    * Xato xabari -> nechta marta uchragani: `{ "API2: HTTP 500": 12, ... }`.
-   *
    * ⚠️ Nima uchun shu yerda saqlanadi: `Property.lastSyncError` faqat OXIRGI holatni
    * saqlaydi, ya'ni keyingi sinxronizatsiya o'sha obyektni yangilasa, avvalgi run'ning
    * xatosi izsiz yo'qolardi va tarixdagi "xato: 33" soni tushuntirib bo'lmas holga
@@ -614,9 +625,9 @@ model SyncRun {
    * keyin ham o'zgarmaydi.
    */
   failureSummary Json?
-  startedAt     DateTime?
-  finishedAt    DateTime?
-  createdAt     DateTime      @default(now())
+  startedAt      DateTime?
+  finishedAt     DateTime?
+  createdAt      DateTime      @default(now())
 
   @@index([status])
   @@index([createdAt])
@@ -828,20 +839,18 @@ model ImtiyozResultCache {
 
 enum SectionVisibility {
   SUPER_ONLY // faqat super admin (yangi bo'limning standart holati)
-  ROLES      // super admin + `roles` ro'yxatidagilar
-  EVERYONE   // `SectionDef.allowRoles` doirasidagi hamma
+  ROLES // super admin + `roles` ro'yxatidagilar
+  EVERYONE // `SectionDef.allowRoles` doirasidagi hamma
 }
 
 /**
  * Bir bo'lim = bir qator. Bo'limlarning O'ZI kodda e'lon qilinadi
  * (`src/lib/sections.ts`), bu jadval faqat KIMGA KO'RINISHINI saqlaydi —
  * shuning uchun UI'dan yangi qator yaratilmaydi, faqat mavjudi tahrirlanadi.
- *
  * ⚠️ QATOR YO'Q BO'LSA — `SUPER_ONLY` deb qaraladi (`sectionAccess.ts`).
  * Ya'ni yangi bo'lim qo'shib deploy qilinganda, hech narsa sozlanmasa ham u
  * avtomatik faqat super adminga ko'rinadi (fail-closed). Bu ataylab: unutilgan
  * bo'lim yashirin qoladi, ochilib ketmaydi.
- *
  * ⚠️ `roles` bazada cheklanmaydi — chegara `SectionDef.allowRoles` orqali
  * KODDA qo'yiladi va o'qish paytida kesishma olinadi. Sabab: chegara kod bilan
  * birga o'zgaradi (yangi rol qo'shilishi mumkin), migratsiya bilan emas.
@@ -860,55 +869,62 @@ model SectionAccess {
 
 /**
  * Boshqaruv panelidagi ko'rsatkichlarning KUNLIK o'lchovi.
- *
  * ⚠️ **Sabab:** `Property` ning statistika ustunlari har sinxronizatsiyada USTIDAN
  * yoziladi, `ObjectStatusCheck` da esa `@@unique([propertyId, apiSource])` — ya'ni
  * "o'tgan oyda nechta obyekt bo'sh turgan edi" degan savolga bazada javob YO'Q.
  * Bu jadval o'sha bo'shliqni to'ldiradi: har kuni bir marta joriy holat yoziladi.
- *
  * ⚠️ **Tarixni backfill qilib BO'LMAYDI** — o'tmishdagi holat hech qayerda saqlanmagan.
  * Shuning uchun jadval bo'sh bo'lganda grafik NOL chiziq chizmaydi, umuman
  * ko'rsatilmaydi (aks holda "hech narsa o'zgarmadi" degan yolg'on xulosa chiqardi).
- *
  * **Gran — `(day, sourceId, regionId)`.** Barcha kesimlar shundan YIG'INDI bilan
  * tiklanadi: rol doirasi (`sourceIds`), soha filtri (JOIN orqali `name`), hudud kesimi.
  * Faqat hudud grani `sourceIds` doirasini tiklay olmasdi, faqat manba grani esa
  * hudud kesimini bera olmasdi — shuning uchun ikkalasi birga.
- *
  * ⚠️ **`soha` (nom) ustuni ATAYLAB yo'q.** `OrganizationSource.name` admin UI'da
  * qayta nomlanishi mumkin — nom saqlansa tarix ikkiga bo'linib qolardi. JOIN esa
  * har doim joriy nomni beradi.
- *
  * ⚠️ **Kalitda NULL yo'q** (ikkala ustun ham NOT NULL) — loyihada bu naqsh
  * allaqachon bir marta buzgan: `@@unique([regionId, stir])` da `regionId` NULL
  * bo'lganda Postgres NULL'larni farqli deb hisoblab dublikatni o'tkazib yuborgan.
  * Bu yerda `Property.sourceId`/`regionId` ikkalasi ham majburiy, ya'ni muammo yo'q.
  */
 model DashboardSnapshot {
-  /** O'lchov sanasi — **Asia/Tashkent** kuni (`snapshots.ts`), UTC emas. */
-  day      DateTime @db.Date
+  /**
+   * O'lchov sanasi — **Asia/Tashkent** kuni (`snapshots.ts`), UTC emas.
+   */
+  day      DateTime           @db.Date
   sourceId String
   source   OrganizationSource @relation(fields: [sourceId], references: [id], onDelete: Cascade)
   regionId String
   region   Region             @relation(fields: [regionId], references: [id], onDelete: Cascade)
 
-  /** Balansdagi obyektlar soni (`removedFromBalance = false` — `sourceCond()` bilan bir xil). */
-  totalObjects Int
-  /** Effektiv kategoriyasi 11 ("Bo'sh turgan"). */
-  vacantObjects Int
+  /**
+   * Balansdagi obyektlar soni (`removedFromBalance = false` — `sourceCond()` bilan bir xil).
+   */
+  totalObjects    Int
+  /**
+   * Effektiv kategoriyasi 11 ("Bo'sh turgan").
+   */
+  vacantObjects   Int
   /**
    * Shundan FAQAT binolar (`NOT isLand`) — `landSplit` sohalarida (Davlat aktivlari
    * agentligi / Direksiya) kartada aynan shu son ko'rsatiladi.
    */
   vacantBuildings Int
-  /** Ijara shartnomasi bor obyektlar (`rentContractCount > 0`) — kategoriyadan mustaqil. */
-  rentedObjects Int
-  /** Shartnomalar soni (obyektlar bo'yicha yig'indi). */
-  contractCount Int
+  /**
+   * Ijara shartnomasi bor obyektlar (`rentContractCount > 0`) — kategoriyadan mustaqil.
+   */
+  rentedObjects   Int
+  /**
+   * Shartnomalar soni (obyektlar bo'yicha yig'indi).
+   */
+  contractCount   Int
 
-  rentArea Decimal @db.Decimal(18, 2)
-  rentSum  Decimal @db.Decimal(20, 2)
-  /** Bo'sh maydon yig'indisi (`Property.vacantArea` = foydali − ijarada). */
+  rentArea   Decimal @db.Decimal(18, 2)
+  rentSum    Decimal @db.Decimal(20, 2)
+  /**
+   * Bo'sh maydon yig'indisi (`Property.vacantArea` = foydali − ijarada).
+   */
   vacantArea Decimal @db.Decimal(18, 2)
 
   /**
@@ -920,4 +936,115 @@ model DashboardSnapshot {
 
   @@id([day, sourceId, regionId])
   @@index([day])
+}
+
+// ───────────────────── Auksion buyurtmalari (get-order API) ─────────────────────
+//
+// ⚠️ MUSTAQIL QUYI TIZIM — `Property`/`AuctionLot` ga BOG'LANMAGAN va ularga ta'sir
+// qilmaydi. Farqi:
+//   `AuctionLot` — kadastr bo'yicha bittalab so'raladi (API 3/4/6), faqat BIZNING
+//                  bazadagi obyektlar uchun, har sinxronizatsiyada qayta yoziladi.
+//   `AuctionOrder` — 14 viloyat akkaunti bo'yicha auksion tizimidagi BARCHA
+//                  buyurtmalar (2026-09-07 o'lchovi: 68 196 ta), obyektlarimiz
+//                  bilan kesishmasligi ham mumkin. Tarixiy yozuv sifatida saqlanadi.
+//
+// ⚠️ SHAXSIY MA'LUMOT: g'olibning F.I.Sh., passport, JSHSHIR, telefon, manzili va
+// bank hisob raqami shu jadvalda. Bo'lim `allowRoles` da faqat adminga ochiq
+// (`lib/sections.ts` → `auksion`) — kengaytirishdan oldin shuni hisobga oling.
+model AuctionOrder {
+  /**
+   * Auksion tizimidagi `order_id` — global unikal, upsert kaliti (skript ham shunday).
+   */
+  orderId    Int  @id
+  oldOrderId Int?
+  newOrderId Int?
+
+  /**
+   * Qaysi akkaunt (viloyat) orqali olingan — `.env.auction` dagi `name` (QR, AND, ...).
+   * ⚠️ `region` maydonidan FARQ QILADI: bu — so'rov yuborilgan akkaunt, u esa
+   * buyurtmaning o'z hududi. Odatda mos keladi, lekin kafolat yo'q.
+   */
+  credential String
+
+  name        String?
+  region      String?
+  regionSoato String?
+  area        String?
+  /**
+   * Tuman SOATO kodi — `District.code` bilan bir xil kodlash (API 2 `district_id`).
+   */
+  areaSoato   String?
+  address     String?
+
+  groupName    String?
+  categoryName String?
+  categoryId   Int?
+
+  orderStatus     String?
+  orderStatusesId Int?
+  lotStatus       String?
+  lotStatusesId   Int?
+  lotNumber       String?
+
+  startPrice    Decimal? @db.Decimal(18, 2)
+  paidPrice     Decimal? @db.Decimal(18, 2)
+  soldPrice     Decimal? @db.Decimal(18, 2)
+  centerFee     Decimal? @db.Decimal(18, 2)
+  fullPricePaid Int?
+  withDiscount  Int?
+  termPayment   Int?
+  termMonth     Int?
+
+  // ⚠️ Sanalar API'da "DD.MM.YYYY" yoki "DD.MM.YYYY HH:mm:ss" ko'rinishida keladi
+  // (ISO EMAS) — `parseDotDateTime()` bilan o'giriladi, API 4 dagi bilan bir xil tuzoq.
+  lotPlaceDate      DateTime?
+  auctionDate       DateTime?
+  firstLotPlaceDate DateTime?
+  firstAuctionDate  DateTime?
+  lotAcceptedTime   DateTime?
+
+  customerName  String?
+  customerInn   String?
+  customerSoato String?
+
+  // ── Shaxsiy ma'lumot (yuqoridagi ogohlantirishga qarang) ──
+  winnerName             String?
+  winnerInn              String?
+  winnerPassport         String?
+  winnerPinfl            String?
+  winnerPhone            String?
+  winnerAddress          String?
+  winnerPassportDate     DateTime?
+  winnerPassportIssuedBy String?
+  winnerSubjectType      Int?
+
+  bankName String?
+  bankMfo  String?
+
+  lat Float?
+  lng Float?
+
+  protocolFileUrl    String?
+  isDowngradeAuction Int?
+  propSet            Int?
+  acceptState        Int?
+  score              Float?
+
+  /**
+   * To'liq xom javob. ⚠️ `rawApi2` bilan bir xil sabab: mantiq o'zgarsa 68 000
+   * buyurtmani 20 daqiqa davomida qayta yuklamasdan qayta hisoblash mumkin.
+   * Ustunlarga chiqarilmagan maydonlar ham shu yerda (`details`, `images`,
+   * `documents`, `winner_payments`, `scoring_params`, izohlar).
+   */
+  raw Json?
+
+  syncedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+
+  @@index([credential])
+  @@index([region])
+  @@index([auctionDate])
+  @@index([orderStatusesId])
+  @@index([lotNumber])
+  @@index([customerInn])
 }

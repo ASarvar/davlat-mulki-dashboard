@@ -26,6 +26,9 @@ yarn-error.log*
 # production sirlari (serverda qo'lda yaratiladi) — namunasi git'da qoladi
 .env.production
 !.env.production.example
+# auksion buyurtmalari API'si — 14 viloyatning login/paroli JSON bo'lib turadi
+.env.auction
+!.env.auction.example
 
 # vaqtinchalik diagnostika/sinov skriptlari (_diag.ts, _scope.ts ...) — repo'ga tushmasin
 /_*.ts

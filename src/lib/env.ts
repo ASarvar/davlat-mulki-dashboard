@@ -1,4 +1,33 @@
 import { z } from "zod";
+import { config as loadDotenv } from "dotenv";
+
+/**
+ * ⚠️ `.env.auction` — auksion buyurtmalari API'sining ALOHIDA fayli (foydalanuvchi
+ * shunday yuritadi, 2026-09-07). Uni HECH KIM avtomatik o'qimaydi: Next.js faqat
+ * `.env`/`.env.local`/`.env.production` ni, worker esa `dotenv/config` orqali `.env` ni
+ * yuklaydi. Shuning uchun bu yerda aniq yuklanadi — zod tekshiruvidan OLDIN.
+ *
+ * ⚠️ `override: false` (dotenv standarti) — ya'ni allaqachon o'rnatilgan qiymat
+ * (`.env`, `.env.production` yoki Docker `environment:`) USTUN turadi. Serverda
+ * alohida fayl yaratmasdan, kalitlarni to'g'ridan-to'g'ri `.env.production` ga
+ * yozish ham ishlaydi.
+ *
+ * ⚠️ Fayl yo'q bo'lsa — xato EMAS: auksion bo'limi ixtiyoriy, sozlanmagan bo'lsa
+ * sahifa "sozlanmagan" ogohlantirishini ko'rsatadi.
+ */
+loadDotenv({ path: ".env.auction", quiet: true });
+
+// ⚠️ Foydalanuvchining faylida kalitlar UMUMIY nomlar bilan (`API_URL`,
+// `REGIONS_CREDENTIALS`) — mustaqil skriptdan qolgan. Bizning env fazomizda esa
+// `API_URL` juda xavfli nom (API1_BASE_URL … API6_BASE_URL yonida ma'nosiz), shuning
+// uchun ular shu yerda AUCTION_ORDERS_* ga ko'chiriladi. Foydalanuvchi faylini
+// o'zgartirmasdan ishlayveradi; yangi nomlarni bevosita bergan bo'lsa — o'sha ustun.
+if (!process.env.AUCTION_ORDERS_URL && process.env.API_URL) {
+  process.env.AUCTION_ORDERS_URL = process.env.API_URL;
+}
+if (!process.env.AUCTION_ORDERS_CREDENTIALS && process.env.REGIONS_CREDENTIALS) {
+  process.env.AUCTION_ORDERS_CREDENTIALS = process.env.REGIONS_CREDENTIALS;
+}
 
 // Server-side env validatsiyasi. Yaroqsiz konfiguratsiyada ilova ishga tushmaydi.
 const schema = z.object({
@@ -151,6 +180,23 @@ const schema = z.object({
    * (6 soatlik cron). 24 soatlik tsikl + 2 soat xavfsizlik marjasi.
    */
   IMTIYOZ_YATT_FRESH_HOURS: z.coerce.number().int().positive().default(22),
+
+  // ── Auksion buyurtmalari (get-order) ──
+  // POST {AUCTION_ORDERS_URL} body {username, password, language, page} → sahifalangan
+  // `orders` massivi. Har viloyatning O'Z akkaunti bor, shuning uchun Basic auth emas —
+  // login/parol so'rov tanasida ketadi.
+  AUCTION_ORDERS_URL: z.string().url().optional(),
+  /**
+   * 14 viloyat akkaunti: `[{"name":"QR","username":"…","password":"…"}, …]`.
+   * ⚠️ JSON SATR bo'lib keladi — `auctionCredentials()` uni tekshirib ochadi.
+   * Bu yerda `.transform()` qilinmaydi: yaroqsiz JSON butun ilovani ishga
+   * tushmaydigan qilib qo'yardi, holbuki auksion bo'limi ixtiyoriy.
+   */
+  AUCTION_ORDERS_CREDENTIALS: z.string().optional(),
+  /** Bitta sahifadagi yozuvlar soni — API o'zi 20 ta beradi, faqat kutish uchun. */
+  AUCTION_ORDERS_PAGE_SIZE: z.coerce.number().int().positive().default(20),
+  /** Sahifalar orasidagi pauza (ms) — skriptdagi 100 ms bilan bir xil. */
+  AUCTION_ORDERS_DELAY_MS: z.coerce.number().int().nonnegative().default(100),
 
   // Rate-limit / retry
   API_RATE_MAX: z.coerce.number().int().positive().default(10),

@@ -18,6 +18,7 @@ import {
   BadgePercent,
   SlidersHorizontal,
   Table2,
+  Gavel,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -59,6 +60,7 @@ const ICONS: Record<string, LucideIcon> = {
   sync: RefreshCw,
   sources: Database,
   users: Users,
+  auksion: Gavel,
   sections: SlidersHorizontal,
 };
 

@@ -13,6 +13,8 @@ import { triggerFullSync } from "./enqueue";
 import { isYattIndexFresh, syncYattIndex } from "@/server/services/imtiyoz/yattIndex";
 import { takeDashboardSnapshot } from "@/server/services/snapshots";
 import { imtiyozConfigured } from "@/server/integrations/imtiyoz";
+import { auctionConfigured } from "@/server/integrations/auctionOrders";
+import { syncAuctionOrders } from "@/server/services/auctionOrders";
 
 const leafOpts: PgBoss.WorkOptions = {
   batchSize: env.WORKER_CONCURRENCY,
@@ -165,6 +167,34 @@ async function main() {
     await boss.send(QUEUE.IMTIYOZ_YATT_SYNC, {});
     console.log("[imtiyoz-yatt] indeks eskirgan/yo'q — dastlabki sinxronlash navbatga qo'yildi");
   }
+
+  // ── Auksion buyurtmalari reyestri ──
+  //
+  // ⚠️ Kunlik, soat **04:00** — to'liq sync (03:00) TUGAGANDAN keyin. Ikkalasi
+  // bir vaqtda ishlasa shlyuzga ikki oqim ketardi va `result_code` xatolari
+  // boshlanardi (kommunal API'lardagi saboq).
+  //
+  // ⚠️ Bu job obyektlar sinxronizatsiyasidan MUSTAQIL: `SyncRun` yaratmaydi,
+  // `assertNoActiveRun()` ni tekshirmaydi va kategoriyaga ta'sir qilmaydi.
+  // Uning yiqilishi obyektlar monitoringiga hech qanday zarar bermaydi.
+  await boss.work(QUEUE.AUCTION_ORDERS_SYNC, async () => {
+    if (!auctionConfigured()) {
+      console.warn("[auction-orders] o'tkazib yuborildi: AUCTION_ORDERS_* env sozlanmagan");
+      return;
+    }
+    const r = await syncAuctionOrders((cred, page, pages) => {
+      // Har 25-sahifada bir marta — 3 400 qatorlik log foydasiz bo'lardi.
+      if (page % 25 === 0 || page === pages) console.log(`[auction-orders] ${cred}: ${page}/${pages}`);
+    });
+    const failed = r.perCredential.filter((c) => c.error);
+    const mins = Math.round((r.finishedAt.getTime() - r.startedAt.getTime()) / 60000);
+    console.log(
+      `[auction-orders] ${r.saved} yozuv, ${mins} daqiqa` +
+        (r.skipped ? `, order_id siz ${r.skipped} ta o'tkazildi` : "") +
+        (failed.length ? `, XATO akkauntlar: ${failed.map((c) => c.name).join(", ")}` : ""),
+    );
+  });
+  await boss.schedule(QUEUE.AUCTION_ORDERS_SYNC, "0 4 * * *", {}, { tz: "Asia/Tashkent" });
 
   console.log(
     `🚀 Worker (pg-boss) ishga tushdi. batchSize=${env.WORKER_CONCURRENCY}, poll=${env.WORKER_POLL_SECONDS}s. Queue'lar: ${Object.values(QUEUE).join(", ")}`,

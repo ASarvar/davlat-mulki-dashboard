@@ -23,7 +23,10 @@ async function createAndStart(): Promise<PgBoss> {
       // ~76 000 yozuv) yuklaydi va odatda bir necha daqiqa oladi. Umumiy 120s
       // limitida job o'rtasida "expired" bo'lib, keyin qayta ishga tushardi —
       // ya'ni indeks hech qachon yakunlanmasdi.
-      expireInSeconds: name === QUEUE.IMTIYOZ_YATT_SYNC ? 3600 : 120,
+      // ⚠️ Auksion buyurtmalari ham shunday: 14 akkauntning ~3 400 sahifasi
+      // ketma-ket yuklanadi (~20–25 daqiqa). 2 soat — katta zaxira bilan.
+      expireInSeconds:
+        name === QUEUE.IMTIYOZ_YATT_SYNC ? 3600 : name === QUEUE.AUCTION_ORDERS_SYNC ? 7200 : 120,
     });
   }
   return boss;

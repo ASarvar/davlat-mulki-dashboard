@@ -173,8 +173,14 @@ const parseAreaText = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-/** API 4 `auction_date` jonli javobda ISO emas — "DD.MM.YYYY HH:mm:ss". */
-const parseApi4Date = (v: unknown): Date | null => {
+/**
+ * API 4 `auction_date` jonli javobda ISO emas — "DD.MM.YYYY HH:mm:ss".
+ *
+ * ⚠️ Eksport qilingan: `get-order` API'si (auksion buyurtmalari) AYNAN shu ikki
+ * formatni beradi, ikkinchi parser yozilsa ular vaqt o'tib ajralib ketardi
+ * (`lib/area.ts` / `parseUtilityRaw()` bilan bir xil printsip).
+ */
+export const parseApi4Date = (v: unknown): Date | null => {
   const s = str(v);
   if (!s) return null;
   const m = s.match(/^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{2}):(\d{2}):(\d{2}))?$/);

@@ -17,6 +17,13 @@ export const QUEUE = {
    * olingan snapshot yarim yangilangan holatni yozib, trendda soxta sakrash berardi.
    */
   DASHBOARD_SNAPSHOT: "dashboard-snapshot",
+  /**
+   * Auksion buyurtmalari reyestrini yuklab olish (`services/auctionOrders.ts`).
+   * ⚠️ ENG UZOQ job: 14 akkaunt × jami ~3 400 sahifa, ~20–25 daqiqa
+   * (2026-09-07 o'lchovi: 68 196 buyurtma). `boss.ts` da unga ham alohida
+   * `expireInSeconds` beriladi — YATT indeksi bilan bir xil sabab.
+   */
+  AUCTION_ORDERS_SYNC: "auction-orders-sync",
 } as const;
 
 export interface SyncSourceJob {

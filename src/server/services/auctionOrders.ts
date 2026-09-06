@@ -1,0 +1,297 @@
+import { Prisma } from "@prisma/client";
+import { prisma } from "@/lib/prisma";
+import { env } from "@/lib/env";
+import { parseApi4Date } from "@/server/integrations/auction";
+import {
+  auctionCredentials,
+  fetchOrderPage,
+  type AuctionCredential,
+  type RawAuctionOrder,
+} from "@/server/integrations/auctionOrders";
+
+/**
+ * Auksion buyurtmalari — sinxronlash va o'qish.
+ *
+ * ⚠️ MUSTAQIL: `Property`/`AuctionLot`/kategoriyalarga TEGMAYDI. Bu tarixiy reyestr
+ * nusxasi, obyektlar monitoringi emas.
+ */
+
+// ── Xom javobni ustunlarga o'tkazish ────────────────────────────────────────
+
+const str = (v: unknown): string | null => {
+  if (typeof v === "string") return v.trim() || null;
+  if (typeof v === "number") return String(v);
+  return null;
+};
+const int = (v: unknown): number | null => {
+  const n = typeof v === "string" ? Number(v) : typeof v === "number" ? v : NaN;
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+};
+const num = (v: unknown): number | null => {
+  const n = typeof v === "string" ? Number(v.replace(",", ".")) : typeof v === "number" ? v : NaN;
+  return Number.isFinite(n) ? n : null;
+};
+/** Pul ustunlari `Decimal(18,2)` — Prisma `number` ni ham qabul qiladi, `null` ni ham. */
+const dec = (v: unknown): Prisma.Decimal | null => {
+  const n = num(v);
+  return n === null ? null : new Prisma.Decimal(n);
+};
+
+/**
+ * ⚠️ `order_id` YO'Q bo'lgan yozuv TASHLANADI — u birlamchi kalit, usiz upsert
+ * qilib bo'lmaydi. Skript bunday holatda butun jarayonni to'xtatardi; bu yerda
+ * yozuv o'tkazib yuboriladi va soni hisobotda ko'rsatiladi.
+ */
+export function mapOrder(raw: RawAuctionOrder, credential: string) {
+  const orderId = int(raw.order_id);
+  if (orderId === null) return null;
+
+  return {
+    orderId,
+    oldOrderId: int(raw.old_order_id),
+    newOrderId: int(raw.new_order_id),
+    credential,
+
+    name: str(raw.name),
+    region: str(raw.region),
+    regionSoato: str(raw.region_soato),
+    area: str(raw.area),
+    areaSoato: str(raw.area_soato),
+    address: str(raw.joylashgan_manzil),
+
+    groupName: str(raw.group_name),
+    categoryName: str(raw.category_name),
+    categoryId: int(raw.category_id),
+
+    orderStatus: str(raw.order_status),
+    orderStatusesId: int(raw.order_statuses_id),
+    lotStatus: str(raw.lot_status),
+    lotStatusesId: int(raw.lot_statuses_id),
+    lotNumber: str(raw.lot_number),
+
+    startPrice: dec(raw.start_price),
+    paidPrice: dec(raw.paid_price),
+    soldPrice: dec(raw.sold_price),
+    centerFee: dec(raw.center_fee),
+    fullPricePaid: int(raw.full_price_paid),
+    withDiscount: int(raw.with_discount),
+    termPayment: int(raw.term_payment),
+    termMonth: int(raw.term_month),
+
+    lotPlaceDate: parseApi4Date(raw.lot_place_date),
+    auctionDate: parseApi4Date(raw.auction_date),
+    firstLotPlaceDate: parseApi4Date(raw.first_lot_place_date),
+    firstAuctionDate: parseApi4Date(raw.first_auction_date),
+    lotAcceptedTime: parseApi4Date(raw.lot_accepted_time),
+
+    customerName: str(raw.customer_name),
+    customerInn: str(raw.customer_inn),
+    customerSoato: str(raw.customer_soato),
+
+    winnerName: str(raw.winner_name),
+    winnerInn: str(raw.winner_inn),
+    winnerPassport: str(raw.winner_passport),
+    winnerPinfl: str(raw.winner_pinfl),
+    winnerPhone: str(raw.winner_phone),
+    winnerAddress: str(raw.winner_address),
+    winnerPassportDate: parseApi4Date(raw.winner_passport_date),
+    winnerPassportIssuedBy: str(raw.winner_passport_issued_by),
+    winnerSubjectType: int(raw.winner_subject_type),
+
+    bankName: str(raw.bank_name),
+    bankMfo: str(raw.bank_mfo),
+
+    lat: num(raw.lat),
+    lng: num(raw.lng),
+
+    protocolFileUrl: str(raw.protocol_file_url),
+    isDowngradeAuction: int(raw.is_downgrade_auction),
+    propSet: int(raw.prop_set),
+    acceptState: int(raw.accept_state),
+    score: num(raw.score),
+
+    raw: raw as Prisma.InputJsonValue,
+    syncedAt: new Date(),
+  };
+}
+
+// ── Sinxronlash ─────────────────────────────────────────────────────────────
+
+export interface AuctionSyncResult {
+  /** Akkaunt bo'yicha: nechta yozuv saqlandi. */
+  perCredential: { name: string; saved: number; pages: number; error?: string }[];
+  saved: number;
+  /** `order_id` siz kelgan (saqlanmagan) yozuvlar. */
+  skipped: number;
+  startedAt: Date;
+  finishedAt: Date;
+}
+
+const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Bitta akkauntning barcha sahifasini yuklab, bazaga upsert qiladi.
+ *
+ * ⚠️ Sahifa BATCH bo'lib yoziladi (`$transaction` ichida 20 ta upsert), skriptdagidek
+ * har yozuv uchun alohida BEGIN/COMMIT emas — 68 000 yozuvda bu 68 000 ta tranzaksiya
+ * degani edi.
+ *
+ * ⚠️ Bitta sahifaning xatosi butun akkauntni to'xtatadi (skript bilan bir xil xulq):
+ * yarim yuklangan sahifa ketma-ketligi "ma'lumot to'liq" degan yolg'on taassurot
+ * berardi. Boshqa akkauntlar davom etadi va xato natijada ko'rsatiladi.
+ */
+async function syncCredential(
+  cred: AuctionCredential,
+  onProgress?: (page: number, pages: number) => void,
+): Promise<{ saved: number; skipped: number; pages: number }> {
+  let saved = 0;
+  let skipped = 0;
+  let page = 1;
+  let pages = 1;
+
+  while (page <= pages) {
+    const res = await fetchOrderPage(cred, page);
+    if (page === 1) pages = res.pages;
+    if (res.orders.length === 0) break;
+
+    const rows = res.orders.map((o) => mapOrder(o, cred.name));
+    skipped += rows.filter((r) => r === null).length;
+    const valid = rows.filter((r): r is NonNullable<typeof r> => r !== null);
+
+    await prisma.$transaction(
+      valid.map((data) =>
+        prisma.auctionOrder.upsert({
+          where: { orderId: data.orderId },
+          // ⚠️ `createdAt` yangilanmaydi — birinchi ko'rilgan vaqt saqlanib qolsin.
+          update: data,
+          create: data,
+        }),
+      ),
+    );
+    saved += valid.length;
+
+    onProgress?.(page, pages);
+    page++;
+    if (env.AUCTION_ORDERS_DELAY_MS > 0) await delay(env.AUCTION_ORDERS_DELAY_MS);
+  }
+
+  return { saved, skipped, pages };
+}
+
+/**
+ * Barcha akkauntlarni ketma-ket sinxronlaydi.
+ *
+ * ⚠️ KETMA-KET, parallel emas: 14 ta akkauntni birga tortish shlyuzga bir vaqtda
+ * 14 oqim berardi va `result_code` xatolari boshlanardi (kommunal API'lardagi bilan
+ * bir xil saboq). To'liq yuklash ~20–25 daqiqa.
+ */
+export async function syncAuctionOrders(
+  onProgress?: (cred: string, page: number, pages: number) => void,
+): Promise<AuctionSyncResult> {
+  const startedAt = new Date();
+  const creds = auctionCredentials();
+  const perCredential: AuctionSyncResult["perCredential"] = [];
+  let saved = 0;
+  let skipped = 0;
+
+  for (const cred of creds) {
+    try {
+      const r = await syncCredential(cred, (p, t) => onProgress?.(cred.name, p, t));
+      perCredential.push({ name: cred.name, saved: r.saved, pages: r.pages });
+      saved += r.saved;
+      skipped += r.skipped;
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      console.error(`Auksion sinxronlash xatosi (${cred.name}): ${msg}`);
+      perCredential.push({ name: cred.name, saved: 0, pages: 0, error: msg });
+    }
+  }
+
+  return { perCredential, saved, skipped, startedAt, finishedAt: new Date() };
+}
+
+// ── O'qish (ro'yxat sahifasi) ───────────────────────────────────────────────
+
+export interface AuctionOrderFilters {
+  /** Lot raqami, buyurtma ID, nomi yoki manzili bo'yicha qidiruv. */
+  q?: string;
+  credential?: string;
+  region?: string;
+  /** `order_statuses_id` — auksion holati. */
+  statusId?: number;
+  groupName?: string;
+  /** Auksion sanasi oralig'i (YYYY-MM-DD). */
+  from?: string;
+  to?: string;
+}
+
+export const AUCTION_PAGE_SIZE = 50;
+
+export function auctionWhere(f: AuctionOrderFilters): Prisma.AuctionOrderWhereInput {
+  const and: Prisma.AuctionOrderWhereInput[] = [];
+
+  if (f.q) {
+    const q = f.q.trim();
+    // ⚠️ Raqam kiritilsa `orderId` ni ham tekshiramiz — foydalanuvchi ko'pincha
+    // buyurtma ID sini yoki lot raqamini nusxalab qo'yadi.
+    const asId = Number(q);
+    and.push({
+      OR: [
+        { lotNumber: { contains: q, mode: "insensitive" } },
+        { name: { contains: q, mode: "insensitive" } },
+        { address: { contains: q, mode: "insensitive" } },
+        { customerName: { contains: q, mode: "insensitive" } },
+        ...(Number.isFinite(asId) && Number.isInteger(asId) ? [{ orderId: asId }] : []),
+      ],
+    });
+  }
+  if (f.credential) and.push({ credential: f.credential });
+  if (f.region) and.push({ region: f.region });
+  if (f.statusId !== undefined) and.push({ orderStatusesId: f.statusId });
+  if (f.groupName) and.push({ groupName: f.groupName });
+  if (f.from) and.push({ auctionDate: { gte: new Date(`${f.from}T00:00:00`) } });
+  if (f.to) and.push({ auctionDate: { lte: new Date(`${f.to}T23:59:59`) } });
+
+  return and.length ? { AND: and } : {};
+}
+
+export async function listAuctionOrders(f: AuctionOrderFilters, page: number) {
+  const where = auctionWhere(f);
+  const [rows, total] = await Promise.all([
+    prisma.auctionOrder.findMany({
+      where,
+      // ⚠️ `auctionDate` NULL bo'lgan yozuvlar bor — `nulls: "last"` busiz ular
+      // ro'yxatning boshiga chiqib, eng yangi auksionlarni pastga surib yuborardi.
+      orderBy: [{ auctionDate: { sort: "desc", nulls: "last" } }, { orderId: "desc" }],
+      skip: (page - 1) * AUCTION_PAGE_SIZE,
+      take: AUCTION_PAGE_SIZE,
+    }),
+    prisma.auctionOrder.count({ where }),
+  ]);
+  return { rows, total, pages: Math.max(1, Math.ceil(total / AUCTION_PAGE_SIZE)) };
+}
+
+/** Filtr tanlagichlari uchun — bazada haqiqatan uchraydigan qiymatlar. */
+export async function auctionFacets() {
+  const [credentials, regions, statuses, groups, last] = await Promise.all([
+    prisma.auctionOrder.groupBy({ by: ["credential"], _count: true, orderBy: { credential: "asc" } }),
+    prisma.auctionOrder.groupBy({ by: ["region"], _count: true, orderBy: { region: "asc" } }),
+    prisma.auctionOrder.groupBy({
+      by: ["orderStatusesId", "orderStatus"],
+      _count: true,
+      orderBy: { orderStatusesId: "asc" },
+    }),
+    prisma.auctionOrder.groupBy({ by: ["groupName"], _count: true, orderBy: { groupName: "asc" } }),
+    prisma.auctionOrder.aggregate({ _max: { syncedAt: true }, _count: true }),
+  ]);
+  return {
+    credentials: credentials.map((c) => c.credential),
+    regions: regions.map((r) => r.region).filter((r): r is string => Boolean(r)),
+    statuses: statuses
+      .filter((s) => s.orderStatusesId !== null)
+      .map((s) => ({ id: s.orderStatusesId as number, label: s.orderStatus ?? `#${s.orderStatusesId}` })),
+    groups: groups.map((g) => g.groupName).filter((g): g is string => Boolean(g)),
+    lastSyncedAt: last._max.syncedAt,
+    totalRows: last._count,
+  };
+}

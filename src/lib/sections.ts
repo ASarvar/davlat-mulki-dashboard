@@ -73,6 +73,12 @@ export const SECTIONS: SectionDef[] = [
   { key: "requests",       href: "/dashboard/requests",           label: "Tasdiqlash so'rovlari", exact: false, allowRoles: ALL_ROLES },
   { key: "imtiyoz",        href: "/dashboard/imtiyoz",            label: "Ijara imtiyozi",       exact: false, allowRoles: ALL_ROLES },
   { key: "notifications",  href: "/dashboard/notifications",      label: "Bildirishnomalar",     exact: false, allowRoles: ALL_ROLES },
+  // ⚠️ Auksion buyurtmalari reyestrida SHAXSIY MA'LUMOT bor (g'olibning F.I.Sh.,
+  // passport, JSHSHIR, telefon, manzili). Shuning uchun `allowRoles` ataylab faqat
+  // adminlar — bazadagi sozlama uni kengaytira olmaydi (foydalanuvchi qarori,
+  // 2026-09-07). Kengaytirish kerak bo'lsa avval shaxsiy ustunlarni yashirish
+  // masalasini hal qiling.
+  { key: "auksion",        href: "/dashboard/auksion",            label: "Auksion buyurtmalari", exact: false, allowRoles: ADMINS },
   { key: "cadastre-check", href: "/dashboard/cadastre-check",     label: "Kadastrni tekshirish", exact: false, allowRoles: ADMINS },
   { key: "sync",           href: "/dashboard/sync",               label: "Sinxronizatsiya",      exact: false, allowRoles: ADMINS },
   { key: "sources",        href: "/dashboard/sources",            label: "Manbalar (STIR)",      exact: false, allowRoles: ADMINS },

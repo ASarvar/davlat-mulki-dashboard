@@ -803,6 +803,56 @@ jadvaliga tegmaydi. To'liq hujjat **`imtiyoz` skill'ida**
 YATT indeksi, TIEK/natija keshlari, audit va ochiq `check-discount` endpoint'i.
 Shu quyi tizimga tegsangiz o'sha skill'ni oching.
 
+## Auksion buyurtmalari reyestri (`/dashboard/auksion`) — 2026-09-07
+
+⚠️ **MUSTAQIL quyi tizim** — `Property`/`AuctionLot`/kategoriyalarga TEGMAYDI.
+Mustaqil `get-auc-order2.js` skriptidan ko'chirildi; skript endi kerak emas.
+
+`AuctionLot` (API 3/4/6) kadastr bo'yicha **bittalab** so'raladi va faqat bizning
+obyektlarimizni qamraydi. Bu API esa 14 viloyat akkaunti bo'yicha auksion
+tizimidagi **barcha** buyurtmani sahifalab to'kadi — jonli o'lchov (2026-09-07):
+**68 196 buyurtma, 3 417 sahifa, ~20–25 daqiqa**.
+
+```
+integrations/auctionOrders.ts   mijoz (fetchOrderPage, auctionCredentials)
+services/auctionOrders.ts       mapOrder + syncAuctionOrders + listAuctionOrders
+QUEUE.AUCTION_ORDERS_SYNC       worker, cron "0 4 * * *" (kunlik sync 03:00 dan KEYIN)
+AuctionOrder (Postgres)         orderId birlamchi kalit, upsert
+```
+
+⚠️ **Auth Basic EMAS** — login/parol so'rov **tanasida** ketadi va har viloyatning
+o'z juftligi bor. `http.ts` dagi umumiy Basic yordamchisi bu yerda ishlamaydi.
+
+⚠️ **`result_code !== 0` — HTTP 200 bilan keladigan mantiqiy xato** (API 2 ning
+`code: 90000` tuzog'i bilan bir xil naqsh). `res.ok` ni tekshirish yetarli emas.
+
+⚠️ **Sozlamalar `.env.auction` da** — Next.js ham, worker ham uni O'ZI o'qimaydi,
+`lib/env.ts` uni **aniq yuklaydi** (`override: false`, ya'ni `.env.production`
+dagi qiymat ustun). Eski nomlar (`API_URL`, `REGIONS_CREDENTIALS`) ham qabul
+qilinadi va `AUCTION_ORDERS_*` ga ko'chiriladi — `API_URL` bizning env fazomizda
+(API1_BASE_URL … API6_BASE_URL yonida) juda chalkash nom.
+⚠️ **`REGIONS_CREDENTIALS` — SIR**: 14 ta login/parol. Xato xabariga QO'SHMANG
+(ishlab chiqishda `JSON.parse` yiqilib butun qiymatni logga bosgan edi).
+⚠️ Skriptdagi `DB_*` kalitlari kerak emas — ma'lumot loyihaning o'z bazasiga yoziladi.
+
+⚠️ **Tartib `order_id` ham, sana ham bo'yicha EMAS** (1-sahifa 2021, oxirgisi 2023
+bo'lishi mumkin) — ya'ni "yangilarigacha o'qib to'xtash" ishonchsiz. Har safar
+to'liq to'kiladi, `orderId` bo'yicha upsert qilinadi.
+⚠️ Akkauntlar **ketma-ket** yuklanadi, parallel emas — 14 oqim shlyuzda
+`result_code` xatolarini boshlardi (kommunal API'lardagi bilan bir xil saboq).
+⚠️ `boss.ts` da unga alohida **`expireInSeconds: 7200`** beriladi; umumiy 120s
+job'ni o'rtasida uzardi (YATT indeksi bilan bir xil sabab).
+
+⚠️ **SHAXSIY MA'LUMOT**: g'olibning F.I.Sh., passport, JSHSHIR, telefon, manzili
+va bank hisob raqami saqlanadi. Shuning uchun `sections.ts` da `allowRoles`
+**faqat adminlar** (foydalanuvchi qarori) — bazadagi sozlama uni kengaytira
+olmaydi. Jadvalda ko'rinmaydi, faqat qator ochilganda; Excel eksporti
+`private, no-store` bilan beriladi va `requireSection("auksion")` bilan qorovullangan.
+
+⚠️ Sana `parseApi4Date()` (auction.ts) bilan o'qiladi — **ikkinchi parser
+yozmang**: API "DD.MM.YYYY" va "DD.MM.YYYY HH:mm:ss" ni beradi, API 4 dagi bilan
+aynan bir xil.
+
 ## Ishlash tartibi — MUHIM
 
 1. **Kod o'zgargach worker'ni qayta ishga tushiring.** `tsx` watch emas — ishlab turgan worker eski
