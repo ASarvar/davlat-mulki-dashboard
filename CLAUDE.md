@@ -817,7 +817,7 @@ tizimidagi **barcha** buyurtmani sahifalab to'kadi — jonli o'lchov (2026-09-07
 ```
 integrations/auctionOrders.ts   mijoz (fetchOrderPage, auctionCredentials)
 services/auctionOrders.ts       mapOrder + syncAuctionOrders + listAuctionOrders
-QUEUE.AUCTION_ORDERS_SYNC       worker, cron "0 4 * * *" (kunlik sync 03:00 dan KEYIN)
+QUEUE.AUCTION_ORDERS_SYNC       worker, cron "0 2 * * *" (obyektlar sync 03:00 dan OLDIN)
 AuctionOrder (Postgres)         orderId birlamchi kalit, upsert
 AuctionSyncRun (Postgres)       jarayon holati — ekrandagi jonli ko'rsatkich
 ```

@@ -8,6 +8,7 @@ import { QUEUE } from "@/server/queue/jobs";
 import { auctionConfigured } from "@/server/integrations/auctionOrders";
 import { latestAuctionSyncRun, isRunStale } from "@/server/services/auctionOrders";
 import { nf } from "@/lib/format";
+import { auctionRegionName } from "@/lib/auctionRegions";
 
 /** Ekranga uzatiladigan jarayon holati — client komponent uchun oddiy tiplar. */
 export interface AuctionSyncStatus {
@@ -57,7 +58,7 @@ function scopeLabel(run: NonNullable<Awaited<ReturnType<typeof latestAuctionSync
   // ⚠️ Akkauntlar TO'LIQ ro'yxat bo'lsa yorliqqa qo'shilmaydi — "14 ta akkaunt"
   // hech qanday ma'lumot bermaydi, faqat matnni uzaytiradi.
   if (run.scopeCredentials.length > 0 && run.scopeCredentials.length < 14) {
-    parts.push(run.scopeCredentials.join(", "));
+    parts.push(run.scopeCredentials.map(auctionRegionName).join(", "));
   }
   return parts.length ? parts.join(" · ") : null;
 }

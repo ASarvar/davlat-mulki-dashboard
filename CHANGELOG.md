@@ -7,6 +7,22 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.12.0
+
+- **Yangi bo'lim: «Auksion buyurtmalari»** (`/dashboard/auksion`). Auksion
+  tizimidagi barcha buyurtmalar reyestri — 14 viloyat akkaunti bo'yicha
+  **68 196 ta yozuv**. Qidiruv (lot raqami, buyurtma ID, nomi, manzili),
+  viloyat/holat/tur/sana filtrlari, qatorni ochib to'liq ma'lumot va Excel
+  eksporti. Ilgari bu alohida skript (`get-auc-order2.js`) edi — endi kerak emas.
+  ⚠️ Bo'lim **faqat administratorlarga** ochiq: g'olib haqidagi shaxsiy ma'lumot
+  (F.I.Sh., passport, JSHSHIR, telefon, manzil) saqlanadi. U jadvalda
+  ko'rinmaydi — faqat qator ochilganda.
+- **Reyestr har kecha soat 02:00 da o'zi yangilanadi** (joriy yil bo'yicha).
+  Qo'lda yangilash uchun sahifada tugma bor va jarayon **jonli ko'rsatiladi**:
+  qaysi viloyat, nechanchi sahifa, nechta yozuv saqlandi.
+- **Yangilash filtri** — sana oralig'i va viloyat tanlash. Bitta viloyatni
+  yangilash ~26 soniya, to'liq reyestr ~16 daqiqa.
+
 ## 1.11.3
 
 - **Xarita ancha kattalashdi** va endi boshqarish qulayroq: kattalashtirish

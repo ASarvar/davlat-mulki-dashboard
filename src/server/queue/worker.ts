@@ -177,9 +177,14 @@ async function main() {
 
   // ── Auksion buyurtmalari reyestri ──
   //
-  // ⚠️ Kunlik, soat **04:00** — to'liq sync (03:00) TUGAGANDAN keyin. Ikkalasi
-  // bir vaqtda ishlasa shlyuzga ikki oqim ketardi va `result_code` xatolari
-  // boshlanardi (kommunal API'lardagi saboq).
+  // ⚠️ Kunlik, soat **02:00** (foydalanuvchi tanlovi, 2026-09-07) — obyektlar
+  // sinxronizatsiyasi (03:00) BOSHLANGUNCHA tugaydi: run ~15 daqiqa, ya'ni
+  // ~02:15 da yakunlanadi. Ikkalasi bir vaqtda ishlasa shlyuzga ikki oqim
+  // ketardi va `result_code` xatolari boshlanardi (kommunal API'lardagi saboq).
+  //
+  // ⚠️ `DASHBOARD_SNAPSHOT` ham 02:00 da, lekin TO'QNASHMAYDI: u `Property`
+  // agregatlarini o'qiydi, bu esa `AuctionOrder` ga yozadi — umumiy jadval yo'q,
+  // va snapshot bir necha soniyada tugaydi.
   //
   // ⚠️ Bu job obyektlar sinxronizatsiyasidan MUSTAQIL: `SyncRun` yaratmaydi,
   // `assertNoActiveRun()` ni tekshirmaydi va kategoriyaga ta'sir qilmaydi.
@@ -217,7 +222,7 @@ async function main() {
   // /dashboard/auksion sahifasidan sanasiz ishga tushiriladi.
   await boss.schedule(
     QUEUE.AUCTION_ORDERS_SYNC,
-    "0 4 * * *",
+    "0 2 * * *",
     { currentYear: true },
     { tz: "Asia/Tashkent" },
   );

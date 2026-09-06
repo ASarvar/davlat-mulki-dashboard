@@ -2,15 +2,16 @@ import { z } from "zod";
 import { config as loadDotenv } from "dotenv";
 
 /**
- * ⚠️ `.env.auction` — auksion buyurtmalari API'sining ALOHIDA fayli (foydalanuvchi
- * shunday yuritadi, 2026-09-07). Uni HECH KIM avtomatik o'qimaydi: Next.js faqat
- * `.env`/`.env.local`/`.env.production` ni, worker esa `dotenv/config` orqali `.env` ni
- * yuklaydi. Shuning uchun bu yerda aniq yuklanadi — zod tekshiruvidan OLDIN.
+ * ⚠️ `.env.auction` — auksion API'si uchun ESKI, ixtiyoriy fayl.
  *
- * ⚠️ `override: false` (dotenv standarti) — ya'ni allaqachon o'rnatilgan qiymat
- * (`.env`, `.env.production` yoki Docker `environment:`) USTUN turadi. Serverda
- * alohida fayl yaratmasdan, kalitlarni to'g'ridan-to'g'ri `.env.production` ga
- * yozish ham ishlaydi.
+ * 2026-09-07 dan kalitlar `.env` (dev) va `.env.production` (server) da turadi,
+ * ya'ni odatda bu fayl YO'Q va bu satr hech narsa qilmaydi. U orqaga moslik
+ * uchun qoldirilgan: Next.js ham, worker ham `.env.auction` ni O'ZI o'qimaydi
+ * (Next faqat `.env*`, worker esa `dotenv/config` orqali `.env`), shuning uchun
+ * kimdir uni ishlatsa shu yer yuklaydi — zod tekshiruvidan OLDIN.
+ *
+ * ⚠️ `override: false` (dotenv standarti) — `.env`/`.env.production` dagi qiymat
+ * USTUN turadi. Ya'ni ikkala joyda ham bo'lsa, asosiy fayl g'olib chiqadi.
  *
  * ⚠️ Fayl yo'q bo'lsa — xato EMAS: auksion bo'limi ixtiyoriy, sozlanmagan bo'lsa
  * sahifa "sozlanmagan" ogohlantirishini ko'rsatadi.

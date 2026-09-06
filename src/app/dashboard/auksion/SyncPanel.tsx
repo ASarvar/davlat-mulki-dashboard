@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { RefreshCw, CheckCircle2, AlertTriangle, Loader2, SlidersHorizontal } from "lucide-react";
 import { triggerAuctionSync, getAuctionSyncStatus, type AuctionSyncStatus } from "./actions";
+import { auctionRegionName } from "@/lib/auctionRegions";
 
 /**
  * Reyestrni yangilash tugmasi + JONLI jarayon ko'rsatkichi.
@@ -110,7 +111,10 @@ export function SyncPanel({
       // ⚠️ Sana filtri bilan ishlaganda FAQAT yozilgan sonni ko'rsatish
       // chalg'itardi ("502 yozuv" — 68 000 lik bazada bu kam ko'rinadi).
       // Nechtasi oraliqdan tashqarida qolgani ham aytiladi.
-      const extra = st.filtered ? `, oraliqdan tashqari ${st.filteredLabel}` : "";
+      // ⚠️ `?? st.filtered` — eskirgan RSC payload'ida `filteredLabel` bo'lmasligi
+      // mumkin (foydalanuvchi ekranida bir marta "undefined" chiqdi). Yorliq
+      // hech qachon "undefined" ko'rsatmasligi kerak.
+      const extra = st.filtered ? `, oraliqdan tashqari ${st.filteredLabel ?? st.filtered}` : "";
       return `Yakunlandi — ${st.savedLabel} yozuv${extra}`;
     }
     if (st.status === "PARTIAL")
@@ -135,17 +139,17 @@ export function SyncPanel({
       : CheckCircle2;
 
   return (
-    <div className="flex min-w-[280px] flex-col items-end gap-1.5">
+    <div className="relative flex min-w-[280px] flex-col items-end gap-1.5">
       <div className="flex items-center gap-1.5">
         <button
           type="button"
           disabled={busy}
           onClick={() => setOpen((v) => !v)}
-          title="Yangilash doirasi: sana va viloyat"
+          title="Yangilash filtri: sana va viloyat"
           className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-2 text-[12px] text-slate-600 shadow-sm transition hover:bg-muted disabled:opacity-50"
         >
           <SlidersHorizontal className="h-3.5 w-3.5" />
-          Doira
+          Filtr
         </button>
       <button
         type="button"
@@ -165,10 +169,16 @@ export function SyncPanel({
       </button>
       </div>
 
-      {/* ⚠️ Doira tanlagich jarayon ketayotganda yopiladi — o'zgartirish ayni
+      {/* ⚠️ Filtr tanlagich jarayon ketayotganda yopiladi — o'zgartirish ayni
           paytdagi run'ga ta'sir qilmaydi va foydalanuvchini chalg'itardi. */}
+      {/* ⚠️ Kenglik ALOHIDA sinflar bilan (`w-` + `max-w-`), `w-[min(560px,88vw)]`
+          BILAN EMAS: Tailwind arbitrary qiymat ichidagi VERGULNI qabul qilmaydi va
+          klass umuman generatsiya bo'lmaydi — panel torayib, sana maydonlari
+          bir-birining ostiga tushib ketardi (ishlab chiqishda aynan shu bo'ldi). */}
       {!busy && open && (
-        <div className="w-full space-y-2 rounded-lg border border-border bg-card p-3 text-left shadow-sm">
+        // ⚠️ ABSOLUTE ochiluvchi: oqim ichida qolsa sahifa sarlavhasini pastga
+        // surib yuborardi (filtr ochilganda butun tepa qismi sakrardi).
+        <div className="absolute right-0 top-full z-20 mt-1.5 w-[560px] max-w-[88vw] space-y-2 rounded-lg border border-border bg-card p-3 text-left shadow-lg">
           <div className="flex flex-wrap items-end gap-2">
             <label className="flex flex-col gap-1">
               <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Sanadan</span>
@@ -176,7 +186,7 @@ export function SyncPanel({
                 type="date"
                 value={from}
                 onChange={(e) => setFrom(e.target.value)}
-                className="rounded-md border border-slate-200 px-2 py-1 text-[12px]"
+                className="h-[30px] rounded-md border border-slate-200 px-2 text-[12px]"
               />
             </label>
             <label className="flex flex-col gap-1">
@@ -185,19 +195,28 @@ export function SyncPanel({
                 type="date"
                 value={to}
                 onChange={(e) => setTo(e.target.value)}
-                className="rounded-md border border-slate-200 px-2 py-1 text-[12px]"
+                className="h-[30px] rounded-md border border-slate-200 px-2 text-[12px]"
               />
             </label>
-            <button
-              type="button"
-              onClick={() => {
-                setFrom("");
-                setTo("");
-              }}
-              className="rounded-md border border-border px-2 py-1 text-[11px] text-slate-600 transition hover:bg-muted"
-            >
-              To&apos;liq (sanasiz)
-            </button>
+            {/* ⚠️ Sana maydonlari bilan BIR XIL balandlikda turishi uchun tugma ham
+                ustun ichida va tepasida ko'rinmas yorliq bor — aks holda u
+                `items-end` da pastga tushib, qatordan chiqib turardi. */}
+            <label className="flex flex-col gap-1">
+              <span aria-hidden className="text-[10px] uppercase tracking-wide text-transparent">
+                &nbsp;
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setFrom("");
+                  setTo("");
+                }}
+                title="Sana cheklovini olib tashlash — butun reyestr yangilanadi"
+                className="h-[30px] rounded-md border border-border px-3 text-[12px] text-slate-600 transition hover:bg-muted"
+              >
+                To&apos;liq
+              </button>
+            </label>
           </div>
 
           {credentials.length > 0 && (
@@ -213,6 +232,7 @@ export function SyncPanel({
                       key={c}
                       type="button"
                       onClick={() => setCreds((v) => (on ? v.filter((x) => x !== c) : [...v, c]))}
+                      title={c}
                       className={`rounded-md border px-2 py-0.5 text-[11px] transition ${
                         on
                           ? "border-transparent bg-cobalt text-white"
@@ -220,7 +240,7 @@ export function SyncPanel({
                       }`}
                       style={on ? { background: "var(--cobalt)" } : undefined}
                     >
-                      {c}
+                      {auctionRegionName(c)}
                     </button>
                   );
                 })}
@@ -258,10 +278,10 @@ export function SyncPanel({
           <span>{label()}</span>
         </span>
       )}
-      {/* ⚠️ Doira ALBATTA ko'rsatiladi: usiz "502 yozuv" degan natija to'liq
+      {/* ⚠️ Filtr ALBATTA ko'rsatiladi: usiz "502 yozuv" degan natija to'liq
           yangilash deb tushunilib, ma'lumot yo'qolgandek taassurot berardi. */}
       {st && !queued && st.scopeLabel && (
-        <span className="text-right text-[11px] text-muted-foreground">doira: {st.scopeLabel}</span>
+        <span className="text-right text-[11px] text-muted-foreground">filtr: {st.scopeLabel}</span>
       )}
       {queued && <span className="text-[12px] text-muted-foreground">Navbatga qo&apos;yildi, worker boshlamoqda…</span>}
       {msg && !busy && <span className="text-[12px] text-muted-foreground">{msg}</span>}
