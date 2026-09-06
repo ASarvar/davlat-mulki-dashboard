@@ -30,9 +30,36 @@ export interface AuctionSyncStatus {
   startedAt: string | null;
   finishedAt: string | null;
   failedCredentials: string[];
+  /** Sana oralig'iga tushmagani uchun yozilmagan yozuvlar. */
+  filtered: number;
+  /** ⚠️ Serverda formatlangan — `savedLabel` bilan bir xil sabab (gidratsiya). */
+  filteredLabel: string;
+  /** Run doirasi — ekranda "nima yangilangani" ni ko'rsatish uchun. */
+  scopeLabel: string | null;
   error: string | null;
   /** Worker o'lib qolgani sababli osilib qolgan run. */
   stale: boolean;
+}
+
+/**
+ * "2026-01-01 dan · 3 ta akkaunt" ko'rinishidagi qisqa yorliq.
+ *
+ * ⚠️ Sana SERVERDA formatlanadi (client komponentdagi `toLocaleString` gidratsiyani
+ * buzardi — shu fayldagi `savedLabel` izohiga qarang). Bu yerda ISO'ning kun qismi
+ * olinadi: u mintaqaga bog'liq emas.
+ */
+function scopeLabel(run: NonNullable<Awaited<ReturnType<typeof latestAuctionSyncRun>>>): string | null {
+  const parts: string[] = [];
+  const d = (x: Date) => x.toISOString().slice(0, 10);
+  if (run.scopeFrom && run.scopeTo) parts.push(`${d(run.scopeFrom)} — ${d(run.scopeTo)}`);
+  else if (run.scopeFrom) parts.push(`${d(run.scopeFrom)} dan`);
+  else if (run.scopeTo) parts.push(`${d(run.scopeTo)} gacha`);
+  // ⚠️ Akkauntlar TO'LIQ ro'yxat bo'lsa yorliqqa qo'shilmaydi — "14 ta akkaunt"
+  // hech qanday ma'lumot bermaydi, faqat matnni uzaytiradi.
+  if (run.scopeCredentials.length > 0 && run.scopeCredentials.length < 14) {
+    parts.push(run.scopeCredentials.join(", "));
+  }
+  return parts.length ? parts.join(" · ") : null;
 }
 
 function toStatus(run: Awaited<ReturnType<typeof latestAuctionSyncRun>>): AuctionSyncStatus | null {
@@ -68,6 +95,9 @@ function toStatus(run: Awaited<ReturnType<typeof latestAuctionSyncRun>>): Auctio
     startedAt: run.startedAt.toISOString(),
     finishedAt: run.finishedAt?.toISOString() ?? null,
     failedCredentials: per.filter((c) => c.error).map((c) => c.name),
+    filtered: run.filtered,
+    filteredLabel: nf(run.filtered),
+    scopeLabel: scopeLabel(run),
     error: run.error,
     stale,
   };
@@ -89,7 +119,17 @@ export async function getAuctionSyncStatus(): Promise<AuctionSyncStatus | null> 
  * ⚠️ `requireSection` MAJBURIY — bo'limni yashirish uning server action'ini
  * yashirmaydi (CLAUDE.md qoidasi).
  */
-export async function triggerAuctionSync(): Promise<{ ok: boolean; message: string }> {
+export interface TriggerScope {
+  /** "YYYY-MM-DD" — bo'sh bo'lsa cheklovsiz. */
+  from?: string;
+  to?: string;
+  /** Akkaunt nomlari. Bo'sh = hammasi. */
+  credentials?: string[];
+}
+
+export async function triggerAuctionSync(
+  scope: TriggerScope = {},
+): Promise<{ ok: boolean; message: string }> {
   await requireSection("auksion");
 
   if (!auctionConfigured()) {
@@ -109,10 +149,19 @@ export async function triggerAuctionSync(): Promise<{ ok: boolean; message: stri
     const boss = await getBoss();
     const id = await boss.send(
       QUEUE.AUCTION_ORDERS_SYNC,
-      { startedById: user?.id },
+      {
+        startedById: user?.id,
+        from: scope.from || undefined,
+        to: scope.to || undefined,
+        credentials: scope.credentials?.length ? scope.credentials : undefined,
+      },
       // ⚠️ `singletonKey` — takroriy bosishda navbat bir xil job bilan to'lib
-      // ketmasin (YATT indeksidagi bilan bir xil sabab).
-      { singletonKey: "auction-orders-sync" },
+      // ketmasin (YATT indeksidagi bilan bir xil sabab). Doira kalitga KIRADI:
+      // aks holda "faqat TOSH-SH" so'rovi navbatdagi to'liq yangilash tufayli
+      // jimgina tashlanib ketardi.
+      {
+        singletonKey: `auction-orders-sync:${scope.from ?? ""}:${scope.to ?? ""}:${(scope.credentials ?? []).join(",")}`,
+      },
     );
     revalidatePath("/dashboard/auksion");
     return id

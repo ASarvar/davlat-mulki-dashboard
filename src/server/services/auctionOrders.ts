@@ -124,16 +124,76 @@ export interface AuctionSyncResult {
   saved: number;
   /** `order_id` siz kelgan (saqlanmagan) yozuvlar. */
   skipped: number;
+  /** Sana oralig'iga tushmagani uchun yozilmagan yozuvlar. */
+  filtered: number;
   startedAt: Date;
   finishedAt: Date;
 }
 
+/** Run doirasi — nima yangilanadi. */
+export interface AuctionSyncOptions {
+  /** Sana oralig'i (`auctionDate`, u yo'q bo'lsa `lotPlaceDate` bo'yicha). */
+  from?: Date;
+  to?: Date;
+  /** Akkaunt nomlari (QR, AND …). Bo'sh/berilmagan = hammasi. */
+  credentials?: string[];
+  startedById?: string;
+}
+
+/**
+ * Joriy yil boshi (Toshkent) — kunlik cron shu bilan chaqiriladi.
+ *
+ * ⚠️ Nima uchun kunlik yangilash faqat joriy yil: tugagan auksionlar o'zgarmaydi,
+ * ya'ni 2019–2025 yozuvlarini har kecha qayta yozish keraksiz.
+ *
+ * ⚠️ Bu VAQTNI deyarli tejamaydi — o'lchangan (2026-09-07): to'liq 16d37s ↔
+ * joriy yil 15d3s. Sahifalar baribir to'liq o'qiladi (API filtrlay olmaydi),
+ * vaqtning deyarli hammasi HTTP'da. Foydasi — bazaga yozish 68 196 → 11 890
+ * (83% kam): kamroq WAL, kamroq bloat. Tezlik kerak bo'lsa AKKAUNT filtri.
+ */
+export function currentYearStart(): Date {
+  const now = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tashkent" }));
+  return new Date(`${now.getFullYear()}-01-01T00:00:00`);
+}
+
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+/**
+ * Sana oralig'i — qaysi yozuvlar BAZAGA YOZILADI.
+ *
+ * ⚠️ Bu API filtri EMAS: `get-order` sana bo'yicha filtrlay olmaydi (54 parametr
+ * nomi sinaldi — hech biri javobga ta'sir qilmadi) va tartib ham sana bo'yicha
+ * emas (2026-yil yozuvlari 25-, 40-, 85-sahifalarda tarqoq). Ya'ni sahifalar
+ * BARIBIR to'liq o'qiladi; tejash faqat bazaga yozishda (joriy yil ≈ 10%).
+ */
+export interface DateScope {
+  from?: Date;
+  to?: Date;
+}
+
+/**
+ * Yozuv oraliqqa tushadimi.
+ *
+ * ⚠️ SANASI YO'Q yozuv HAR DOIM saqlanadi (fail-open). Jonli o'lchov (2026-09-07):
+ * 5 307 yozuvda umuman sana yo'q va ularning 367 tasi HALI FAOL — "Buyurtma
+ * yaratilgan/yuborilgan/tasdiqni kutish", ya'ni eng yangi buyurtmalar. Oddiy
+ * sana filtri aynan ularni jimgina tashlab ketardi.
+ */
+function inScope(row: { auctionDate: Date | null; lotPlaceDate: Date | null }, scope: DateScope): boolean {
+  if (!scope.from && !scope.to) return true;
+  const d = row.auctionDate ?? row.lotPlaceDate;
+  if (!d) return true;
+  if (scope.from && d < scope.from) return false;
+  if (scope.to && d > scope.to) return false;
+  return true;
+}
+
 /** Sahifadagi yozuvlarni bazaga yozadi va nechtasi saqlanganini qaytaradi. */
-async function persistPage(orders: RawAuctionOrder[], credName: string) {
+async function persistPage(orders: RawAuctionOrder[], credName: string, scope: DateScope) {
   const rows = orders.map((o) => mapOrder(o, credName));
-  const valid = rows.filter((r): r is NonNullable<typeof r> => r !== null);
+  const mapped = rows.filter((r): r is NonNullable<typeof r> => r !== null);
+  const valid = mapped.filter((r) => inScope(r, scope));
+  const filtered = mapped.length - valid.length;
 
   // ⚠️ Bitta `$transaction` — Prisma uni BITTA batch qilib yuboradi. Skript har
   // yozuv uchun alohida BEGIN/COMMIT qilardi, ya'ni 68 000 ta tranzaksiya.
@@ -148,7 +208,7 @@ async function persistPage(orders: RawAuctionOrder[], credName: string) {
     ),
   );
 
-  return { saved: valid.length, skipped: rows.length - valid.length };
+  return { saved: valid.length, skipped: rows.length - mapped.length, filtered };
 }
 
 /**
@@ -163,16 +223,18 @@ async function persistPage(orders: RawAuctionOrder[], credName: string) {
  */
 async function syncCredential(
   cred: AuctionCredential,
+  scope: DateScope,
   /** `saved` — SHU akkaunt bo'yicha shu paytgacha yozilgani (jamlanma emas). */
   onProgress?: (page: number, pages: number, saved: number) => Promise<void> | void,
-): Promise<{ saved: number; skipped: number; pages: number }> {
+): Promise<{ saved: number; skipped: number; filtered: number; pages: number }> {
   const first = await fetchOrderPage(cred, 1);
   const pages = first.pages;
-  if (first.orders.length === 0) return { saved: 0, skipped: 0, pages };
+  if (first.orders.length === 0) return { saved: 0, skipped: 0, filtered: 0, pages };
 
-  const acc = await persistPage(first.orders, cred.name);
+  const acc = await persistPage(first.orders, cred.name, scope);
   let saved = acc.saved;
   let skipped = acc.skipped;
+  let filtered = acc.filtered;
   await onProgress?.(1, pages, saved);
 
   const conc = env.AUCTION_ORDERS_CONCURRENCY;
@@ -188,16 +250,17 @@ async function syncCredential(
     // har sahifa uchun alohida emas — baza bilan aloqa 4 barobar kam bo'ladi.
     const merged = results.flatMap((r) => r.orders);
     if (merged.length > 0) {
-      const r = await persistPage(merged, cred.name);
+      const r = await persistPage(merged, cred.name, scope);
       saved += r.saved;
       skipped += r.skipped;
+      filtered += r.filtered;
     }
 
     await onProgress?.(Math.min(start + conc - 1, pages), pages, saved);
     if (env.AUCTION_ORDERS_DELAY_MS > 0) await delay(env.AUCTION_ORDERS_DELAY_MS);
   }
 
-  return { saved, skipped, pages };
+  return { saved, skipped, filtered, pages };
 }
 
 /**
@@ -211,15 +274,32 @@ async function syncCredential(
  * ⚠️ Progress SAHIFA to'plamlari yakunida yoziladi (~340 marta), har yozuvda emas —
  * aks holda 68 000 ta ortiqcha UPDATE bo'lardi.
  */
-export async function syncAuctionOrders(startedById?: string): Promise<AuctionSyncResult> {
+export async function syncAuctionOrders(opts: AuctionSyncOptions = {}): Promise<AuctionSyncResult> {
   const startedAt = new Date();
-  const creds = auctionCredentials();
+  const scope: DateScope = { from: opts.from, to: opts.to };
+
+  // ⚠️ Noma'lum akkaunt nomi jimgina "hech narsa yangilanmadi" ga olib kelmasin —
+  // tanlov bo'sh chiqsa hammasini olamiz emas, xato tashlaymiz.
+  const all = auctionCredentials();
+  const wanted = opts.credentials?.filter(Boolean) ?? [];
+  const creds = wanted.length ? all.filter((c) => wanted.includes(c.name)) : all;
+  if (wanted.length && creds.length === 0) {
+    throw new Error(`Tanlangan akkaunt topilmadi: ${wanted.join(", ")}`);
+  }
+
   const perCredential: AuctionSyncResult["perCredential"] = [];
   let saved = 0;
   let skipped = 0;
+  let filtered = 0;
 
   const run = await prisma.auctionSyncRun.create({
-    data: { credentialTotal: creds.length, startedById: startedById ?? null },
+    data: {
+      credentialTotal: creds.length,
+      startedById: opts.startedById ?? null,
+      scopeFrom: opts.from ?? null,
+      scopeTo: opts.to ?? null,
+      scopeCredentials: creds.map((c) => c.name),
+    },
   });
 
   try {
@@ -230,7 +310,7 @@ export async function syncAuctionOrders(startedById?: string): Promise<AuctionSy
       });
 
       try {
-        const r = await syncCredential(cred, async (page, pages, credSaved) => {
+        const r = await syncCredential(cred, scope, async (page, pages, credSaved) => {
           await prisma.auctionSyncRun.update({
             where: { id: run.id },
             // ⚠️ `saved` — oldingi akkauntlar jamlanmasi + SHU akkauntning joriy
@@ -242,6 +322,7 @@ export async function syncAuctionOrders(startedById?: string): Promise<AuctionSy
         perCredential.push({ name: cred.name, saved: r.saved, pages: r.pages });
         saved += r.saved;
         skipped += r.skipped;
+        filtered += r.filtered;
       } catch (e) {
         const msg = e instanceof Error ? e.message : String(e);
         console.error(`Auksion sinxronlash xatosi (${cred.name}): ${msg}`);
@@ -250,7 +331,7 @@ export async function syncAuctionOrders(startedById?: string): Promise<AuctionSy
 
       await prisma.auctionSyncRun.update({
         where: { id: run.id },
-        data: { saved, skipped, perCredential },
+        data: { saved, skipped, filtered, perCredential },
       });
     }
 
@@ -265,6 +346,7 @@ export async function syncAuctionOrders(startedById?: string): Promise<AuctionSy
         finishedAt: new Date(),
         saved,
         skipped,
+        filtered,
         perCredential,
       },
     });
@@ -280,6 +362,7 @@ export async function syncAuctionOrders(startedById?: string): Promise<AuctionSy
           error: e instanceof Error ? e.message : String(e),
           saved,
           skipped,
+          filtered,
           perCredential,
         },
       })
@@ -287,7 +370,7 @@ export async function syncAuctionOrders(startedById?: string): Promise<AuctionSy
     throw e;
   }
 
-  return { perCredential, saved, skipped, startedAt, finishedAt: new Date() };
+  return { perCredential, saved, skipped, filtered, startedAt, finishedAt: new Date() };
 }
 
 /**

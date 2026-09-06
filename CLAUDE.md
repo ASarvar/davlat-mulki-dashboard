@@ -822,6 +822,50 @@ AuctionOrder (Postgres)         orderId birlamchi kalit, upsert
 AuctionSyncRun (Postgres)       jarayon holati — ekrandagi jonli ko'rsatkich
 ```
 
+### Yangilash DOIRASI — sana va akkaunt (2026-09-07)
+
+⚠️ **API sana bo'yicha filtrlay OLMAYDI.** 54 ta parametr nomi sinaldi
+(`date_from`, `from_date`, `begin_date`, `start_date`, `dateFrom`, `year`,
+`period`, `since`, `after` va h.k., ikki formatda) — hech biri javobga ta'sir
+qilmadi. Tartib ham sana bo'yicha emas: QR akkauntida 2026-yil yozuvlari 25-,
+40-, 70-, 85-sahifalarda tarqoq, 2021-yil esa 1-, 85-, 95-sahifalarda. Ya'ni
+**"oxirgi sahifalardan teskari o'qib to'xtash" ham ishlamaydi.**
+
+Shuning uchun sana filtri FAQAT YOZISHDA qo'llanadi (`inScope()`): sahifalar
+baribir to'liq o'qiladi, tejash bazada. Jonli o'lchov: joriy yil = 68 196
+yozuvning **9.7%** i.
+
+⚠️ **SANASI YO'Q yozuv HAR DOIM saqlanadi** (fail-open). 5 307 yozuvda umuman
+sana yo'q (`auctionDate`, `lotPlaceDate`, `firstLotPlaceDate` — uchalasi ham),
+va ularning **367 tasi HALI FAOL**: "Buyurtma yaratilgan/yuborilgan/tasdiqni
+kutish". Oddiy sana filtri aynan eng yangi buyurtmalarni jimgina tashlab ketardi.
+
+⚠️ **Kunlik cron `{ currentYear: true }` bayrog'i bilan chaqiriladi, aniq sana
+bilan EMAS** — jadval bir marta ro'yxatdan o'tadi, aniq sana yozilsa 1-yanvarda
+eski yil bilan qotib qolardi.
+
+⚠️ **`singletonKey` doirani O'Z ICHIGA OLADI**
+(`auction-orders-sync:<from>:<to>:<akkauntlar>`) — aks holda "faqat TOSH-SH"
+so'rovi navbatdagi to'liq yangilash tufayli jimgina tashlanib ketardi.
+
+⚠️ **SANA FILTRI VAQTNI DEYARLI TEJAMAYDI** — o'lchangan (2026-09-07):
+to'liq **16d 37s** ↔ joriy yil **15d 3s** (atigi ~10%), garchi yozuvlar
+68 196 → 11 890 ga (83% kam) tushsa ham. Sabab: vaqtning deyarli hammasi
+HTTP'da (sahifalar baribir to'liq o'qiladi), bazaga yozish esa kichik ulush.
+Uning FOYDASI — bazaga keraksiz yozuvni kamaytirish (WAL/bloat), tezlik emas.
+
+⚠️ **HAQIQIY TEZLIK LEVERI — AKKAUNT filtri**: bitta viloyat + joriy yil (SIR)
+**26 soniya** (502 yozildi, 1 928 sana bo'yicha tashlandi, jami 2 430 =
+akkauntning aniq soni). "Bitta viloyatni yangilash" kerak bo'lganda shuni
+ishlating, sana filtrini emas.
+
+⚠️ **Migratsiya QO'LDA yoziladi.** `prisma migrate dev` bu loyihada ishlamaydi:
+pg_trgm GIN indekslari migratsiyadan tashqarida qo'llanadi
+(`prisma/apply-indexes.ts`) va Prisma buni "drift" deb ko'rib **butun bazani
+reset qilishni** taklif qiladi. To'g'ri yo'l: migratsiya papkasini qo'lda
+yaratib, `prisma db execute` bilan qo'llash va `prisma migrate resolve
+--applied <nom>` bilan belgilash.
+
 ### Tezlik — o'lchangan qiymatlar (2026-09-07)
 
 ⚠️ **`per_page` ISHLAYDI va 50 da CHEGARALANADI** — 100/200/500 so'ralganda ham 50

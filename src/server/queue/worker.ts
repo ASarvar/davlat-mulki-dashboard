@@ -2,7 +2,14 @@
 import "dotenv/config";
 import PgBoss from "pg-boss";
 import { getBoss, stopBoss } from "./boss";
-import { QUEUE, type JobOutcome, type PropertyBaseJob, type StatusCheckJob, type SyncSourceJob } from "./jobs";
+import {
+  QUEUE,
+  type AuctionSyncJob,
+  type JobOutcome,
+  type PropertyBaseJob,
+  type StatusCheckJob,
+  type SyncSourceJob,
+} from "./jobs";
 import { env } from "@/lib/env";
 import { prisma } from "@/lib/prisma";
 import { processSyncSource } from "./processors/syncSource";
@@ -14,7 +21,7 @@ import { isYattIndexFresh, syncYattIndex } from "@/server/services/imtiyoz/yattI
 import { takeDashboardSnapshot } from "@/server/services/snapshots";
 import { imtiyozConfigured } from "@/server/integrations/imtiyoz";
 import { auctionConfigured } from "@/server/integrations/auctionOrders";
-import { syncAuctionOrders } from "@/server/services/auctionOrders";
+import { syncAuctionOrders, currentYearStart } from "@/server/services/auctionOrders";
 
 const leafOpts: PgBoss.WorkOptions = {
   batchSize: env.WORKER_CONCURRENCY,
@@ -177,23 +184,43 @@ async function main() {
   // ⚠️ Bu job obyektlar sinxronizatsiyasidan MUSTAQIL: `SyncRun` yaratmaydi,
   // `assertNoActiveRun()` ni tekshirmaydi va kategoriyaga ta'sir qilmaydi.
   // Uning yiqilishi obyektlar monitoringiga hech qanday zarar bermaydi.
-  await boss.work<{ startedById?: string }>(QUEUE.AUCTION_ORDERS_SYNC, async ([job]) => {
+  await boss.work<AuctionSyncJob>(QUEUE.AUCTION_ORDERS_SYNC, async ([job]) => {
     if (!auctionConfigured()) {
       console.warn("[auction-orders] o'tkazib yuborildi: AUCTION_ORDERS_* env sozlanmagan");
       return;
     }
-    // ⚠️ Progress endi `AuctionSyncRun` jadvaliga yoziladi (ekranda jonli ko'rinadi) —
+    const d = job?.data ?? {};
+    // ⚠️ `currentYear` — kunlik cron shu bayroq bilan keladi. Sanani JOB ichiga
+    // yozib qo'ymaymiz: jadval bir marta ro'yxatdan o'tadi va yil almashganda
+    // (1-yanvar) eski sana bilan qotib qolardi.
+    const from = d.currentYear ? currentYearStart() : d.from ? new Date(d.from) : undefined;
+    // ⚠️ Progress `AuctionSyncRun` jadvaliga yoziladi (ekranda jonli ko'rinadi) —
     // konsol logi faqat yakuniy xulosa.
-    const r = await syncAuctionOrders(job?.data?.startedById);
+    const r = await syncAuctionOrders({
+      from,
+      to: d.to ? new Date(d.to) : undefined,
+      credentials: d.credentials,
+      startedById: d.startedById,
+    });
     const failed = r.perCredential.filter((c) => c.error);
     const mins = Math.round((r.finishedAt.getTime() - r.startedAt.getTime()) / 60000);
     console.log(
       `[auction-orders] ${r.saved} yozuv, ${mins} daqiqa` +
+        (r.filtered ? `, sana oralig'idan tashqari ${r.filtered} ta` : "") +
         (r.skipped ? `, order_id siz ${r.skipped} ta o'tkazildi` : "") +
         (failed.length ? `, XATO akkauntlar: ${failed.map((c) => c.name).join(", ")}` : ""),
     );
   });
-  await boss.schedule(QUEUE.AUCTION_ORDERS_SYNC, "0 4 * * *", {}, { tz: "Asia/Tashkent" });
+  // ⚠️ Kunlik jadval FAQAT JORIY YILNI yangilaydi (foydalanuvchi qarori,
+  // 2026-09-07): tugagan auksionlar o'zgarmaydi, ya'ni 2019–2025 yozuvlarini
+  // har kecha qayta yozish keraksiz. To'liq yangilash kerak bo'lsa —
+  // /dashboard/auksion sahifasidan sanasiz ishga tushiriladi.
+  await boss.schedule(
+    QUEUE.AUCTION_ORDERS_SYNC,
+    "0 4 * * *",
+    { currentYear: true },
+    { tz: "Asia/Tashkent" },
+  );
 
   console.log(
     `🚀 Worker (pg-boss) ishga tushdi. batchSize=${env.WORKER_CONCURRENCY}, poll=${env.WORKER_POLL_SECONDS}s. Queue'lar: ${Object.values(QUEUE).join(", ")}`,

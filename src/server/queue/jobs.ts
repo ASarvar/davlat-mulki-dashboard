@@ -19,12 +19,32 @@ export const QUEUE = {
   DASHBOARD_SNAPSHOT: "dashboard-snapshot",
   /**
    * Auksion buyurtmalari reyestrini yuklab olish (`services/auctionOrders.ts`).
-   * ⚠️ ENG UZOQ job: 14 akkaunt × jami ~3 400 sahifa, ~20–25 daqiqa
-   * (2026-09-07 o'lchovi: 68 196 buyurtma). `boss.ts` da unga ham alohida
+   * ⚠️ ENG UZOQ job: 14 akkaunt × ~1 364 sahifa. Jonli o'lchov (2026-09-07):
+   * to'liq yuklash **16d 37s**, 68 196 buyurtma. ⚠️ SANA filtri vaqtni deyarli
+   * tejamaydi (joriy yil **15d 3s**) — sahifalar baribir to'liq o'qiladi;
+   * AKKAUNT filtri esa tejaydi (bitta viloyat **26s**). `boss.ts` da alohida
    * `expireInSeconds` beriladi — YATT indeksi bilan bir xil sabab.
    */
   AUCTION_ORDERS_SYNC: "auction-orders-sync",
 } as const;
+
+/**
+ * Auksion reyestrini yangilash doirasi.
+ *
+ * ⚠️ Sana JOB ichida SATR bo'lib yuriladi (`Date` emas) — pg-boss payload'ni
+ * JSON qilib saqlaydi.
+ * ⚠️ `currentYear` bayrog'i aniq sanadan AFZAL: kunlik jadval bir marta
+ * ro'yxatdan o'tadi, aniq sana yozilsa 1-yanvarda eski yil bilan qotib qolardi.
+ */
+export interface AuctionSyncJob {
+  currentYear?: boolean;
+  /** "YYYY-MM-DD" */
+  from?: string;
+  to?: string;
+  /** Akkaunt nomlari (QR, AND …). Bo'sh = hammasi. */
+  credentials?: string[];
+  startedById?: string;
+}
 
 export interface SyncSourceJob {
   syncRunId: string;

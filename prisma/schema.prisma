@@ -325,6 +325,7 @@ model Property {
   /**
    * /**
    * /**
+   * /**
    * Oxirgi `ELECTRIC_CONSUMING_MONTHS` oyda `SALDO_PERIOD.CURRENT_EE_KWH > 0` —
    * ya'ni hisoblagich bo'yicha HAQIQIY elektr sarfi qayd etilgan. Gazdagi
    * `gasConsuming` ning elektr muqobili, lekin ishonchliroq: elektrda hisoblagichsiz
@@ -1082,6 +1083,19 @@ model AuctionSyncRun {
    */
   saved   Int @default(0)
   skipped Int @default(0)
+
+  /** Sana filtri tufayli yozilmagan (API'dan olingan, lekin oraliqqa tushmagan). */
+  filtered Int @default(0)
+
+  // ── Run doirasi (nima yangilangani) ──
+  // ⚠️ API sana bo'yicha filtrlay OLMAYDI (54 parametr nomi sinaldi, tartib ham
+  // tasodifiy) — shuning uchun sahifalar baribir TO'LIQ o'qiladi va filtr FAQAT
+  // yozishda qo'llanadi. Tejash bazada: joriy yil ≈ yozuvlarning 10% i.
+  scopeFrom DateTime?
+  scopeTo   DateTime?
+
+  /** Bo'sh massiv = barcha akkauntlar. */
+  scopeCredentials String[]
 
   /**
    * Akkaunt kesimidagi natija: [{name, saved, pages, error?}].

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { RefreshCw, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
+import { RefreshCw, CheckCircle2, AlertTriangle, Loader2, SlidersHorizontal } from "lucide-react";
 import { triggerAuctionSync, getAuctionSyncStatus, type AuctionSyncStatus } from "./actions";
 
 /**
@@ -17,7 +17,19 @@ import { triggerAuctionSync, getAuctionSyncStatus, type AuctionSyncStatus } from
  */
 const POLL_MS = 3000;
 
-export function SyncPanel({ initial }: { initial: AuctionSyncStatus | null }) {
+/** Joriy yil boshi — "2026-01-01". Tugma bosilmaguncha hech narsaga ta'sir qilmaydi. */
+function yearStart(): string {
+  return `${new Date().getFullYear()}-01-01`;
+}
+
+export function SyncPanel({
+  initial,
+  credentials,
+}: {
+  initial: AuctionSyncStatus | null;
+  /** Bazada uchraydigan akkauntlar (`auctionFacets().credentials`). */
+  credentials: string[];
+}) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [st, setSt] = useState<AuctionSyncStatus | null>(initial);
@@ -30,6 +42,14 @@ export function SyncPanel({ initial }: { initial: AuctionSyncStatus | null }) {
    * Bu bayroq oraliqni yopadi: yangi run paydo bo'lgunicha "boshlanmoqda".
    */
   const [queued, setQueued] = useState(false);
+  const [open, setOpen] = useState(false);
+  // ⚠️ Standart — JORIY YIL. Diqqat: bu VAQTNI deyarli tejamaydi (o'lchangan:
+  // to'liq 16d37s ↔ joriy yil 15d3s) — sahifalar baribir to'liq o'qiladi.
+  // Foydasi bazaga keraksiz yozuvni kamaytirish (68 196 → 11 890).
+  // Tezlik kerak bo'lsa VILOYAT tanlang: bitta viloyat ~26 soniya.
+  const [from, setFrom] = useState(yearStart());
+  const [to, setTo] = useState("");
+  const [creds, setCreds] = useState<string[]>([]);
 
   const running = st?.running ?? false;
   const busy = running || queued;
@@ -86,7 +106,13 @@ export function SyncPanel({ initial }: { initial: AuctionSyncStatus | null }) {
       return `${acc}${pg} · ${st.savedLabel} yozuv`;
     }
     if (st.stale) return "Oldingi yangilash yakunlanmagan (worker to'xtagan bo'lishi mumkin)";
-    if (st.status === "DONE") return `Yakunlandi — ${st.savedLabel} yozuv`;
+    if (st.status === "DONE") {
+      // ⚠️ Sana filtri bilan ishlaganda FAQAT yozilgan sonni ko'rsatish
+      // chalg'itardi ("502 yozuv" — 68 000 lik bazada bu kam ko'rinadi).
+      // Nechtasi oraliqdan tashqarida qolgani ham aytiladi.
+      const extra = st.filtered ? `, oraliqdan tashqari ${st.filteredLabel}` : "";
+      return `Yakunlandi — ${st.savedLabel} yozuv${extra}`;
+    }
     if (st.status === "PARTIAL")
       return `Qisman: ${st.savedLabel} yozuv, xato akkauntlar — ${st.failedCredentials.join(", ")}`;
     if (st.status === "FAILED") return st.error ? `Xato: ${st.error}` : "Yangilash muvaffaqiyatsiz";
@@ -109,13 +135,24 @@ export function SyncPanel({ initial }: { initial: AuctionSyncStatus | null }) {
       : CheckCircle2;
 
   return (
-    <div className="flex min-w-[260px] flex-col items-end gap-1.5">
+    <div className="flex min-w-[280px] flex-col items-end gap-1.5">
+      <div className="flex items-center gap-1.5">
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => setOpen((v) => !v)}
+          title="Yangilash doirasi: sana va viloyat"
+          className="inline-flex items-center gap-1 rounded-lg border border-border bg-card px-2.5 py-2 text-[12px] text-slate-600 shadow-sm transition hover:bg-muted disabled:opacity-50"
+        >
+          <SlidersHorizontal className="h-3.5 w-3.5" />
+          Doira
+        </button>
       <button
         type="button"
         disabled={pending || busy}
         onClick={() =>
           start(async () => {
-            const r = await triggerAuctionSync();
+            const r = await triggerAuctionSync({ from, to, credentials: creds });
             setMsg(r.message);
             if (r.ok) setQueued(true);
             setSt(await getAuctionSyncStatus());
@@ -126,6 +163,81 @@ export function SyncPanel({ initial }: { initial: AuctionSyncStatus | null }) {
         <RefreshCw className={`h-4 w-4 ${pending || busy ? "animate-spin" : ""}`} />
         {running ? "Yangilanmoqda…" : queued ? "Boshlanmoqda…" : pending ? "Yuborilmoqda…" : "Yangilash"}
       </button>
+      </div>
+
+      {/* ⚠️ Doira tanlagich jarayon ketayotganda yopiladi — o'zgartirish ayni
+          paytdagi run'ga ta'sir qilmaydi va foydalanuvchini chalg'itardi. */}
+      {!busy && open && (
+        <div className="w-full space-y-2 rounded-lg border border-border bg-card p-3 text-left shadow-sm">
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Sanadan</span>
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => setFrom(e.target.value)}
+                className="rounded-md border border-slate-200 px-2 py-1 text-[12px]"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-[10px] uppercase tracking-wide text-muted-foreground">Gacha</span>
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => setTo(e.target.value)}
+                className="rounded-md border border-slate-200 px-2 py-1 text-[12px]"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                setFrom("");
+                setTo("");
+              }}
+              className="rounded-md border border-border px-2 py-1 text-[11px] text-slate-600 transition hover:bg-muted"
+            >
+              To&apos;liq (sanasiz)
+            </button>
+          </div>
+
+          {credentials.length > 0 && (
+            <div>
+              <div className="mb-1 text-[10px] uppercase tracking-wide text-muted-foreground">
+                Viloyatlar {creds.length === 0 && <span className="normal-case">(bo&apos;sh = hammasi)</span>}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {credentials.map((c) => {
+                  const on = creds.includes(c);
+                  return (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setCreds((v) => (on ? v.filter((x) => x !== c) : [...v, c]))}
+                      className={`rounded-md border px-2 py-0.5 text-[11px] transition ${
+                        on
+                          ? "border-transparent bg-cobalt text-white"
+                          : "border-border bg-card text-slate-600 hover:bg-muted"
+                      }`}
+                      style={on ? { background: "var(--cobalt)" } : undefined}
+                    >
+                      {c}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          <p className="text-[11px] leading-relaxed text-muted-foreground">
+            ⚠️ Sana API&apos;ga yuborilmaydi — u filtrlashni qo&apos;llab-quvvatlamaydi:
+            sahifalar baribir to&apos;liq o&apos;qiladi, shuning uchun sana{" "}
+            <strong>vaqtni deyarli tejamaydi</strong> (to&apos;liq 16 daq ↔ joriy yil 15 daq),
+            faqat bazaga keraksiz yozuvni kamaytiradi. Tez yangilash kerak bo&apos;lsa{" "}
+            <strong>viloyat tanlang</strong> — bittasi ~26 soniya. Sanasi yo&apos;q buyurtmalar
+            (yangi va bekor qilinganlar) HAR DOIM saqlanadi.
+          </p>
+        </div>
+      )}
 
       {running && (
         <div className="w-full">
@@ -145,6 +257,11 @@ export function SyncPanel({ initial }: { initial: AuctionSyncStatus | null }) {
           <Icon className={`h-3.5 w-3.5 shrink-0 ${st.running ? "animate-spin" : ""}`} />
           <span>{label()}</span>
         </span>
+      )}
+      {/* ⚠️ Doira ALBATTA ko'rsatiladi: usiz "502 yozuv" degan natija to'liq
+          yangilash deb tushunilib, ma'lumot yo'qolgandek taassurot berardi. */}
+      {st && !queued && st.scopeLabel && (
+        <span className="text-right text-[11px] text-muted-foreground">doira: {st.scopeLabel}</span>
       )}
       {queued && <span className="text-[12px] text-muted-foreground">Navbatga qo&apos;yildi, worker boshlamoqda…</span>}
       {msg && !busy && <span className="text-[12px] text-muted-foreground">{msg}</span>}

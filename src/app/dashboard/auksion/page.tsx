@@ -175,7 +175,7 @@ export default async function AuksionPage({ searchParams }: { searchParams: Prom
             )}
           </p>
         </div>
-        <SyncPanel initial={syncStatus} />
+        <SyncPanel initial={syncStatus} credentials={facets.credentials} />
       </div>
 
       {/* ⚠️ `action` ATAYLAB berilmagan — GET forma joriy URL'ga yuboradi va shu
