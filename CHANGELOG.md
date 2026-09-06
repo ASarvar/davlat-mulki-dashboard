@@ -7,6 +7,27 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.11.3
+
+- **Xarita ancha kattalashdi** va endi boshqarish qulayroq: kattalashtirish
+  **Ctrl + g'ildirak** bilan (oddiy g'ildirak sahifani aylantiradi — ilgari xarita
+  ustidan o'tayotganda sahifa "yopishib" qolardi), yon tomonda **to'liq ekran**
+  tugmasi bor.
+- **Tuzatildi: xarita ba'zan bo'sh yoki bitta plitka bo'lib chiqardi** —
+  to'liq ekranga o'tganda ham. Ikkita alohida sabab topildi va ikkalasi ham
+  bartaraf etildi (Leaflet uslublari kech yuklanishi; xarita konteynerining
+  o'z klasslari qayta chizishda o'chib ketishi).
+- **"Kategoriya taqsimoti"** kartalariga har bir kategoriyaning **ikonkasi**
+  qo'shildi; kartalar kenglikning 2/3 qismini, halqa diagramma 1/3 qismini
+  egallaydi.
+- **"Ijara shartnomalari — oylar kesimi"** grafigi endi faqat **joriy yilni**
+  ko'rsatadi. Ilgari oxirgi 24 oy chizilardi, lekin ma'lumot joriy yildan
+  boshlangani uchun grafikning yarmidan ko'pi bo'sh nol chiziq edi.
+- **"Kommunal qamrov" grafigi boshqaruv panelidan olib tashlandi**, uning o'rniga
+  **"Ijaradagi maydon"** va **"Bo'sh maydon"** alohida ikki grafik chiqdi — ilgari
+  ikkalasi bitta ustunda taxlangani uchun hududlarni bir-biri bilan solishtirib
+  bo'lmasdi. Kommunal ma'lumotlar `Rasmiy hisobot` sahifasida o'zgarishsiz qoladi.
+
 ## 1.11.2
 
 - **Boshqaruv paneli yangi ko'rinishda.** Asosiy ko'rsatkich kartalariga ikonka
