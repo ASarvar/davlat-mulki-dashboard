@@ -6,7 +6,12 @@ import { getCurrentUser } from "@/lib/authz";
 import { getBoss } from "@/server/queue/boss";
 import { QUEUE } from "@/server/queue/jobs";
 import { auctionConfigured } from "@/server/integrations/auctionOrders";
-import { latestAuctionSyncRun, isRunStale } from "@/server/services/auctionOrders";
+import {
+  latestAuctionSyncRun,
+  isRunStale,
+  type AuctionCredentialResult,
+} from "@/server/services/auctionOrders";
+import { auctionDbConfigured } from "@/server/services/auctionOrdersExternal";
 import { nf } from "@/lib/format";
 import { auctionRegionName } from "@/lib/auctionRegions";
 
@@ -40,6 +45,18 @@ export interface AuctionSyncStatus {
   error: string | null;
   /** Worker o'lib qolgani sababli osilib qolgan run. */
   stale: boolean;
+  /**
+   * Tashqi `orders` bazasiga yozishdagi xato — sinxronizatsiya YAKUNLANGAN
+   * bo'lsa ham ko'rsatiladi.
+   *
+   * ⚠️ Alohida maydon, `error` ga qo'shilmaydi: bizning reyestrimiz to'liq
+   * yozilgan, ya'ni run "DONE". Uni "FAILED" qilib ko'rsatish yolg'on bo'lardi,
+   * jim o'tkazib yuborish esa boshqa API'lar eski ma'lumot bilan qolganini
+   * yashirardi.
+   */
+  externalError: string | null;
+  /** Tashqi bazaga yozilgan yozuvlar (serverda formatlangan). */
+  externalSavedLabel: string | null;
 }
 
 /**
@@ -67,8 +84,10 @@ function toStatus(run: Awaited<ReturnType<typeof latestAuctionSyncRun>>): Auctio
   if (!run) return null;
   const stale = run.status === "RUNNING" && isRunStale(run.startedAt);
   const per = Array.isArray(run.perCredential)
-    ? (run.perCredential as { name: string; error?: string }[])
+    ? (run.perCredential as unknown as AuctionCredentialResult[])
     : [];
+  const externalError = per.find((c) => c.externalError)?.externalError ?? null;
+  const externalSaved = per.reduce((s, c) => s + (c.externalSaved ?? 0), 0);
 
   // ⚠️ Foiz IKKI darajadan: tugagan akkauntlar + joriy akkauntning sahifalari.
   // Faqat akkauntlar bo'yicha hisoblansa ko'rsatkich 14 marta sakrab, oradagi
@@ -101,6 +120,10 @@ function toStatus(run: Awaited<ReturnType<typeof latestAuctionSyncRun>>): Auctio
     scopeLabel: scopeLabel(run),
     error: run.error,
     stale,
+    externalError,
+    // ⚠️ Tashqi baza sozlanmagan bo'lsa `externalSaved` har doim 0 bo'ladi —
+    // bunda qator UMUMAN ko'rsatilmaydi ("0 ta yozildi" xato taassurot berardi).
+    externalSavedLabel: auctionDbConfigured() && externalSaved > 0 ? nf(externalSaved) : null,
   };
 }
 

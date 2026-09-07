@@ -5,8 +5,9 @@ Davlat mulki obyektlaridan foydalanish samaradorligini kuzatuvchi **ichki (inter
 
 ## Stack
 
-Next.js 15 (App Router) · TypeScript strict · Prisma + PostgreSQL · **pg-boss** (navbat, Redis YO'Q) ·
-Auth.js v5 (Credentials) · Tailwind · lucide-react · exceljs.
+Next.js 15 (App Router) · TypeScript strict · Prisma + PostgreSQL.
+Navbat — **pg-boss**, ya'ni **Redis YO'Q** (`package.json` buni aytmaydi).
+Qolgan bog'liqliklar `package.json` da.
 
 **Ikki muhit — chalkashtirmang:**
 - **Dev (Windows) — Docker YO'Q.** Postgres native (**5433-portda**), `.env`, `npm run dev`,
@@ -16,13 +17,10 @@ Auth.js v5 (Credentials) · Tailwind · lucide-react · exceljs.
 
 ## Buyruqlar
 
-```bash
-npm run dev          # ilova (3000-port MAJBURIY — NEXTAUTH_URL unga bog'langan)
-npm run worker       # fon jarayoni — sync ISHLASHI UCHUN SHART
-npm run typecheck    # tsc --noEmit
-npm run db:seed      # kategoriyalar + hududlar + super-admin
-npm run prisma:migrate
-```
+Ro'yxati `package.json` → `scripts` da. Undan chiqmaydigan ikki shart:
+
+- **`npm run dev` — 3000-port MAJBURIY** (`NEXTAUTH_URL` unga bog'langan).
+- **`npm run worker` — sinxronizatsiya ISHLASHI UCHUN SHART** (alohida jarayon).
 
 Serverda (`DEPLOY.md`da to'liq): `docker compose up -d --build` — migratsiya avtomatik.
 
@@ -806,129 +804,12 @@ Shu quyi tizimga tegsangiz o'sha skill'ni oching.
 ## Auksion buyurtmalari reyestri (`/dashboard/auksion`) — 2026-09-07
 
 ⚠️ **MUSTAQIL quyi tizim** — `Property`/`AuctionLot`/kategoriyalarga TEGMAYDI.
-Mustaqil `get-auc-order2.js` skriptidan ko'chirildi; skript endi kerak emas.
-
-`AuctionLot` (API 3/4/6) kadastr bo'yicha **bittalab** so'raladi va faqat bizning
-obyektlarimizni qamraydi. Bu API esa 14 viloyat akkaunti bo'yicha auksion
-tizimidagi **barcha** buyurtmani sahifalab to'kadi — jonli o'lchov (2026-09-07):
-**68 196 buyurtma**. Optimallashtirilgandan keyin 1 364 sahifa, **~16 daqiqa**
-(71 yozuv/s, jonli o'lchov 2026-09-07).
-
-```
-integrations/auctionOrders.ts   mijoz (fetchOrderPage, auctionCredentials)
-services/auctionOrders.ts       mapOrder + syncAuctionOrders + listAuctionOrders
-QUEUE.AUCTION_ORDERS_SYNC       worker, cron "0 2 * * *" (obyektlar sync 03:00 dan OLDIN)
-AuctionOrder (Postgres)         orderId birlamchi kalit, upsert
-AuctionSyncRun (Postgres)       jarayon holati — ekrandagi jonli ko'rsatkich
-```
-
-### Yangilash DOIRASI — sana va akkaunt (2026-09-07)
-
-⚠️ **API sana bo'yicha filtrlay OLMAYDI.** 54 ta parametr nomi sinaldi
-(`date_from`, `from_date`, `begin_date`, `start_date`, `dateFrom`, `year`,
-`period`, `since`, `after` va h.k., ikki formatda) — hech biri javobga ta'sir
-qilmadi. Tartib ham sana bo'yicha emas: QR akkauntida 2026-yil yozuvlari 25-,
-40-, 70-, 85-sahifalarda tarqoq, 2021-yil esa 1-, 85-, 95-sahifalarda. Ya'ni
-**"oxirgi sahifalardan teskari o'qib to'xtash" ham ishlamaydi.**
-
-Shuning uchun sana filtri FAQAT YOZISHDA qo'llanadi (`inScope()`): sahifalar
-baribir to'liq o'qiladi, tejash bazada. Jonli o'lchov: joriy yil = 68 196
-yozuvning **9.7%** i.
-
-⚠️ **SANASI YO'Q yozuv HAR DOIM saqlanadi** (fail-open). 5 307 yozuvda umuman
-sana yo'q (`auctionDate`, `lotPlaceDate`, `firstLotPlaceDate` — uchalasi ham),
-va ularning **367 tasi HALI FAOL**: "Buyurtma yaratilgan/yuborilgan/tasdiqni
-kutish". Oddiy sana filtri aynan eng yangi buyurtmalarni jimgina tashlab ketardi.
-
-⚠️ **Kunlik cron `{ currentYear: true }` bayrog'i bilan chaqiriladi, aniq sana
-bilan EMAS** — jadval bir marta ro'yxatdan o'tadi, aniq sana yozilsa 1-yanvarda
-eski yil bilan qotib qolardi.
-
-⚠️ **`singletonKey` doirani O'Z ICHIGA OLADI**
-(`auction-orders-sync:<from>:<to>:<akkauntlar>`) — aks holda "faqat TOSH-SH"
-so'rovi navbatdagi to'liq yangilash tufayli jimgina tashlanib ketardi.
-
-⚠️ **SANA FILTRI VAQTNI DEYARLI TEJAMAYDI** — o'lchangan (2026-09-07):
-to'liq **16d 37s** ↔ joriy yil **15d 3s** (atigi ~10%), garchi yozuvlar
-68 196 → 11 890 ga (83% kam) tushsa ham. Sabab: vaqtning deyarli hammasi
-HTTP'da (sahifalar baribir to'liq o'qiladi), bazaga yozish esa kichik ulush.
-Uning FOYDASI — bazaga keraksiz yozuvni kamaytirish (WAL/bloat), tezlik emas.
-
-⚠️ **HAQIQIY TEZLIK LEVERI — AKKAUNT filtri**: bitta viloyat + joriy yil (SIR)
-**26 soniya** (502 yozildi, 1 928 sana bo'yicha tashlandi, jami 2 430 =
-akkauntning aniq soni). "Bitta viloyatni yangilash" kerak bo'lganda shuni
-ishlating, sana filtrini emas.
-
-⚠️ **Migratsiya QO'LDA yoziladi.** `prisma migrate dev` bu loyihada ishlamaydi:
-pg_trgm GIN indekslari migratsiyadan tashqarida qo'llanadi
-(`prisma/apply-indexes.ts`) va Prisma buni "drift" deb ko'rib **butun bazani
-reset qilishni** taklif qiladi. To'g'ri yo'l: migratsiya papkasini qo'lda
-yaratib, `prisma db execute` bilan qo'llash va `prisma migrate resolve
---applied <nom>` bilan belgilash.
-
-### Tezlik — o'lchangan qiymatlar (2026-09-07)
-
-⚠️ **`per_page` ISHLAYDI va 50 da CHEGARALANADI** — 100/200/500 so'ralganda ham 50
-qaytaradi. Standart 20 edi; 50 ga o'tish so'rovlar sonini **3 417 → 1 364** qildi.
-⚠️ **Sana/holat bo'yicha filtr YO'Q**: `date_from`, `from_date`, `begin_date`,
-`start_date`, `order_statuses_id`, `sort`, `order_by` — hammasi sinaldi, javobga
-umuman ta'sir qilmadi. Ya'ni **inkremental sinxronlash imkonsiz**, har safar
-to'liq to'kish shart. Tartib ham `order_id` yoki sana bo'yicha emas (1-sahifa
-2021, oxirgisi 2023) — "yangilarigacha o'qib to'xtash" ham ishlamaydi.
-⚠️ **Sahifa parallelligi** (`AUCTION_ORDERS_CONCURRENCY`, standart 4): o'lchov —
-1 oqim 1.8 sahifa/s, 3 oqim 1.8, 6 oqim 3.5, xato 0 ta. Foyda bor, lekin chiziqli
-emas. **Akkauntlar baribir KETMA-KET** — 14 oqim shlyuzni bosardi.
-⚠️ **ASOSIY TORMOZ BIZDA EMAS**: server sahifa chuqurlashgani sari sekinlashadi —
-2-sahifa 343 ms, 25-sahifa 665 ms, 50-sahifa 1 114 ms, 99-sahifa **2 303 ms**
-(klassik OFFSET narxi). Shuning uchun `per_page` ni oshirish eng kuchli lever:
-sahifa soni kamaysa, umumiy offset narxi ham kamayadi. Parallellikni oshirish
-bundan ancha kam foyda beradi.
-⚠️ Qidiruv uchun `prisma/sql/pg_trgm.sql` da 4 ta GIN indeks (`name`, `address`,
-`lotNumber`, `customerName`) — usiz har `contains` 68 000 qatorni skanerlardi.
-⚠️ `auctionFacets()` keshlangan (5 daq), lekin `auctionTotals()` — YO'Q: worker
-`revalidateTag` chaqira olmaydi, ya'ni sinxronizatsiya tugagach ekranda eski son
-turardi. Ikkalasi shu sabab ajratilgan.
-
-⚠️ **Auth Basic EMAS** — login/parol so'rov **tanasida** ketadi va har viloyatning
-o'z juftligi bor. `http.ts` dagi umumiy Basic yordamchisi bu yerda ishlamaydi.
-
-⚠️ **`result_code !== 0` — HTTP 200 bilan keladigan mantiqiy xato** (API 2 ning
-`code: 90000` tuzog'i bilan bir xil naqsh). `res.ok` ni tekshirish yetarli emas.
-
-⚠️ **Sozlamalar `.env.auction` da** — Next.js ham, worker ham uni O'ZI o'qimaydi,
-`lib/env.ts` uni **aniq yuklaydi** (`override: false`, ya'ni `.env.production`
-dagi qiymat ustun). Eski nomlar (`API_URL`, `REGIONS_CREDENTIALS`) ham qabul
-qilinadi va `AUCTION_ORDERS_*` ga ko'chiriladi — `API_URL` bizning env fazomizda
-(API1_BASE_URL … API6_BASE_URL yonida) juda chalkash nom.
-⚠️ **`REGIONS_CREDENTIALS` — SIR**: 14 ta login/parol. Xato xabariga QO'SHMANG
-(ishlab chiqishda `JSON.parse` yiqilib butun qiymatni logga bosgan edi).
-⚠️ Skriptdagi `DB_*` kalitlari kerak emas — ma'lumot loyihaning o'z bazasiga yoziladi.
-
-⚠️ **Tartib `order_id` ham, sana ham bo'yicha EMAS** (1-sahifa 2021, oxirgisi 2023
-bo'lishi mumkin) — ya'ni "yangilarigacha o'qib to'xtash" ishonchsiz. Har safar
-to'liq to'kiladi, `orderId` bo'yicha upsert qilinadi.
-⚠️ Akkauntlar **ketma-ket** yuklanadi, parallel emas — 14 oqim shlyuzda
-`result_code` xatolarini boshlardi (kommunal API'lardagi bilan bir xil saboq).
-⚠️ `boss.ts` da unga alohida **`expireInSeconds: 1800`** beriladi; umumiy 120s
-job'ni o'rtasida uzardi (YATT indeksi bilan bir xil sabab). **Bundan kattaroq
-qo'ymang**: bu ayni paytda "worker o'lsa job qachon qayta uriniladi" degani ham —
-dastlab 7200 qo'yilgan edi va worker to'xtaganda job 2 soat `active` bo'lib
-osilib qoldi, qayta ishga tushirish ham, ekrandagi ko'rsatkich ham bloklandi.
-`AUCTION_RUN_STALE_MINUTES` (30) shu qiymatga moslashtirilgan.
-
-⚠️ Sahifa xatosi 3 marta qayta uriniladi (backoff 1/2/4s), keyin BUTUN akkauntni
-to'xtatadi — ataylab: yarim yuklangan ketma-ketlik "ma'lumot to'liq" degan
-yolg'on taassurot berardi. Boshqa akkauntlar davom etadi, natija `PARTIAL` bo'ladi.
-
-⚠️ **SHAXSIY MA'LUMOT**: g'olibning F.I.Sh., passport, JSHSHIR, telefon, manzili
-va bank hisob raqami saqlanadi. Shuning uchun `sections.ts` da `allowRoles`
-**faqat adminlar** (foydalanuvchi qarori) — bazadagi sozlama uni kengaytira
-olmaydi. Jadvalda ko'rinmaydi, faqat qator ochilganda; Excel eksporti
-`private, no-store` bilan beriladi va `requireSection("auksion")` bilan qorovullangan.
-
-⚠️ Sana `parseApi4Date()` (auction.ts) bilan o'qiladi — **ikkinchi parser
-yozmang**: API "DD.MM.YYYY" va "DD.MM.YYYY HH:mm:ss" ni beradi, API 4 dagi bilan
-aynan bir xil.
+14 viloyat akkaunti bo'yicha auksion tizimidagi BARCHA buyurtmalar (~68 000).
+⚠️ **SHAXSIY MA'LUMOT** saqlanadi (g'olibning passport, JSHSHIR, telefon), shuning
+uchun bo'lim `allowRoles` da faqat adminlarga ochiq.
+To'liq hujjat — **`auksion` skill'ida** (`.claude/skills/auksion/SKILL.md`):
+API tuzoqlari, sinxronlash mexanikasi, o'lchangan tezlik raqamlari va filtr.
+Shu quyi tizimga tegsangiz o'sha skill'ni oching.
 
 ## Ishlash tartibi — MUHIM
 

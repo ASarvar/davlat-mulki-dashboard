@@ -115,7 +115,11 @@ export function SyncPanel({
       // mumkin (foydalanuvchi ekranida bir marta "undefined" chiqdi). Yorliq
       // hech qachon "undefined" ko'rsatmasligi kerak.
       const extra = st.filtered ? `, oraliqdan tashqari ${st.filteredLabel ?? st.filtered}` : "";
-      return `Yakunlandi — ${st.savedLabel} yozuv${extra}`;
+      // ⚠️ Tashqi bazaga yozilgani ALOHIDA aytiladi: undan boshqa API'lar
+      // ma'lumot oladi, ya'ni "yakunlandi" ning o'zi yetarli emas — u yerga
+      // yetib bordimi yoki yo'qmi ko'rinib turishi kerak.
+      const ext = st.externalSavedLabel ? ` · tashqi bazaga ${st.externalSavedLabel}` : "";
+      return `Yakunlandi — ${st.savedLabel} yozuv${extra}${ext}`;
     }
     if (st.status === "PARTIAL")
       return `Qisman: ${st.savedLabel} yozuv, xato akkauntlar — ${st.failedCredentials.join(", ")}`;
@@ -282,6 +286,13 @@ export function SyncPanel({
           yangilash deb tushunilib, ma'lumot yo'qolgandek taassurot berardi. */}
       {st && !queued && st.scopeLabel && (
         <span className="text-right text-[11px] text-muted-foreground">filtr: {st.scopeLabel}</span>
+      )}
+      {/* ⚠️ Tashqi baza xatosi run "DONE" bo'lganda ham chiqadi — bizning
+          reyestrimiz to'liq, lekin boshqa API'lar ESKI ma'lumot bilan qolgan. */}
+      {st && !queued && st.externalError && (
+        <span className="text-right text-[11px] text-amber-700">
+          Tashqi bazaga yozilmadi: {st.externalError}
+        </span>
       )}
       {queued && <span className="text-[12px] text-muted-foreground">Navbatga qo&apos;yildi, worker boshlamoqda…</span>}
       {msg && !busy && <span className="text-[12px] text-muted-foreground">{msg}</span>}

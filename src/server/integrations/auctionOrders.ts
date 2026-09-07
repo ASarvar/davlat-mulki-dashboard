@@ -55,6 +55,35 @@ export function auctionConfigured(): boolean {
 /** API javobidagi bitta buyurtma — barcha maydonlar ixtiyoriy (real javobda ko'pi `null`). */
 export type RawAuctionOrder = Record<string, unknown> & { order_id?: number };
 
+/** Satrdagi BARCHA sonlar (bo'shliqlar tashlanadi, vergul o'nlik ajratgich ham bo'lishi mumkin). */
+function numbersIn(v: unknown): number[] {
+  if (typeof v === "number") return Number.isFinite(v) ? [v] : [];
+  if (typeof v !== "string") return [];
+  const found = v.replace(/\s/g, "").match(/-?\d+(?:[.,]\d+)?/g);
+  if (!found) return [];
+  return found.map((s) => Number(s.replace(",", "."))).filter((n) => Number.isFinite(n));
+}
+
+/**
+ * `lat`/`lng` juftligini o'qiydi.
+ *
+ * ⚠️ API ba'zan IKKALA koordinatani `lat` ga birga soladi —
+ * `lat: "40.303085, 68.415794"`, `lng: "68.415794"` (jonli o'lchov SIR,
+ * 2026-09-07: 2 430 yozuvdan 2 tasi). Oddiy `Number()` bunda `NaN` beradi va
+ * koordinata jimgina yo'qolardi.
+ *
+ * ⚠️ Juftlik tartibi HAR DOIM `lat, lng`, shuning uchun ikkita son topilsa
+ * IKKINCHISI uzunlik deb olinadi — birinchisini olish uzunlik o'rniga kenglikni
+ * yozib, nuqtani xaritada boshqa joyga tashlardi.
+ */
+export function parseCoordPair(rawLat: unknown, rawLng: unknown): { lat: number | null; lng: number | null } {
+  const a = numbersIn(rawLat);
+  const b = numbersIn(rawLng);
+  const lat = a[0] ?? null;
+  const lng = b.length >= 2 ? b[1] : (b[0] ?? (a.length >= 2 ? a[1] : null));
+  return { lat, lng: lng ?? null };
+}
+
 export interface OrderPage {
   /** Jami buyurtmalar (akkaunt bo'yicha). */
   total: number;

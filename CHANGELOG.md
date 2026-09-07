@@ -7,6 +7,25 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.13.0
+
+- **Auksion buyurtmalari endi TASHQI bazaga ham yoziladi** (`project.orders`).
+  Sabab: o'sha jadvaldan boshqa API'lar ma'lumot oladi — ilgari uni mustaqil
+  `get-auc-order2.js` skripti to'ldirardi. Bizning `AuctionOrder` jadvali
+  o'zgarishsiz qoladi: ro'yxat, filtr va Excel shundan o'qiydi (tashqi jadvalda
+  akkaunt ustuni ham, indekslar ham yo'q). Sozlash — `.env` da
+  `DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD` (eski `.env.auction` bloki
+  o'zgarishsiz ishlaydi) yoki `AUCTION_DATABASE_URL`. Sozlanmasa tashqi yozuv
+  o'tkazib yuboriladi.
+- **Sinxronizatsiya panelida tashqi bazaning holati ko'rinadi** — «Yakunlandi —
+  N yozuv · tashqi bazaga N», xato bo'lsa alohida sariq qatorda. Tashqi
+  bazaning nosozligi sinxronizatsiyani to'xtatmaydi: bizning reyestrimiz baribir
+  to'liq yoziladi.
+- **Koordinata o'qish tuzatildi.** API ba'zan ikkala koordinatani `lat`
+  maydoniga birga soladi (`"40.303085, 68.415794"`) — bunday yozuvlarda
+  koordinata jimgina yo'qolayotgan edi.
+- Yangi bog'liqlik qo'shilmadi.
+
 ## 1.12.1
 
 - **Nomlar soddalashtirildi.** Sidebarda «Rasmiy hisobot» → **«Hisobot»**

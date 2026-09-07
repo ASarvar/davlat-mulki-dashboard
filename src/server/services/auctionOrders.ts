@@ -6,9 +6,11 @@ import { parseApi4Date } from "@/server/integrations/auction";
 import {
   auctionCredentials,
   fetchOrderPage,
+  parseCoordPair,
   type AuctionCredential,
   type RawAuctionOrder,
 } from "@/server/integrations/auctionOrders";
+import { pushOrdersExternal } from "@/server/services/auctionOrdersExternal";
 
 /**
  * Auksion buyurtmalari — sinxronlash va o'qish.
@@ -102,8 +104,8 @@ export function mapOrder(raw: RawAuctionOrder, credential: string) {
     bankName: str(raw.bank_name),
     bankMfo: str(raw.bank_mfo),
 
-    lat: num(raw.lat),
-    lng: num(raw.lng),
+    // ⚠️ `num()` EMAS: API ba'zan ikkala koordinatani `lat` ga birga soladi.
+    ...parseCoordPair(raw.lat, raw.lng),
 
     protocolFileUrl: str(raw.protocol_file_url),
     isDowngradeAuction: int(raw.is_downgrade_auction),
@@ -118,9 +120,29 @@ export function mapOrder(raw: RawAuctionOrder, credential: string) {
 
 // ── Sinxronlash ─────────────────────────────────────────────────────────────
 
+/**
+ * Akkaunt bo'yicha yakun — `AuctionSyncRun.perCredential` JSON'ida ham shu shakl.
+ *
+ * ⚠️ `interface` EMAS, `type`: Prisma'ning `InputJsonValue` tipi indeks
+ * imzosini talab qiladi va `interface` uni bermaydi (TS cheklovi) — bu shakl
+ * to'g'ridan-to'g'ri Json ustunga yoziladi.
+ */
+export type AuctionCredentialResult = {
+  name: string;
+  saved: number;
+  pages: number;
+  error?: string;
+  /** Tashqi `orders` jadvaliga yozilgan yozuvlar. */
+  externalSaved?: number;
+  /** Tashqi jadval QABUL QILMAGAN yozuvlar (bittalab urinishdan keyin ham). */
+  externalFailed?: number;
+  /** Tashqi bazaga yozishdagi BIRINCHI xato (sinxronizatsiyani to'xtatmaydi). */
+  externalError?: string;
+};
+
 export interface AuctionSyncResult {
   /** Akkaunt bo'yicha: nechta yozuv saqlandi. */
-  perCredential: { name: string; saved: number; pages: number; error?: string }[];
+  perCredential: AuctionCredentialResult[];
   saved: number;
   /** `order_id` siz kelgan (saqlanmagan) yozuvlar. */
   skipped: number;
@@ -188,17 +210,29 @@ function inScope(row: { auctionDate: Date | null; lotPlaceDate: Date | null }, s
   return true;
 }
 
-/** Sahifadagi yozuvlarni bazaga yozadi va nechtasi saqlanganini qaytaradi. */
+/**
+ * Sahifadagi yozuvlarni bazaga yozadi va nechtasi saqlanganini qaytaradi.
+ *
+ * ⚠️ IKKI BAZAGA yoziladi: bizniki (ro'yxat/filtr/Excel shundan o'qiydi) va
+ * TASHQI `orders` jadvali (undan boshqa API'lar ma'lumot oladi). Ikkalasiga ham
+ * AYNAN bir xil to'plam — sana filtridan o'tganlar — tushadi.
+ *
+ * ⚠️ Tashqi bazaning xatosi sinxronizatsiyani TO'XTATMAYDI: u boshqa tizim va
+ * uning nosozligi bizning reyestrimizni yarim yuklangan holda qoldirmasligi
+ * kerak. Xato sanaladi va akkaunt hisobotida ko'rsatiladi.
+ */
 async function persistPage(orders: RawAuctionOrder[], credName: string, scope: DateScope) {
-  const rows = orders.map((o) => mapOrder(o, credName));
-  const mapped = rows.filter((r): r is NonNullable<typeof r> => r !== null);
-  const valid = mapped.filter((r) => inScope(r, scope));
-  const filtered = mapped.length - valid.length;
+  type Pair = { raw: RawAuctionOrder; data: NonNullable<ReturnType<typeof mapOrder>> };
+  const pairs = orders
+    .map((raw) => ({ raw, data: mapOrder(raw, credName) }))
+    .filter((p): p is Pair => p.data !== null);
+  const valid = pairs.filter((p) => inScope(p.data, scope));
+  const filtered = pairs.length - valid.length;
 
   // ⚠️ Bitta `$transaction` — Prisma uni BITTA batch qilib yuboradi. Skript har
   // yozuv uchun alohida BEGIN/COMMIT qilardi, ya'ni 68 000 ta tranzaksiya.
   await prisma.$transaction(
-    valid.map((data) =>
+    valid.map(({ data }) =>
       prisma.auctionOrder.upsert({
         where: { orderId: data.orderId },
         // ⚠️ `createdAt` yangilanmaydi — birinchi ko'rilgan vaqt saqlanib qolsin.
@@ -208,7 +242,28 @@ async function persistPage(orders: RawAuctionOrder[], credName: string, scope: D
     ),
   );
 
-  return { saved: valid.length, skipped: rows.length - mapped.length, filtered };
+  let externalSaved = 0;
+  let externalFailed = 0;
+  let externalError: string | undefined;
+  try {
+    const r = await pushOrdersExternal(valid.map((p) => p.raw));
+    externalSaved = r.saved;
+    externalFailed = r.failed;
+    externalError = r.error;
+  } catch (e) {
+    // Ulanish umuman ochilmagan holat (jadval yo'q, parol xato) — bu yerda tushadi.
+    externalFailed = valid.length;
+    externalError = e instanceof Error ? e.message : String(e);
+  }
+
+  return {
+    saved: valid.length,
+    skipped: orders.length - pairs.length,
+    filtered,
+    externalSaved,
+    externalFailed,
+    externalError,
+  };
 }
 
 /**
@@ -226,15 +281,30 @@ async function syncCredential(
   scope: DateScope,
   /** `saved` — SHU akkaunt bo'yicha shu paytgacha yozilgani (jamlanma emas). */
   onProgress?: (page: number, pages: number, saved: number) => Promise<void> | void,
-): Promise<{ saved: number; skipped: number; filtered: number; pages: number }> {
+): Promise<{
+  saved: number;
+  skipped: number;
+  filtered: number;
+  pages: number;
+  externalSaved: number;
+  externalFailed: number;
+  externalError?: string;
+}> {
   const first = await fetchOrderPage(cred, 1);
   const pages = first.pages;
-  if (first.orders.length === 0) return { saved: 0, skipped: 0, filtered: 0, pages };
+  if (first.orders.length === 0) {
+    return { saved: 0, skipped: 0, filtered: 0, pages, externalSaved: 0, externalFailed: 0 };
+  }
 
   const acc = await persistPage(first.orders, cred.name, scope);
   let saved = acc.saved;
   let skipped = acc.skipped;
   let filtered = acc.filtered;
+  let externalSaved = acc.externalSaved;
+  let externalFailed = acc.externalFailed;
+  // ⚠️ BIRINCHI xato saqlanadi, oxirgisi emas: keyingilar odatda o'sha sabab
+  // (ulanish uzilgan) takrori bo'ladi va asl xabarni yashirib qo'yardi.
+  let externalError = acc.externalError;
   await onProgress?.(1, pages, saved);
 
   const conc = env.AUCTION_ORDERS_CONCURRENCY;
@@ -254,13 +324,16 @@ async function syncCredential(
       saved += r.saved;
       skipped += r.skipped;
       filtered += r.filtered;
+      externalSaved += r.externalSaved;
+      externalFailed += r.externalFailed;
+      externalError ??= r.externalError;
     }
 
     await onProgress?.(Math.min(start + conc - 1, pages), pages, saved);
     if (env.AUCTION_ORDERS_DELAY_MS > 0) await delay(env.AUCTION_ORDERS_DELAY_MS);
   }
 
-  return { saved, skipped, filtered, pages };
+  return { saved, skipped, filtered, pages, externalSaved, externalFailed, externalError };
 }
 
 /**
@@ -319,7 +392,17 @@ export async function syncAuctionOrders(opts: AuctionSyncOptions = {}): Promise<
             data: { page, pages, saved: saved + credSaved, skipped },
           });
         });
-        perCredential.push({ name: cred.name, saved: r.saved, pages: r.pages });
+        if (r.externalError) {
+          console.error(`Auksion tashqi bazaga yozish xatosi (${cred.name}): ${r.externalError}`);
+        }
+        perCredential.push({
+          name: cred.name,
+          saved: r.saved,
+          pages: r.pages,
+          externalSaved: r.externalSaved,
+          externalFailed: r.externalFailed,
+          externalError: r.externalError,
+        });
         saved += r.saved;
         skipped += r.skipped;
         filtered += r.filtered;

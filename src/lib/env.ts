@@ -30,6 +30,24 @@ if (!process.env.AUCTION_ORDERS_CREDENTIALS && process.env.REGIONS_CREDENTIALS) 
   process.env.AUCTION_ORDERS_CREDENTIALS = process.env.REGIONS_CREDENTIALS;
 }
 
+/**
+ * ⚠️ Skriptning bazasi — `DB_HOST`/`DB_PORT`/`DB_NAME`/`DB_USER`/`DB_PASSWORD`
+ * (`get-auc-order2.js` aynan shu 5 tasini o'qiydi). Bizga esa bitta ulanish satri
+ * kerak, shuning uchun ular shu yerda `AUCTION_DATABASE_URL` ga yig'iladi —
+ * foydalanuvchi eski `.env.auction` blokini O'ZGARTIRMASDAN qo'ya oladi.
+ *
+ * ⚠️ Login/parol `encodeURIComponent` bilan qochiriladi: parolda `@` yoki `/`
+ * bo'lsa satr jimgina noto'g'ri xostga ulanardi.
+ * ⚠️ `AUCTION_DATABASE_URL` to'g'ridan-to'g'ri berilgan bo'lsa — O'SHA ustun.
+ */
+if (!process.env.AUCTION_DATABASE_URL && process.env.DB_HOST && process.env.DB_NAME) {
+  const user = encodeURIComponent(process.env.DB_USER ?? "");
+  const pass = encodeURIComponent(process.env.DB_PASSWORD ?? "");
+  const auth = user ? `${user}${pass ? `:${pass}` : ""}@` : "";
+  const port = process.env.DB_PORT || "5432";
+  process.env.AUCTION_DATABASE_URL = `postgresql://${auth}${process.env.DB_HOST}:${port}/${process.env.DB_NAME}`;
+}
+
 // Server-side env validatsiyasi. Yaroqsiz konfiguratsiyada ilova ishga tushmaydi.
 const schema = z.object({
   DATABASE_URL: z.string().url(),
@@ -213,6 +231,23 @@ const schema = z.object({
   AUCTION_ORDERS_DELAY_MS: z.coerce.number().int().nonnegative().default(100),
   /** Sahifa uchun urinishlar soni (backoff bilan) — xato butun akkauntni to'xtatadi. */
   AUCTION_ORDERS_MAX_ATTEMPTS: z.coerce.number().int().positive().default(3),
+  /**
+   * TASHQI baza — auksion buyurtmalari SHU YERGA HAM yoziladi (`orders` jadvali).
+   *
+   * ⚠️ Nima uchun ikkinchi baza: o'sha bazadan BOSHQA API'lar ham ma'lumot oladi
+   * (foydalanuvchi talabi, 2026-09-07). Bizning `AuctionOrder` jadvali saqlanadi —
+   * ro'yxat, filtr va Excel o'sha yerdan o'qiydi (tashqi jadvalda `credential`
+   * ustuni ham, indekslar ham yo'q).
+   * ⚠️ Sozlanmagan bo'lsa tashqi yozuv butunlay o'tkazib yuboriladi — xato emas.
+   * ⚠️ `DB_HOST`/`DB_NAME`/… berilgan bo'lsa yuqorida avtomatik yig'iladi.
+   */
+  AUCTION_DATABASE_URL: z.string().url().optional(),
+  /**
+   * Tashqi bazadagi jadval nomi.
+   * ⚠️ SQL ga XOM qo'shiladi (identifikatorni parametrlab bo'lmaydi), shuning
+   * uchun `auctionOrdersExternal.ts` da qat'iy naqsh bilan tekshiriladi.
+   */
+  AUCTION_ORDERS_TABLE: z.string().default("orders"),
 
   // Rate-limit / retry
   API_RATE_MAX: z.coerce.number().int().positive().default(10),
