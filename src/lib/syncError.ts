@@ -24,6 +24,10 @@ const API_LABEL: Record<string, string> = {
   UTIL_GAS: "Gaz (Hududgaz)",
   UTIL_ELECTRIC: "Elektr (HET)",
   UTIL_ELECTRIC_DETAIL: "Elektr tafsiloti (HET 2-bosqich)",
+  // ⚠️ Yagona KICHIK harfli kalit — `cadData.ts` xabarlarni shu prefiks bilan
+  // yozadi. API 2 ning o'rnini bosgan (2026-09-06), shuning uchun yorlig'i ham
+  // o'sha ma'noda.
+  cad_data: "cad_data — kadastr asosiy ma'lumoti (API 2 o'rniga)",
 };
 
 export interface SyncErrorInfo {
@@ -39,7 +43,12 @@ export interface SyncErrorInfo {
   raw: string;
 }
 
-const PREFIX_RE = /^([A-Z0-9_]+):\s*/;
+/**
+ * ⚠️ Kichik harfli kalitlar ANIQ sanaladi, `[A-Za-z_]+` deb kengaytirilmaydi:
+ * xabarlarning ko'pi oddiy o'zbekcha jumla va undagi birinchi so'zdan keyin
+ * ikki nuqta kelsa ("Xatolik: …") u API prefiksi deb o'qilib ketardi.
+ */
+const PREFIX_RE = /^([A-Z0-9_]+|cad_data):\s*/;
 
 /**
  * Xato sababini aniqlaydi. Tartib MUHIM — aniqroq naqshlar yuqorida turadi
@@ -63,7 +72,22 @@ function explain(message: string): Pick<SyncErrorInfo, "reason" | "blame"> {
       blame: "external",
     };
   }
-  if (/kadastr raqami topilmadi|topilmadi \(404\)/.test(m)) {
+  // ⚠️ `cad_data` xato kodlari — `integrations/cadData.ts` → `ERROR_LABEL`.
+  // Ular "[2032] kadastr topilmadi" shaklida keladi; umumiy naqsh
+  // ("kadastr RAQAMI topilmadi") ularga tushmasdi va xato "Aniqlanmadi" bo'lib
+  // ko'rinardi (foydalanuvchi ekranida shunday chiqdi, 2026-09-07).
+  if (/tashkilotga tegishli emas/.test(m)) {
+    return {
+      reason:
+        "Obyekt endi bu tashkilotga tegishli emas — balansdan chiqqan bo'lishi mumkin. " +
+        "Kadastr raqami to'g'ri, lekin so'ralgan STIR egasi bilan mos kelmadi",
+      blame: "data",
+    };
+  }
+  if (/stir noto'g'ri formatda|stir berilmagan/.test(m)) {
+    return { reason: "Tashkilotning STIR raqami yo'q yoki noto'g'ri formatda", blame: "config" };
+  }
+  if (/kadastr(?: raqami)? topilmadi|obyekt topilmadi|topilmadi \(404\)/.test(m)) {
     return { reason: "Bu kadastr raqami tashqi bazada topilmadi", blame: "data" };
   }
   if (/abort|timeout|vaqt tugadi/.test(m)) {

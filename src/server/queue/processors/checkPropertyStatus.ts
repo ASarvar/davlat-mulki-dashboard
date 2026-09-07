@@ -160,7 +160,9 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
    */
   let cadCoords: { lat: number; lng: number } | null = null;
   if (refreshBase) {
-    const base = await fetchBase(cadNumber, current.source?.stir);
+    // ⚠️ Eski kadastr UZATILADI: `cad_data` yangi raqamni topmasa u bilan qayta
+    // uriladi (boshqa tekshiruvlar allaqachon shunday qiladi — `callWithCadFallback`).
+    const base = await fetchBase(cadNumber, current.source?.stir, cadNumberOld);
     if (base.ok) {
       const b = base.data;
       // Tuman API 2 bilan birga keladi — obyekt hududi bo'yicha District upsert qilamiz.

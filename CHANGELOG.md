@@ -7,6 +7,20 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+- **Asosiy ma'lumot topilmasa endi zaxira zanjiri ishlaydi.** `cad_data` obyektni
+  topmasa avval ESKI kadastr raqami bilan qayta uriladi, so'ng API 2 ga tushiladi
+  (auksion/ijara/kommunal tekshiruvlari allaqachon shunday ishlardi, asosiy
+  ma'lumot esa urinmasdi va obyekt bo'sh qolib ketardi). Xato bo'lsa ekranda
+  asosiy manbaning sababi ko'rsatiladi.
+- **Sinxronizatsiya xatolari to'g'ri tasniflanadi.** `cad_data` xatolari «Qaysi
+  API ekani aniqlanmadi / Aniqlanmadi» bo'lib chiqayotgan edi — sabab prefiks
+  faqat bosh harfli kalitlarni tanirdi. Endi `2030`/`2032`/`2108` va `404`
+  uchun alohida o'zbekcha tushuntirish bor (masalan «Obyekt endi bu tashkilotga
+  tegishli emas — balansdan chiqqan bo'lishi mumkin»).
+- **Baza zaxiralari Docker image'iga tushmaydi** — `.dockerignore` ga `*.sql.gz`
+  va shu kabi qoidalar qo'shildi. Server papkasida turgan dump'lar `worker`
+  image'i ichiga ko'chib qolayotgan edi.
+
 ## 1.13.0
 
 - **Auksion buyurtmalari endi TASHQI bazaga ham yoziladi** (`project.orders`).

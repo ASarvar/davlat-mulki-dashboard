@@ -15,6 +15,15 @@ build
 data
 uploads
 
+# ⚠️ Baza zaxiralari. Server papkasida `db-2026-08-17.sql.gz` kabi fayllar
+# turgan edi va ular build kontekstiga kirardi: `Dockerfile` da `COPY . .`
+# bor, `tools` bosqichi esa `builder` dan meros oladi — ya'ni BUTUN baza
+# dump'i ishlab turgan worker image'i ichida qolardi.
+*.sql
+*.sql.gz
+*.dump
+*.tar.gz
+
 # Git / IDE / OS
 .git
 .gitignore

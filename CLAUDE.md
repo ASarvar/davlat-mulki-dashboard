@@ -322,7 +322,9 @@ eski kadastr va nom mosligi — **100%** (117 obyektda tekshirilgan).
 2. **Balansdan chiqqan obyektning YANGI egasini aniqlash yangi API bilan MUMKIN EMAS** —
    biz u yerda aynan egani qidiramiz, ya'ni STIRni oldindan bilmaymiz. Shuning uchun
    `syncSource.ts` dagi holder-lookup ATAYLAB eski API 2 da qoldirilgan. **API 2 ni
-   sozlamadan olib tashlamang.**
+   sozlamadan olib tashlamang** — u `fetchBase()` ning zaxira zanjirida ham
+   ishlatiladi (`cad_data` topmasa: eski kadastr → API 2 → API 2 + eski kadastr;
+   xato bo'lsa ASOSIY manbaning sababi qaytariladi).
 3. `2108` amalda "balansdan chiqqan" signali, lekin unga qarab AVTOMATIK
    `removedFromBalance` qilinmaydi — bu qaror API 1 ning ro'yxati bo'yicha qabul
    qilinadi (yolg'on ijobiy natijaning oldini olish).
