@@ -36,6 +36,33 @@ tayanadi, xabar MATNI hech qachon solishtirilmaydi.
 | `NO_WORKERS` | false | baza javob berdi, shartnoma yo'q — **haqiqiy fakt** |
 | `INCONCLUSIVE_SOLIQ` / `_TIEK` / `_YATT_INDEX` | **null** | aniqlab bo'lmadi |
 
+### ⚠️ Standart hisobot davri — `defaultPeriod()` (2026-09-08)
+
+Davr berilmasa **o'tgan oy** olinadi. Hisoblash `lib/imtiyoz.ts` → `defaultPeriod()` da,
+**yagona joyda**: sahifadagi forma (`CheckForm.tsx`) ham, ochiq endpoint (`evaluate.ts`) ham
+shuni chaqiradi.
+
+⚠️ Ilgari ular AJRALGAN edi va bu jonli xatoga olib keldi (foydalanuvchi topdi): endpointda
+standart qattiq **`period = 1` (yanvar)**, sahifada esa o'tgan oy hisoblanardi. Natijada bir
+xil STIR bir kunda ikki xil javob berardi —
+
+```
+STIR 310853491, 2026-09-08:
+  parametrsiz (forma) → 2026/1  → 2 xodim, 0 nogiron   → NOT_ELIGIBLE
+  ?year=2026&period=8 → 2026/8  → 5 xodim, 3 nogiron   → ELIGIBLE
+```
+
+ya'ni shartnoma formasi 8 oylik eskirgan ma'lumot bo'yicha imtiyozni RAD qilardi.
+Eski Express ilovada ham xuddi shu standart bor edi (`index.js:603`) — ko'chirishda paydo
+bo'lgan xato emas, yil boshida bilinmay kelgan.
+
+⚠️ **Joriy oy so'ralmaydi** — Soliq bazasi uni hali to'ldirmagan bo'ladi. Jonli o'lchov
+(o'sha STIR): oy 6/7/8 → 5 xodim, **oy 9 → 0 xodim** (`NO_WORKERS`). Joriy oyni so'rash
+yolg'on rad javobi bo'lardi.
+
+⚠️ Yanvarda o'tgan oy — O'TGAN YILNING dekabri. `new Date(y, -1, 1)` shuni to'g'ri beradi
+(sinovda tekshirilgan: 2026-01-15 → 2025/12).
+
 ### YATT indeksi — ⚠️ asl ilovadan ENG KATTA farq
 
 `yatt_workers` endpoint tadbirkor bo'yicha **FILTRLAMAYDI**: har bir so'rov butun respublika

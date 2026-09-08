@@ -7,6 +7,14 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.13.1
+
+- **Ijara imtiyozi: shartnoma formasi noto'g'ri davr bo'yicha javob berayotgan edi.**
+  Davr ko'rsatilmasa tizim **yanvar** ma'lumotini olardi (sahifadagi forma esa o'tgan oyni).
+  Natijada bir xil STIR uchun forma «imtiyoz yo'q», sahifa «imtiyoz bor» deb ko'rsatishi
+  mumkin edi — jonli holatda aynan shunday bo'ldi (yanvarda 2 xodim, avgustda 5 xodim).
+  Endi ikkalasi ham bitta `defaultPeriod()` funksiyasidan o'tgan oyni oladi.
+
 - **Asosiy ma'lumot topilmasa endi zaxira zanjiri ishlaydi.** `cad_data` obyektni
   topmasa avval ESKI kadastr raqami bilan qayta uriladi, so'ng API 2 ga tushiladi
   (auksion/ijara/kommunal tekshiruvlari allaqachon shunday ishlardi, asosiy

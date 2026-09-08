@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Loader2, Search } from "lucide-react";
 import { withBase } from "@/lib/basePath";
-import { classifySubject, type ImtiyozResult } from "@/lib/imtiyoz";
+import { classifySubject, defaultPeriod, type ImtiyozResult } from "@/lib/imtiyoz";
 import { ResultView } from "./ResultView";
 import { HealthPanel } from "./HealthPanel";
 
@@ -38,11 +38,12 @@ export function CheckForm({ operator }: { operator: string }) {
   // Standart davr — O'TGAN oy (joriy oy hali to'liq yakunlanmagan bo'lishi mumkin).
   const [year, setYear] = useState("");
   const [period, setPeriod] = useState("");
+  // ⚠️ Hisoblash `defaultPeriod()` da — ochiq endpoint ham SHU funksiyani
+  // ishlatadi, ya'ni sahifa va forma hech qachon ajralib qolmaydi.
   useEffect(() => {
-    const now = new Date();
-    const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    setYear(String(prev.getFullYear()));
-    setPeriod(String(prev.getMonth() + 1));
+    const d = defaultPeriod();
+    setYear(String(d.year));
+    setPeriod(String(d.period));
   }, []);
 
   const subject = classifySubject(raw);

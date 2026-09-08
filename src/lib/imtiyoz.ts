@@ -112,6 +112,28 @@ export const WORKER_STATUS_LABEL: Record<ImtiyozWorkerStatus, string> = {
   failed: "Tekshirilmadi",
 };
 
+/**
+ * Standart hisobot davri — **O'TGAN oy**.
+ *
+ * ⚠️ Nima uchun joriy oy EMAS: Soliq bazasi joriy oyni hali to'ldirmagan bo'ladi.
+ * Jonli o'lchov (STIR 310853491, 2026-09-08): oy 6/7/8 → 5 xodim, oy 9 → **0 xodim**
+ * (`NO_WORKERS`). Ya'ni joriy oyni so'rash yolg'on rad javobiga olib kelardi.
+ *
+ * ⚠️ YAGONA JOY — sahifadagi forma ham (`CheckForm.tsx`), ochiq endpoint ham
+ * (`evaluate.ts`) shu funksiyani chaqiradi. Ilgari ular AJRALGAN edi: endpointda
+ * standart qattiq `period = 1` (yanvar) edi, sahifa esa o'tgan oyni hisoblardi.
+ * Natijada bir xil STIR bir kunda ikki xil javob berardi — shartnoma formasi
+ * yanvar ma'lumoti asosida "imtiyoz yo'q" deb rad qilar, sahifa esa avgust
+ * bo'yicha "imtiyoz qo'llaniladi" derdi (foydalanuvchi topdi, 2026-09-08).
+ *
+ * ⚠️ Yanvarda o'tgan oy — O'TGAN YILNING dekabri (`new Date(y, -1, 1)` shuni beradi).
+ * ⚠️ Server vaqt mintaqasiga tayanadi (`TZ=Asia/Tashkent`, `.env.production`).
+ */
+export function defaultPeriod(now: Date = new Date()): { year: number; period: number } {
+  const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  return { year: prev.getFullYear(), period: prev.getMonth() + 1 };
+}
+
 export interface SubjectClassification {
   valid: boolean;
   normalized: string;

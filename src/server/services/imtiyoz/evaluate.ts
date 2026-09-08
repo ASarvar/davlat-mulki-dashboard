@@ -22,6 +22,7 @@ import { prisma } from "@/lib/prisma";
 import { env } from "@/lib/env";
 import {
   classifySubject,
+  defaultPeriod,
   type ImtiyozResult,
   type ImtiyozWorkerRow,
   type ImtiyozWorkerStatus,
@@ -220,8 +221,13 @@ export async function evaluateEligibility(
   const startedAt = Date.now();
   const subject = classifySubject(subjectIdRaw);
   const tin = subject.normalized;
-  const year = Number(options.year) || new Date().getFullYear();
-  const period = Number(options.period) || 1;
+  // ⚠️ Standart davr `defaultPeriod()` dan — ilgari bu yerda qattiq `period = 1`
+  // (yanvar) turardi va ochiq endpoint (shartnoma formasi) 8 oylik eskirgan
+  // ma'lumot bo'yicha javob berardi. Sahifadagi forma esa o'tgan oyni o'zi
+  // hisoblardi, ya'ni ikkalasi bir kunda qarama-qarshi xulosa chiqarardi.
+  const fallback = defaultPeriod();
+  const year = Number(options.year) || fallback.year;
+  const period = Number(options.period) || fallback.period;
   const refresh = !!options.refresh;
   const key = cacheKeyOf(tin, year, period);
 
