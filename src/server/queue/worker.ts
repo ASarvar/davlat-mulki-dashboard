@@ -22,6 +22,7 @@ import { takeDashboardSnapshot } from "@/server/services/snapshots";
 import { imtiyozConfigured } from "@/server/integrations/imtiyoz";
 import { auctionConfigured } from "@/server/integrations/auctionOrders";
 import { syncAuctionOrders, currentYearStart } from "@/server/services/auctionOrders";
+import { syncAuctionOrderDetails } from "@/server/services/auctionOrderDetails";
 
 const leafOpts: PgBoss.WorkOptions = {
   batchSize: env.WORKER_CONCURRENCY,
@@ -215,6 +216,33 @@ async function main() {
         (r.skipped ? `, order_id siz ${r.skipped} ta o'tkazildi` : "") +
         (failed.length ? `, XATO akkauntlar: ${failed.map((c) => c.name).join(", ")}` : ""),
     );
+    // ⚠️ Tafsilotlar (ijara maydoni, kadastr) — ALOHIDA job: har buyurtmaga
+    // alohida so'rov, birinchi to'ldirish ~6 000 ta. Shu job ichida qilinsa
+    // 30 daqiqalik `expireInSeconds` dan oshib, pg-boss uni ishlab turgan
+    // paytda qayta boshlab yuborishi mumkin edi.
+    await boss.send(QUEUE.AUCTION_DETAILS_SYNC, {}, { singletonKey: "auction-details" });
+  });
+
+  await boss.work(QUEUE.AUCTION_DETAILS_SYNC, async () => {
+    if (!auctionConfigured()) return;
+    const r = await syncAuctionOrderDetails();
+    console.log(
+      `[auction-details] ${r.checked}/${r.candidates} tekshirildi` +
+        ` (maydon ${r.withRentArea}, kadastr ${r.withCadastre}, topilmadi ${r.notFound})` +
+        `, tashqi bazaga ${r.externalUpdated}` +
+        (r.failed ? `, XATO ${r.failed}: ${r.firstError}` : "") +
+        (r.mismatched ? `, boshqa buyurtma qaytgan ${r.mismatched}` : "") +
+        (r.externalFailed ? `, tashqi baza xatosi ${r.externalFailed}` : "") +
+        `, qoldi ${r.remaining}, ${Math.round(r.ms / 1000)}s`,
+    );
+    // ⚠️ Vaqt chegarasiga yetib to'xtagan va OLG'A SILJIGAN bo'lsa — davomi.
+    // `singletonKey` YO'Q: faol job o'z kalitini band qilib turadi va takroriy
+    // `send` jimgina rad etilardi. Navbat bitta-bitta ishlaydi, ya'ni ikki nusxa
+    // parallel ketmaydi. `checked > 0` sharti — hech narsa siljimasa aylanib
+    // qolmasin.
+    if (r.stoppedByBudget && r.remaining > 0 && r.checked > 0) {
+      await boss.send(QUEUE.AUCTION_DETAILS_SYNC, {});
+    }
   });
   // ⚠️ Kunlik jadval FAQAT JORIY YILNI yangilaydi (foydalanuvchi qarori,
   // 2026-09-07): tugagan auksionlar o'zgarmaydi, ya'ni 2019–2025 yozuvlarini

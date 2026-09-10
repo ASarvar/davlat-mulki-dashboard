@@ -162,3 +162,69 @@ export async function fetchOrderPage(cred: AuctionCredential, page: number): Pro
   }
   throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
 }
+
+/** Buyurtmaning `details[]` massividagi bitta element (`{key, value, ...}`). */
+export interface OrderDetail {
+  key?: string;
+  value?: unknown;
+  [k: string]: unknown;
+}
+
+export type OrderDetailsResult =
+  | { status: "ok"; details: OrderDetail[] }
+  | { status: "not_found" }
+  | { status: "mismatch"; got: number | null };
+
+/**
+ * BITTA buyurtma — `details[]` bilan (ijara maydoni, kadastr raqami).
+ *
+ * ⚠️ Ommaviy (sahifalab) javobda `details` YO'Q — ular faqat `order: <id>` bilan
+ * so'ralganda keladi (ilgari buni ikkita mustaqil skript qilardi).
+ * ⚠️ Login/parol — buyurtmachining akkaunti (`customer_inn`). Xato xabariga
+ * login ham, parol ham QO'SHILMAYDI — faqat buyurtma raqami.
+ * ⚠️ Javobdagi `order_id` so'ralgani bilan SOLISHTIRILADI (`mismatch`): bu API
+ * ko'p parametrni jimgina e'tiborsiz qoldiradi (sana filtri — 54 nom sinalgan).
+ * `order` ham e'tiborsiz qolsa, begona buyurtmaning kadastri yozilib ketardi.
+ */
+export async function fetchOrderDetails(
+  orderId: number,
+  username: string,
+  password: string,
+): Promise<OrderDetailsResult> {
+  const url = env.AUCTION_ORDERS_URL;
+  if (!url) throw new Error("AUCTION_ORDERS_URL sozlanmagan");
+
+  let lastErr: unknown;
+  for (let attempt = 1; attempt <= env.AUCTION_ORDERS_MAX_ATTEMPTS; attempt++) {
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ order: orderId, username, password, language: "uz" }),
+        signal: AbortSignal.timeout(env.API_TIMEOUT_MS * 2),
+      });
+      if (!res.ok) throw new Error(`get-order HTTP ${res.status} (buyurtma ${orderId})`);
+
+      const data = (await res.json()) as {
+        result_code?: number;
+        result_msg?: string;
+        orders?: RawAuctionOrder[];
+      };
+      if (data.result_code !== 0) {
+        throw new Error(`get-order xatosi (buyurtma ${orderId}): ${data.result_msg ?? data.result_code}`);
+      }
+
+      const o = data.orders?.[0];
+      if (!o) return { status: "not_found" };
+      const got = Number(o.order_id);
+      if (got !== orderId) return { status: "mismatch", got: Number.isFinite(got) ? got : null };
+      const details = (o as { details?: unknown }).details;
+      return { status: "ok", details: Array.isArray(details) ? (details as OrderDetail[]) : [] };
+    } catch (e) {
+      lastErr = e;
+      if (attempt === env.AUCTION_ORDERS_MAX_ATTEMPTS) break;
+      await new Promise((r) => setTimeout(r, 1000 * 2 ** (attempt - 1)));
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error(String(lastErr));
+}

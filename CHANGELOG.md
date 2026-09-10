@@ -7,6 +7,15 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.15.0
+
+- **Auksion buyurtmalariga ijara maydoni va kadastr raqami qo'shildi.** Ular
+  ommaviy yuklashda kelmaydi — har buyurtma uchun alohida so'raladi va IKKALA
+  bazaga (bizniki va tashqi `orders`) yoziladi. Ilgari buni ikkita alohida skript
+  qilardi. Buyurtma qatori ochilganda va Excel'da ko'rinadi. Yangilash ommaviy
+  sinxronizatsiyadan keyin avtomatik boshlanadi; birinchi to'ldirish bir necha
+  bosqichda davom etishi mumkin.
+
 ## 1.14.0
 
 - **Sessiya endi 1 soat faolsizlikdan keyin tugaydi.** Ilgari muddat berilmagan edi

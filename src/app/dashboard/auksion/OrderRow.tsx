@@ -47,6 +47,9 @@ export interface OrderView {
   lotPlaceDateLabel: string;
   termLabel: string;
   coordsLabel: string | null;
+  cadastreNumber: string | null;
+  /** Serverda formatlangan ("123,45 m²"). */
+  rentAreaLabel: string | null;
 }
 
 function Field({ label, value }: { label: string; value: string | null | undefined }) {
@@ -119,6 +122,8 @@ export function OrderRow({ order: o }: { order: OrderView }) {
               <Field label="To'langan summa" value={o.paidPriceLabel} />
               <Field label="To'lov shartlari" value={o.termLabel} />
               <Field label="Koordinata" value={o.coordsLabel} />
+              <Field label="Kadastr raqami" value={o.cadastreNumber} />
+              <Field label="Ijara maydoni" value={o.rentAreaLabel} />
 
               <div className="col-span-2 md:col-span-4">
                 <div className="mb-2 mt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">

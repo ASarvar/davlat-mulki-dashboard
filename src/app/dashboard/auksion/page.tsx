@@ -74,6 +74,12 @@ function toOrderView(o: AuctionOrder): OrderView {
     termLabel:
       o.termPayment === 1 ? `Bo'lib to'lash${o.termMonth ? ` — ${o.termMonth} oy` : ""}` : "To'liq",
     coordsLabel: o.lat !== null && o.lng !== null ? `${o.lat}, ${o.lng}` : null,
+    cadastreNumber: o.cadastreNumber,
+    // ⚠️ Shu yerda (serverda) formatlanadi — client'da `toLocaleString` gidratsiyani buzardi.
+    rentAreaLabel:
+      o.rentArea !== null
+        ? `${Number(o.rentArea).toLocaleString("uz-UZ", { maximumFractionDigits: 2 })} m²`
+        : null,
   };
 }
 

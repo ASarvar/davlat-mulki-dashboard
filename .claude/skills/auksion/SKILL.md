@@ -225,3 +225,40 @@ olmaydi. Jadvalda ko'rinmaydi, faqat qator ochilganda; Excel eksporti
 ⚠️ Sana `parseApi4Date()` (auction.ts) bilan o'qiladi — **ikkinchi parser
 yozmang**: API "DD.MM.YYYY" va "DD.MM.YYYY HH:mm:ss" ni beradi, API 4 dagi bilan
 aynan bir xil.
+
+## Tafsilotlar — ijara maydoni va kadastr raqami (2026-09-10)
+
+`AuctionOrder.rentArea` / `cadastreNumber` / `detailsCheckedAt` va tashqi
+`orders.rent_area` / `cadastre_number`. Ilgari ikkita mustaqil skript to'ldirardi
+(faqat tashqi bazaga) — endi `services/auctionOrderDetails.ts`, IKKALA bazaga.
+
+- ⚠️ **Ommaviy javobda `details` YO'Q** — 68 196 yozuvning hammasida `null`.
+  Faqat `get-order` ga `{ order: <id>, username, password }` bilan BITTA buyurtma
+  so'ralganda keladi: `orders[0].details[]` → `{key, value}`. Kalitlar:
+  `rent_ijara_maydoni_kvm`, `cadastr_number`.
+- **Login/parol — `customer_inn`** (skriptlardagi kabi). Bazada 6 210 nomzodda
+  atigi **14 ta** turli INN — bular 14 viloyat akkaunti (login = parol = STIR).
+  Sozlangan akkaunt topilsa o'shaning paroli olinadi.
+- **Alohida navbat** `AUCTION_DETAILS_SYNC` — ommaviy sinxronizatsiya tugagach
+  qo'yiladi. ⚠️ Shu job ichida emas: birinchi to'ldirish ~6 000 so'rov va
+  30 daqiqalik `expireInSeconds` dan oshib, pg-boss job'ni ishlab turgan paytda
+  qayta boshlab yuborardi. Ichida **vaqt chegarasi**
+  (`AUCTION_DETAILS_BUDGET_MINUTES`, standart 20, max 25) — yetsa o'zini davom
+  ettiradi (`singletonKey`siz: faol job kalitni band qiladi).
+- **Filtr** — skriptlardagi: `auction_date` YOKI `lot_place_date` ≥ joriy yil,
+  status ≠ 7 ("bekor qilingan"), toifa ≠ 7 ("Yengil"). NULL ham chiqib ketadi
+  (`NOT IN` semantikasi).
+- ⚠️ **`detailsCheckedAt`** — skriptlardagi kamchilik tuzatilgan: ular `IS NULL`
+  bo'yicha tanlardi, ya'ni kaliti yo'q buyurtma HAR SAFAR qayta so'ralardi.
+  Qiymati hali bo'sh buyurtma 7 kunda bir qayta tekshiriladi.
+- ⚠️ **`order_id` solishtiriladi** — javobda boshqa buyurtma kelsa (`mismatch`)
+  hech narsa yozilmaydi; 10 ta ketma-ket va birortasi mos kelmasa job to'xtaydi.
+  Bu API sana filtrini jimgina e'tiborsiz qoldirgan edi — `order` ham shunday
+  bo'lsa, begona buyurtmaning kadastri yozilib ketardi.
+- **Maydon** — `parseAreaText()` (API4 dagi "Amalda" qoidasi, vergulli o'nlik).
+  `0` = qiymat yo'q.
+- ⚠️ **Tashqi bazada faqat BO'SH qiymat** — `COALESCE(mavjud, yangi)`. Skriptlar
+  to'ldirgan qiymat ustidan yozilmaydi.
+- ⚠️ 2026-09-10 da dev mashinasi ichki tarmoqqa ulanmagan edi (API
+  `10.190.4.122:8390` — TCP timeout), jonli sinov serverda qilinadi. Lokal sinov —
+  soxta (mock) API bilan.

@@ -248,6 +248,13 @@ const schema = z.object({
    * uchun `auctionOrdersExternal.ts` da qat'iy naqsh bilan tekshiriladi.
    */
   AUCTION_ORDERS_TABLE: z.string().default("orders"),
+  /**
+   * Tafsilotlar (ijara maydoni, kadastr) job'ining VAQT CHEGARASI, daqiqa.
+   * ⚠️ `boss.ts` dagi `expireInSeconds` (30 daqiqa) dan KICHIK bo'lishi shart —
+   * aks holda pg-boss job'ni ishlab turgan paytda qayta boshlab yuborardi.
+   * Chegaraga yetgan job o'zini navbatga qayta qo'yadi (worker.ts).
+   */
+  AUCTION_DETAILS_BUDGET_MINUTES: z.coerce.number().int().positive().max(25).default(20),
 
   // Rate-limit / retry
   API_RATE_MAX: z.coerce.number().int().positive().default(10),

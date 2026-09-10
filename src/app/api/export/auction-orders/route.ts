@@ -32,6 +32,8 @@ const COLS: Col[] = [
   { header: "Manzili", width: 32, get: (o) => o.address },
   { header: "Hudud", width: 22, get: (o) => o.region },
   { header: "Tuman", width: 20, get: (o) => o.area },
+  { header: "Kadastr raqami", width: 24, get: (o) => o.cadastreNumber },
+  { header: "Ijara maydoni (m²)", width: 14, get: (o) => (o.rentArea !== null ? Number(o.rentArea) : null) },
   { header: "Turi", width: 26, get: (o) => o.groupName },
   { header: "Toifa", width: 26, get: (o) => o.categoryName },
   { header: "Auksion sanasi", width: 16, get: (o) => o.auctionDate },

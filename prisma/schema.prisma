@@ -1031,6 +1031,18 @@ model AuctionOrder {
   lat Float?
   lng Float?
 
+  /**
+   * Ijaraga beriladigan maydon (m²) va kadastr raqami — buyurtmaning `details[]`
+   * massividan (`rent_ijara_maydoni_kvm`, `cadastr_number`).
+   * ⚠️ Ommaviy `get-order` javobida `details` YO'Q (68 196 yozuvning hammasida
+   * `null`, 2026-09-10) — bular har bir buyurtma uchun ALOHIDA so'rov bilan
+   * olinadi (`services/auctionOrderDetails.ts`). Ommaviy upsert ularga tegmaydi.
+   */
+  rentArea       Decimal? @db.Decimal(12, 2)
+  cadastreNumber String?
+  /** Tafsilotlar oxirgi so'ralgan vaqt — kalit topilmasa ham yoziladi. */
+  detailsCheckedAt DateTime?
+
   protocolFileUrl    String?
   isDowngradeAuction Int?
   propSet            Int?

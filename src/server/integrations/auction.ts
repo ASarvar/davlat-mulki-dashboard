@@ -163,7 +163,7 @@ const AMOUNT_RE = "\\d+(?:[ \\u00A0]\\d{3})*(?:[.,]\\d+)?";
  * asosan 1048,93 (Amalda 1112,23)" yoki "Umumiy maydoni: 47,0 kv.m." Ikkita raqam
  * bo'lsa "amalda" (haqiqiy o'lchangan) qiymati ustuvor — foydalanuvchi tasdiqlagan.
  */
-const parseAreaText = (v: unknown): number | null => {
+export const parseAreaText = (v: unknown): number | null => {
   const s = str(v);
   if (!s) return null;
   const amaldaMatch = s.match(new RegExp(`amalda\\D*?(${AMOUNT_RE})`, "i"));

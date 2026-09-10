@@ -26,6 +26,13 @@ export const QUEUE = {
    * `expireInSeconds` beriladi — YATT indeksi bilan bir xil sabab.
    */
   AUCTION_ORDERS_SYNC: "auction-orders-sync",
+  /**
+   * Auksion buyurtmalari TAFSILOTLARI — ijara maydoni va kadastr raqami
+   * (`services/auctionOrderDetails.ts`). Har buyurtmaga ALOHIDA so'rov.
+   * ⚠️ `AUCTION_ORDERS_SYNC` tugagach avtomatik qo'yiladi; vaqt chegarasiga
+   * (`AUCTION_DETAILS_BUDGET_MINUTES`) yetsa o'zini davom ettiradi.
+   */
+  AUCTION_DETAILS_SYNC: "auction-details-sync",
 } as const;
 
 /**

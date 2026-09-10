@@ -35,7 +35,11 @@ async function createAndStart(): Promise<PgBoss> {
       // osilib qoldi — qayta ishga tushirish ham, ekrandagi ko'rsatkich ham
       // bloklanardi (ishlab chiqishda aynan shu holat chiqdi).
       expireInSeconds:
-        name === QUEUE.IMTIYOZ_YATT_SYNC ? 3600 : name === QUEUE.AUCTION_ORDERS_SYNC ? 1800 : 120,
+        name === QUEUE.IMTIYOZ_YATT_SYNC
+          ? 3600
+          : name === QUEUE.AUCTION_ORDERS_SYNC || name === QUEUE.AUCTION_DETAILS_SYNC
+            ? 1800
+            : 120,
     });
   }
   return boss;

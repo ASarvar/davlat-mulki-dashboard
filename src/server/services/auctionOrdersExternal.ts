@@ -348,3 +348,32 @@ export async function pushOrdersExternal(orders: RawAuctionOrder[]): Promise<Ext
   }
   return { saved, failed, error };
 }
+
+/**
+ * Tashqi `orders` jadvalida ijara maydoni va kadastr raqamini to'ldiradi.
+ * Qator yangilangan bo'lsa `true`.
+ *
+ * ⚠️ FAQAT BO'SH qiymat yoziladi (`COALESCE(mavjud, yangi)`): bu ustunlarni ilgari
+ * mustaqil skriptlar to'ldirgan (`rent_area IS NULL` / `cadastre_number IS NULL`
+ * bo'yicha) — mavjud qiymat hech qachon ustidan yozilmaydi.
+ * ⚠️ Bu ikki ustun `pushOrdersExternal()` ning 59 ustunlik ro'yxatida YO'Q, ya'ni
+ * ommaviy upsert ularni NULL qilib qo'ymaydi.
+ * ⚠️ `::numeric` / `::text` ANIQ cast: Prisma parametrni o'z tipi bilan yuboradi
+ * (jonli sinovda `VALUES (…)` aynan shu sabab yiqilgan edi).
+ */
+export async function updateOrderDetailsExternal(
+  orderId: number,
+  rentArea: number | null,
+  cadastreNumber: string | null,
+): Promise<boolean> {
+  const db = auctionDb();
+  if (!db || (rentArea === null && cadastreNumber === null)) return false;
+  const table = Prisma.raw(`"${tableName()}"`);
+  const n = await db.$executeRaw(
+    Prisma.sql`UPDATE ${table}
+               SET rent_area = COALESCE(rent_area, ${rentArea}::numeric),
+                   cadastre_number = COALESCE(cadastre_number, ${cadastreNumber}::text)
+               WHERE order_id = ${orderId}`,
+  );
+  return n > 0;
+}
