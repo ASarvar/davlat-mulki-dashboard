@@ -835,6 +835,11 @@ Shu quyi tizimga tegsangiz o'sha skill'ni oching.
    mavjud manbani qayta yozmaydi.
 5. Prisma'da `Json` ustunlar uchun `where: { field: { equals: null } }` SQL NULL bilan mos kelmaydi —
    xom SQL (`"rawApi2" IS NULL`) ishlating.
+6. **Push'dan oldin `next build` — faqat `tsc` YETARLI EMAS.** `next build` tipni boshqacha
+   tekshiradi: `next-auth/jwt` augmentatsiyasi u yerda qo'llanmaydi va JWT maydonlari `unknown`
+   bo'ladi — lokal `tsc` o'tgan kod Docker build'da yiqilgan (1.14.0, `auth.config.ts`).
+   Docker bilan bir xil env'da tekshirish (dev serverni avval to'xtating, keyin `.next` ni o'chiring):
+   `DATABASE_URL="postgresql://build:build@localhost:5432/build" NEXTAUTH_SECRET=x npm run build`.
 
 ## Konventsiyalar
 

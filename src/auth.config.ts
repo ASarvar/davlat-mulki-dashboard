@@ -73,7 +73,11 @@ export const authConfig: NextAuthConfig = {
         session.user.role = token.role as Role;
         session.user.sourceId = (token.sourceId as string | null) ?? null;
         session.user.username = (token.username as string) ?? "";
-        session.user.sessionVersion = token.sessionVersion;
+        // ⚠️ `as` SHART: `next build` tipni tekshirganda token maydonlari `unknown`
+        // bo'ladi (`next-auth/jwt` augmentatsiyasi u yerda qo'llanmaydi), lokal `tsc`
+        // esa buni o'tkazib yuboradi — 1.14.0 Docker build'i aynan shu qatorda yiqilgan.
+        // Qo'shni qatorlar ham shu sabab cast qilingan.
+        session.user.sessionVersion = token.sessionVersion as number | undefined;
       }
       return session;
     },
