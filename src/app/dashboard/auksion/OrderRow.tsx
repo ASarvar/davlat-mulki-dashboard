@@ -18,7 +18,6 @@ import { ChevronRight, ExternalLink } from "lucide-react";
  */
 export interface OrderView {
   orderId: number;
-  credential: string;
   name: string | null;
   region: string | null;
   area: string | null;
@@ -29,15 +28,12 @@ export interface OrderView {
   lotStatus: string | null;
   lotNumber: string | null;
   customerName: string | null;
-  customerInn: string | null;
   winnerName: string | null;
   winnerInn: string | null;
   winnerPinfl: string | null;
   winnerPassport: string | null;
   winnerPhone: string | null;
   winnerAddress: string | null;
-  bankName: string | null;
-  bankMfo: string | null;
   protocolFileUrl: string | null;
   // ── Serverda formatlangan yorliqlar ──
   startPriceLabel: string;
@@ -45,6 +41,8 @@ export interface OrderView {
   paidPriceLabel: string;
   auctionDateLabel: string;
   lotPlaceDateLabel: string;
+  /** Faqat oxirgi lotga qo'yilgan sanadan farq qilsa (qayta savdo). */
+  firstLotPlaceDateLabel: string | null;
   termLabel: string;
   coordsLabel: string | null;
   cadastreNumber: string | null;
@@ -114,27 +112,20 @@ export function OrderRow({ order: o }: { order: OrderView }) {
         <tr className="border-b border-border bg-muted/30">
           <td colSpan={7} className="px-4 py-4">
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
-              <Field label="Akkaunt" value={o.credential} />
               <Field label="Turi" value={o.groupName} />
               <Field label="Toifa" value={o.categoryName} />
               <Field label="Lot holati" value={o.lotStatus} />
               <Field label="Lotga qo'yilgan" value={o.lotPlaceDateLabel} />
+              {o.firstLotPlaceDateLabel && (
+                <Field label="Birinchi marta lotga qo'yilgan" value={o.firstLotPlaceDateLabel} />
+              )}
               <Field label="To'langan summa" value={o.paidPriceLabel} />
               <Field label="To'lov shartlari" value={o.termLabel} />
               <Field label="Koordinata" value={o.coordsLabel} />
               <Field label="Kadastr raqami" value={o.cadastreNumber} />
               <Field label="Ijara maydoni" value={o.rentAreaLabel} />
-
-              <div className="col-span-2 md:col-span-4">
-                <div className="mb-2 mt-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                  Buyurtmachi
-                </div>
-                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 md:grid-cols-4">
-                  <Field label="Nomi" value={o.customerName} />
-                  <Field label="STIR" value={o.customerInn} />
-                  <Field label="Bank" value={o.bankName} />
-                  <Field label="MFO" value={o.bankMfo} />
-                </dl>
+              <div className="col-span-2">
+                <Field label="Buyurtmachi" value={o.customerName} />
               </div>
 
               {/* ⚠️ SHAXSIY MA'LUMOT — g'olib topilmagan buyurtmada blok umuman

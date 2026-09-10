@@ -27,7 +27,6 @@ interface Col {
 const COLS: Col[] = [
   { header: "Buyurtma ID", width: 12, get: (o) => o.orderId },
   { header: "Lot raqami", width: 14, get: (o) => o.lotNumber },
-  { header: "Akkaunt", width: 10, get: (o) => o.credential },
   { header: "Nomi", width: 44, get: (o) => o.name },
   { header: "Manzili", width: 32, get: (o) => o.address },
   { header: "Hudud", width: 22, get: (o) => o.region },
@@ -46,7 +45,6 @@ const COLS: Col[] = [
   { header: "Buyurtma holati", width: 28, get: (o) => o.orderStatus },
   { header: "Lot holati", width: 20, get: (o) => o.lotStatus },
   { header: "Buyurtmachi", width: 36, get: (o) => o.customerName },
-  { header: "Buyurtmachi STIR", width: 14, get: (o) => o.customerInn },
   // ── Shaxsiy ma'lumot ──
   { header: "G'olib", width: 30, get: (o) => o.winnerName },
   { header: "G'olib STIR", width: 14, get: (o) => o.winnerInn },
@@ -71,12 +69,13 @@ export async function GET(req: Request) {
   const holat = sp.get("holat");
   const f: AuctionOrderFilters = {
     q: sp.get("q") || undefined,
-    credential: sp.get("akkaunt") || undefined,
     region: sp.get("hudud") || undefined,
     statusId: holat ? Number(holat) : undefined,
     groupName: sp.get("tur") || undefined,
     from: sp.get("dan") || undefined,
     to: sp.get("gacha") || undefined,
+    lotFrom: sp.get("ldan") || undefined,
+    lotTo: sp.get("lgacha") || undefined,
   };
   const where = auctionWhere(f);
 

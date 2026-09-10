@@ -7,6 +7,16 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.15.1
+
+- **Auksion buyurtmalari: qidiruvga "Lotga qo'yilgan" sana oralig'i qo'shildi**
+  (Excel eksportiga ham qo'llanadi). "Akkaunt" filtri olib tashlandi — u hudud
+  bilan deyarli bir xil edi (68 196 buyurtmadan 13 tasida farq).
+- Buyurtma tafsilotidan akkaunt, buyurtmachi STIR, bank va MFO olib tashlandi
+  (Excel'dan ham — "Akkaunt" va "Buyurtmachi STIR" ustunlari);
+  lotga qo'yilgan sana API soatni bergan bo'lsa soati bilan ko'rinadi, qayta savdoga chiqarilgan
+  lotda birinchi marta qo'yilgan sana ham chiqadi.
+
 ## 1.15.0
 
 - **Auksion buyurtmalariga ijara maydoni va kadastr raqami qo'shildi.** Ular

@@ -486,7 +486,12 @@ export function isRunStale(startedAt: Date): boolean {
 export interface AuctionOrderFilters {
   /** Lot raqami, buyurtma ID, nomi yoki manzili bo'yicha qidiruv. */
   q?: string;
-  credential?: string;
+  /**
+   * ⚠️ Akkaunt (`credential`) bo'yicha filtr ATAYLAB yo'q — u hudud bilan
+   * deyarli bir xil: 68 196 buyurtmadan faqat 13 tasida farq qiladi (o'lchov,
+   * 2026-09-10). Ikki tanlagich foydalanuvchini chalkashtirardi. Akkaunt faqat
+   * YANGILASH doirasida kerak (`SyncPanel`).
+   */
   region?: string;
   /** `order_statuses_id` — auksion holati. */
   statusId?: number;
@@ -494,6 +499,9 @@ export interface AuctionOrderFilters {
   /** Auksion sanasi oralig'i (YYYY-MM-DD). */
   from?: string;
   to?: string;
+  /** Lotga qo'yilgan sana oralig'i (YYYY-MM-DD). */
+  lotFrom?: string;
+  lotTo?: string;
 }
 
 export const AUCTION_PAGE_SIZE = 50;
@@ -516,12 +524,13 @@ export function auctionWhere(f: AuctionOrderFilters): Prisma.AuctionOrderWhereIn
       ],
     });
   }
-  if (f.credential) and.push({ credential: f.credential });
   if (f.region) and.push({ region: f.region });
   if (f.statusId !== undefined) and.push({ orderStatusesId: f.statusId });
   if (f.groupName) and.push({ groupName: f.groupName });
   if (f.from) and.push({ auctionDate: { gte: new Date(`${f.from}T00:00:00`) } });
   if (f.to) and.push({ auctionDate: { lte: new Date(`${f.to}T23:59:59`) } });
+  if (f.lotFrom) and.push({ lotPlaceDate: { gte: new Date(`${f.lotFrom}T00:00:00`) } });
+  if (f.lotTo) and.push({ lotPlaceDate: { lte: new Date(`${f.lotTo}T23:59:59`) } });
 
   return and.length ? { AND: and } : {};
 }

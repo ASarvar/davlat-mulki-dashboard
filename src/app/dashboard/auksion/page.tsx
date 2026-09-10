@@ -36,6 +36,12 @@ function dateLabel(d: Date | null, withTime = false): string {
   });
 }
 
+/** API sanani ba'zan soatsiz beradi ("DD.MM.YYYY") — u holda "00:00" ko'rsatilmaydi. */
+function hasClockTime(d: Date | null): boolean {
+  if (!d) return false;
+  return d.toLocaleTimeString("en-GB", { timeZone: "Asia/Tashkent", hour: "2-digit", minute: "2-digit" }) !== "00:00";
+}
+
 function sumLabel(v: unknown): string {
   if (v === null || v === undefined) return "—";
   const n = Number(v);
@@ -45,7 +51,6 @@ function sumLabel(v: unknown): string {
 function toOrderView(o: AuctionOrder): OrderView {
   return {
     orderId: o.orderId,
-    credential: o.credential,
     name: o.name,
     region: o.region,
     area: o.area,
@@ -56,21 +61,23 @@ function toOrderView(o: AuctionOrder): OrderView {
     lotStatus: o.lotStatus,
     lotNumber: o.lotNumber,
     customerName: o.customerName,
-    customerInn: o.customerInn,
     winnerName: o.winnerName,
     winnerInn: o.winnerInn,
     winnerPinfl: o.winnerPinfl,
     winnerPassport: o.winnerPassport,
     winnerPhone: o.winnerPhone,
     winnerAddress: o.winnerAddress,
-    bankName: o.bankName,
-    bankMfo: o.bankMfo,
     protocolFileUrl: o.protocolFileUrl,
     startPriceLabel: sumLabel(o.startPrice),
     soldPriceLabel: sumLabel(o.soldPrice),
     paidPriceLabel: sumLabel(o.paidPrice),
     auctionDateLabel: dateLabel(o.auctionDate, true),
-    lotPlaceDateLabel: dateLabel(o.lotPlaceDate),
+    lotPlaceDateLabel: dateLabel(o.lotPlaceDate, hasClockTime(o.lotPlaceDate)),
+    // Qayta savdoga chiqarilgan lotda birinchi sana farq qiladi — faqat shunda ko'rsatiladi.
+    firstLotPlaceDateLabel:
+      o.firstLotPlaceDate && o.lotPlaceDate && o.firstLotPlaceDate.getTime() !== o.lotPlaceDate.getTime()
+        ? dateLabel(o.firstLotPlaceDate, hasClockTime(o.firstLotPlaceDate))
+        : null,
     termLabel:
       o.termPayment === 1 ? `Bo'lib to'lash${o.termMonth ? ` — ${o.termMonth} oy` : ""}` : "To'liq",
     coordsLabel: o.lat !== null && o.lng !== null ? `${o.lat}, ${o.lng}` : null,
@@ -115,12 +122,13 @@ export default async function AuksionPage({ searchParams }: { searchParams: Prom
 
   const f: AuctionOrderFilters = {
     q: str(sp.q) || undefined,
-    credential: str(sp.akkaunt) || undefined,
     region: str(sp.hudud) || undefined,
     statusId: str(sp.holat) ? Number(str(sp.holat)) : undefined,
     groupName: str(sp.tur) || undefined,
     from: str(sp.dan) || undefined,
     to: str(sp.gacha) || undefined,
+    lotFrom: str(sp.ldan) || undefined,
+    lotTo: str(sp.lgacha) || undefined,
   };
   const page = Math.max(1, Number(str(sp.p)) || 1);
 
@@ -137,12 +145,13 @@ export default async function AuksionPage({ searchParams }: { searchParams: Prom
   const baseParams = new URLSearchParams();
   for (const [k, v] of Object.entries({
     q: f.q,
-    akkaunt: f.credential,
     hudud: f.region,
     holat: f.statusId?.toString(),
     tur: f.groupName,
     dan: f.from,
     gacha: f.to,
+    ldan: f.lotFrom,
+    lgacha: f.lotTo,
   })) {
     if (v) baseParams.set(k, v);
   }
@@ -198,17 +207,6 @@ export default async function AuksionPage({ searchParams }: { searchParams: Prom
           />
         </label>
         <label className="flex flex-col gap-1">
-          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Akkaunt</span>
-          <select name="akkaunt" defaultValue={f.credential ?? ""} className={inputCls}>
-            <option value="">Hammasi</option>
-            {facets.credentials.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Hudud</span>
           <select name="hudud" defaultValue={f.region ?? ""} className={`${inputCls} max-w-[190px]`}>
             <option value="">Hammasi</option>
@@ -247,6 +245,14 @@ export default async function AuksionPage({ searchParams }: { searchParams: Prom
             <input type="date" name="dan" defaultValue={f.from ?? ""} className={inputCls} />
             <span className="text-muted-foreground">—</span>
             <input type="date" name="gacha" defaultValue={f.to ?? ""} className={inputCls} />
+          </div>
+        </label>
+        <label className="flex flex-col gap-1">
+          <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Lotga qo&apos;yilgan</span>
+          <div className="flex items-center gap-1">
+            <input type="date" name="ldan" defaultValue={f.lotFrom ?? ""} className={inputCls} />
+            <span className="text-muted-foreground">—</span>
+            <input type="date" name="lgacha" defaultValue={f.lotTo ?? ""} className={inputCls} />
           </div>
         </label>
         <button
