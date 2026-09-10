@@ -1,11 +1,12 @@
-import { requireUser } from "@/lib/authz";
+import { requireUserOrRedirect } from "@/lib/authz";
 import { ROLE_LABEL } from "@/lib/roles";
 import { getUnreadNotificationCount } from "@/server/services/notifications";
 import { allowedSectionKeys } from "@/server/services/sectionAccess";
 import { Sidebar } from "@/components/Sidebar";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const user = await requireUser();
+  // ⚠️ Redirect qiladi (xato emas) — eskirgan sessiya login'ga tushsin.
+  const user = await requireUserOrRedirect();
   // Menyu tarkibi SERVERDA hal qilinadi — `Sidebar` client komponenti hech qanday
   // rol mantiqini bilmaydi (ilgari bilardi va sahifa qorovulidan ajralib ketardi).
   const [unread, allowedKeys] = await Promise.all([

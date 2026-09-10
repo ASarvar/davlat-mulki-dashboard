@@ -4,6 +4,25 @@ import { BASE_PATH } from "@/lib/basePath";
 
 // Edge-safe konfiguratsiya (Prisma/bcrypt YO'Q) — middleware shuni ishlatadi.
 // Credentials provider (DB kerak) auth.ts'da qo'shiladi.
+
+/**
+ * Faolsizlik muddati — 1 soat (foydalanuvchi talabi, 2026-09-10).
+ *
+ * ⚠️ SIRPANUVCHI: har so'rovda middleware JWT'ni `now + maxAge` bilan qayta imzolaydi
+ * va cookie muddatini uzaytiradi (`@auth/core/lib/actions/session.js`). Ya'ni bu
+ * "kirgandan 1 soat" EMAS, "oxirgi harakatdan 1 soat". Token ichidagi `exp` ham shunga
+ * ergashadi (`jwt.maxAge` standarti = `session.maxAge`) — o'g'irlangan token ham
+ * 1 soatda o'ladi. Ilgari `maxAge` berilmagan edi: standart 30 kun + har harakatda
+ * uzayish = amalda hech qachon tugamaydigan sessiya.
+ *
+ * ⚠️ Faol sinxronizatsiya paytida `AutoRefresh`/`SyncPanel` sahifani o'zi yangilab
+ * turadi — shu vaqt ichida sessiya ham uzayadi. Bu cheklangan (faqat ish davomida).
+ *
+ * ⚠️ Env orqali EMAS: edge middleware env'ni BUILD vaqtida inline qiladi, Docker
+ * build'da esa `.env.production` yo'q — qiymat jimgina standartga qaytib qolardi.
+ */
+export const SESSION_IDLE_SECONDS = 60 * 60;
+
 export const authConfig: NextAuthConfig = {
   // Self-hosted (on-premise) uchun: reverse-proxy ortida host'ga ishonamiz.
   trustHost: true,
@@ -13,7 +32,7 @@ export const authConfig: NextAuthConfig = {
   // `/api/auth/...` ko'radi. `createActionURL` ham shu prefiks bilan sintetik URL quradi.
   // Sub-path'ni faqat foydalanuvchiga ko'rinadigan joylarda qo'lda qo'shamiz:
   // login redirect — middleware.ts'da, muvaffaqiyatli kirish/chiqish — `withBase()` bilan.
-  session: { strategy: "jwt" },
+  session: { strategy: "jwt", maxAge: SESSION_IDLE_SECONDS },
   pages: { signIn: "/login" },
   // davijara.uz ildizida BOSHQA Auth.js ilova ham bor — standart cookie nomlari
   // (`authjs.session-token` / `__Secure-authjs...`) bir-birini o'chirib, ikkala
@@ -43,6 +62,8 @@ export const authConfig: NextAuthConfig = {
         token.role = (user as { role: Role }).role;
         token.sourceId = (user as { sourceId: string | null }).sourceId;
         token.username = (user as { username: string }).username;
+        // Parol almashtirilsa bazada oshadi — `getCurrentUser()` solishtiradi.
+        token.sessionVersion = (user as { sessionVersion: number }).sessionVersion;
       }
       return token;
     },
@@ -52,6 +73,7 @@ export const authConfig: NextAuthConfig = {
         session.user.role = token.role as Role;
         session.user.sourceId = (token.sourceId as string | null) ?? null;
         session.user.username = (token.username as string) ?? "";
+        session.user.sessionVersion = token.sessionVersion;
       }
       return session;
     },

@@ -217,7 +217,13 @@ export async function updateUser(actorId: string, input: UpdateUserInput) {
 export async function resetPassword(actorId: string, userId: string, newPassword: string) {
   const passwordHash = await bcrypt.hash(newPassword, 10);
   await prisma.$transaction(async (tx) => {
-    await tx.user.update({ where: { id: userId }, data: { passwordHash } });
+    // ⚠️ `sessionVersion` oshiriladi — o'sha foydalanuvchining BARCHA faol sessiyalari
+    // (boshqa brauzer/qurilmadagilari ham) keyingi so'rovda bekor bo'ladi. Ilgari
+    // faqat hash almashardi va eski JWT 30 kungacha ishlayverardi.
+    await tx.user.update({
+      where: { id: userId },
+      data: { passwordHash, sessionVersion: { increment: 1 } },
+    });
     await tx.auditLog.create({
       data: { userId: actorId, action: "RESET_PASSWORD", entityType: "User", entityId: userId },
     });

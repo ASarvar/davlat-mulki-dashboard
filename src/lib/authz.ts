@@ -1,4 +1,5 @@
 import { cache } from "react";
+import { redirect } from "next/navigation";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 import type { Role } from "@prisma/client";
@@ -27,7 +28,15 @@ export function isAdmin(role: Role): boolean {
 const loadUser = cache(async (id: string) =>
   prisma.user.findUnique({
     where: { id },
-    select: { id: true, role: true, sourceId: true, username: true, fullName: true, isActive: true },
+    select: {
+      id: true,
+      role: true,
+      sourceId: true,
+      username: true,
+      fullName: true,
+      isActive: true,
+      sessionVersion: true,
+    },
   }),
 );
 
@@ -40,7 +49,34 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
   const db = await loadUser(sessionUser.id);
   if (!db || !db.isActive) return null;
 
+  // ⚠️ Parol almashtirilgan — token eski versiyada. JWT serverdan bekor qilib bo'lmaydi,
+  // shuning uchun aynan shu solishtirish eski sessiyani o'ldiradi.
+  // ⚠️ Versiyasiz token (bu o'zgarishdan OLDIN berilgan) ham yaroqsiz — deploy paytida
+  // hamma bir marta qayta kiradi. Ataylab: yangi 1 soatlik tartibga toza o'tish.
+  if (session?.user?.sessionVersion !== db.sessionVersion) return null;
+
   return { id: db.id, role: db.role, sourceId: db.sourceId, username: db.username, name: db.fullName };
+}
+
+/** Yaroqsiz sessiyani tozalaydigan route (`app/session-expired/route.ts`). */
+export const SESSION_EXPIRED_PATH = "/session-expired";
+
+/**
+ * SAHIFA qo'riqchisi: foydalanuvchi yo'q yoki sessiya eskirgan bo'lsa — LOGIN'ga.
+ *
+ * ⚠️ `requireUser()` dan farqi: u XATO tashlaydi, bu REDIRECT qiladi. Sahifada xato
+ * tashlansa foydalanuvchi login o'rniga xato sahifasini ko'rardi (`error.tsx` yo'q).
+ * ⚠️ `requireUser()` ni o'zini redirect qiladigan qilib bo'lmaydi: server action'lar
+ * uni `try { } catch { return {error} }` ichida chaqiradi (`objects/actions.ts`) va
+ * `redirect()` ning maxsus xatosi yutilib, formada "NEXT_REDIRECT" chiqardi.
+ * ⚠️ To'g'ridan-to'g'ri `/login` ga EMAS: middleware JWT'ni yaroqli ko'radi (u bazaga
+ * kira olmaydi), ya'ni cookie qolsa foydalanuvchi aylanib qaytardi. Cookie'ni faqat
+ * route handler o'chira oladi.
+ */
+export async function requireUserOrRedirect(): Promise<SessionUser> {
+  const user = await getCurrentUser();
+  if (!user) redirect(SESSION_EXPIRED_PATH);
+  return user;
 }
 
 // Tizimga kirgan foydalanuvchini talab qiladi.

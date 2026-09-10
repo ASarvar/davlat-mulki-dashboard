@@ -9,6 +9,8 @@ declare module "next-auth" {
       role: Role;
       sourceId: string | null;
       username: string;
+      /** Versiyasiz token — bu o'zgarishdan OLDIN berilgan (yaroqsiz deb qaraladi). */
+      sessionVersion?: number;
     } & DefaultSession["user"];
   }
 
@@ -16,6 +18,9 @@ declare module "next-auth" {
     role: Role;
     sourceId: string | null;
     username: string;
+    // ⚠️ Ixtiyoriy: Auth.js `session` callback'ida `session.user` shu interfeysga
+    // birlashadi va u yerga tokendan `number | undefined` tushadi.
+    sessionVersion?: number;
   }
 }
 
@@ -24,5 +29,6 @@ declare module "next-auth/jwt" {
     role: Role;
     sourceId: string | null;
     username: string;
+    sessionVersion?: number;
   }
 }

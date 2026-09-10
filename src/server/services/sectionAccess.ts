@@ -2,7 +2,7 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import type { Role, SectionVisibility } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireUser, type SessionUser } from "@/lib/authz";
+import { requireUserOrRedirect, type SessionUser } from "@/lib/authz";
 import { SECTIONS, sectionDef, type SectionDef } from "@/lib/sections";
 
 /**
@@ -77,7 +77,9 @@ export async function allowedSectionKeys(user: SessionUser): Promise<string[]> {
  * foydalanuvchi uchun MAVJUD EMAS va uning borligi ham oshkor qilinmaydi.
  */
 export async function requireSection(key: string): Promise<SessionUser> {
-  const user = await requireUser();
+  // ⚠️ Redirect, xato emas — eskirgan sessiya login'ga olib borsin (`requireUserOrRedirect`).
+  // Server action'larda ham xavfsiz: bu yerda `try` yo'q (auksion 132/157 — try'dan tashqarida).
+  const user = await requireUserOrRedirect();
   if (!(await canAccess(user, key))) notFound();
   return user;
 }

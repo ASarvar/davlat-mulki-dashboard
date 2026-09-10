@@ -38,6 +38,11 @@ model User {
   role         Role    @default(VIEWER)
   isActive     Boolean @default(true)
 
+  // ⚠️ Parol almashtirilganda +1 (`resetPassword`). JWT serverdan bekor qilib
+  // bo'lmaydi, shuning uchun token ichidagi versiya har so'rovda shu bilan
+  // solishtiriladi (`getCurrentUser`) — mos kelmasa sessiya yaroqsiz.
+  sessionVersion Int @default(0)
+
   // ⚠️ Foydalanuvchi doirasi HUDUD emas, TASHKILOT bo'yicha (2026-07-30).
   // Har bir obyektda `sourceId` majburiy, shuning uchun cheklash aniq va bo'shliqsiz.
   // Hududiy tashkilotga bog'langan odam amalda faqat o'z hududini ko'radi; respublika

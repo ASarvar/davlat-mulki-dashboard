@@ -7,6 +7,16 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.14.0
+
+- **Sessiya endi 1 soat faolsizlikdan keyin tugaydi.** Ilgari muddat berilmagan edi
+  (standart 30 kun, har harakatda uzayardi) — brauzerda bir marta kirilsa, amalda
+  hech qachon qayta so'ralmasdi. Muddat oxirgi harakatdan hisoblanadi.
+- **Parol almashtirilsa foydalanuvchi barcha qurilmalardan chiqariladi.** Ilgari
+  parol o'zgarsa ham eski sessiya ishlayverardi.
+- ⚠️ Deploy paytida **hamma bir marta qayta kiradi** — eski sessiyalar yangi
+  tekshiruvdan o'tmaydi (ataylab).
+
 ## 1.13.1
 
 - **Ijara imtiyozi: shartnoma formasi noto'g'ri davr bo'yicha javob berayotgan edi.**

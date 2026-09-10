@@ -7,9 +7,9 @@ import { withBase } from "@/lib/basePath";
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; expired?: string }>;
 }) {
-  const { error } = await searchParams;
+  const { error, expired } = await searchParams;
 
   async function authenticate(formData: FormData) {
     "use server";
@@ -49,6 +49,12 @@ export default async function LoginPage({
         {error ? (
           <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
             Login yoki parol noto'g'ri
+          </p>
+        ) : null}
+
+        {expired && !error ? (
+          <p className="mb-4 rounded-md bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            Sessiya muddati tugadi yoki parol o'zgartirildi — qayta kiring.
           </p>
         ) : null}
 

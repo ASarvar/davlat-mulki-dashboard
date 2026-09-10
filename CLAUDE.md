@@ -154,6 +154,13 @@ doirani 14 hududga kengaytirardi. Ijrochi/moderator tashkilotsiz qoladi va **hec
 SUPER_ADMIN/ADMIN qo'shadi (ADMIN, ADMIN/SUPER_ADMIN yarata olmaydi). Sync/Manbalar/Userlar —
 faqat SUPER_ADMIN+ADMIN. RAHBARIYAT `userSourceScope()`da `null` (cheklovsiz).
 
+**Sessiya (2026-09-10):** JWT, **1 soat faolsizlik** (`SESSION_IDLE_SECONDS`, sirpanuvchi —
+middleware har so'rovda qayta imzolaydi). Parol almashtirilsa `User.sessionVersion` +1 va
+`getCurrentUser()` token versiyasini bazadagi bilan solishtiradi → barcha qurilmadagi
+sessiyalar bekor. ⚠️ Sahifa qo'riqchisi `requireUserOrRedirect()` (`/session-expired` →
+`signOut` → login); `requireUser()` esa XATO tashlaydi — uni redirect qiladigan qilmang,
+server action'lar uni `try/catch` ichida chaqiradi va redirect yutilardi.
+
 ### Bo'limlar ko'rinishi — `SectionAccess` (2026-09-05)
 
 Qaysi sahifa qaysi rolga ko'rinishi **bazadan** boshqariladi, deploysiz. Maqsad:
