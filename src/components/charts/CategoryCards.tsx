@@ -1,20 +1,22 @@
 import { categoryColor } from "@/lib/chartColors";
 import { categoryIcon } from "@/lib/categoryIcons";
-import type { CategorySlice } from "./CategoryDonut";
+import type { CategorySlice } from "./CategoryBars";
 
 /**
- * Kategoriya taqsimotining KARTA ko'rinishi — halqa diagrammaning YONIDA turadi
- * (halqadagi yorliqlar ro'yxati o'rniga).
+ * Kategoriya taqsimotining KARTA ko'rinishi — ustunli grafikning YONIDA (50/50) turadi,
+ * 3 ustunda (foydalanuvchi talabi, 2026-09-12: 2 ustunda kartalarda bo'sh joy ko'p edi).
+ * Tor kartada yorliq kesilmaydi — 2 qatorga o'raladi (`line-clamp-2`), foiz esa
+ * sig'masa son ostiga tushadi (`flex-wrap`).
  *
  * ⚠️ Dizayn ATAYLAB yuqoridagi asosiy KPI kartalaridan farqli: oq fon, ramka va
- * soya yo'q. Rang faqat ikonka chipida — halqadagi bo'lak rangi bilan bir xil
+ * soya yo'q. Rang faqat ikonka chipida — ustun rangi bilan bir xil
  * (`categoryColor`), ikonkasi esa `categoryIcon` dan. Shu bilan "asosiy
  * ko'rsatkich" va "taqsimot bo'lagi" vizual ravishda ajraladi.
  *
- * Har bir karta obyektlar ro'yxatiga havola (`href` — `effectiveCategory=N`, halqa
- * bo'lagini bosish bilan bir xil mezon).
+ * Har bir karta obyektlar ro'yxatiga havola — mezoni sonning o'zi bilan bir xil
+ * (qanday qurilishi `dashboard/page.tsx` da).
  *
- * ⚠️ Matnlar (`countLabel`/`pctLabel`) SERVERDA formatlangan — `CategoryDonut` bilan
+ * ⚠️ Matnlar (`countLabel`/`pctLabel`) SERVERDA formatlangan — `CategoryBars` bilan
  * bir xil sabab. Komponent sof server-side — client JS kerak emas.
  */
 export function CategoryCards({ data }: { data: CategorySlice[] }) {
@@ -22,7 +24,7 @@ export function CategoryCards({ data }: { data: CategorySlice[] }) {
   if (shown.length === 0) return null;
 
   return (
-    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
       {shown.map((d) => {
         const color = categoryColor(d.code);
         const Icon = categoryIcon(d.code);
@@ -40,10 +42,10 @@ export function CategoryCards({ data }: { data: CategorySlice[] }) {
               <Icon className="size-[18px]" />
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-[11.5px] font-medium text-slate-600" title={d.label}>
+              <p className="line-clamp-2 text-[11.5px] font-medium leading-tight text-slate-600" title={d.label}>
                 {d.label}
               </p>
-              <p className="mt-0.5 flex items-baseline gap-1.5">
+              <p className="mt-0.5 flex flex-wrap items-baseline gap-x-1.5">
                 <span
                   className="text-lg font-bold leading-none tabular-nums"
                   style={{ color: "var(--navy)" }}

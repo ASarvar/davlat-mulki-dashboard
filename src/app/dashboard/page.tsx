@@ -11,17 +11,16 @@ import {
   Banknote,
 } from "lucide-react";
 import { canAccess, firstOpenSectionHref, requireSection } from "@/server/services/sectionAccess";
-import { getDashboardStats } from "@/server/services/stats";
+import { buildDashboardColumns, getDashboardStats } from "@/server/services/stats";
 import { getRentContractTrend, trendYear } from "@/server/services/trends";
 import { getMapData } from "@/server/services/map";
 import { getKpiHistory, MIN_DAYS } from "@/server/services/snapshots";
-import { CATEGORIES } from "@/lib/categories";
 import { isLandSplitSoha } from "@/lib/sourceLabel";
 import { nf, km, pct1, money } from "@/lib/format";
 import { BRAND, categoryColor } from "@/lib/chartColors";
 import { KpiCard, Tag } from "@/components/ui/KpiCard";
 import { Card, ChartCard } from "@/components/ui/Card";
-import { CategoryDonut } from "@/components/charts/CategoryDonut";
+import { CategoryBars, type CategorySlice } from "@/components/charts/CategoryBars";
 import { CategoryCards } from "@/components/charts/CategoryCards";
 import { RegionRanking } from "@/components/charts/RegionRanking";
 import { AreaBalance } from "@/components/charts/AreaBalance";
@@ -95,26 +94,34 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // ── Grafiklar uchun ma'lumot ─────────────────────────────────────────────
   // Hammasi MAVJUD agregatlardan quriladi — yangi SQL yozilmagan.
 
-  const catLabel = new Map<number, string>(CATEGORIES.map((c) => [c.code, c.short] as [number, string]));
-  const donut = s.byCategory
-    // ⚠️ `code: null` — tipda mumkin, amalda bo'lmasligi kerak (kategoriyasiz obyekt
-    // 11 ga tushadi, `CAT_VACANT` default). Majburlab `!` qo'yish o'rniga ochiq
-    // tashlab yuboramiz: bunday qator paydo bo'lsa grafik jim buzilmasin.
-    .filter((c): c is { code: number; count: number } => c.code !== null)
-    .map((c) => ({
+  // ⚠️ Sonlar RASMIY HISOBOTNING JAMI qatori bilan AYNAN bir xil (foydalanuvchi
+  // talabi): ustunlar ham, yig'indi ham hisobot sahifasi va Excel eksporti
+  // ishlatadigan `buildDashboardColumns()` dan. Ilgari bu yerda effektiv kategoriya
+  // taqsimoti (halqa) edi va 3/5/6/12 hisobotdan farq qilardi (kat 3: 546 ↔ 631).
+  // 3/4/5/6/12 XUSUSIYAT bo'yicha sanalgani uchun yig'indi jamidan katta chiqadi.
+  const categoryData: CategorySlice[] = buildDashboardColumns(landSplit ? "landSplit" : "default").map((c) => {
+    const countSubs = c.subs.filter((sub) => !sub.area);
+    const count = s.byRegionCategory.reduce(
+      (a, r) => a + countSubs.reduce((b, sub) => b + sub.get(r), 0),
+      0,
+    );
+    return {
       code: c.code,
-      label: catLabel.get(c.code) ?? `Kategoriya ${c.code}`,
-      count: c.count,
+      label: c.short,
+      count,
       // ⚠️ Matnlar SERVERDA formatlanadi — "uz-UZ" Node va brauzerda turlicha
       // chiqib, gidratsiyani buzardi (client komponentiga tayyor satr boradi).
-      countLabel: nf(c.count),
-      pctLabel: pct1(c.count, t.total),
-      // ⚠️ `effectiveCategory`, `category` EMAS. `category=N` 3/5/6/12 uchun
-      // XUSUSIYAT bo'yicha filtrlaydi (rasmiy hisobot ustunlari shunday), donut esa
-      // effektiv kategoriya taqsimoti — jonli o'lchovda farq katta edi (kat 3: 522↔599).
-      href: objHref(`effectiveCategory=${c.code}`),
-    }))
-    .sort((a, b) => b.count - a.count);
+      countLabel: nf(count),
+      pctLabel: pct1(count, t.total),
+      // Havola sonning O'ZI bilan bir mezonda: bitta "Soni" — hisobot katagidagi
+      // havolaning aynan o'zi; Yer+Bino (`landSplit` kat 1–4) esa effektiv
+      // kategoriyadan sanaladi (`landCategoryCountRows`), shuning uchun `effectiveCategory`.
+      href:
+        countSubs.length === 1
+          ? objHref(`category=${c.code}${countSubs[0].qsExtra ?? ""}`)
+          : objHref(`effectiveCategory=${c.code}`),
+    };
+  });
 
   // ⚠️ Respublika darajasidagi tashkilotlar qatorlari hudud EMAS (`regionId` da
   // `OrganizationSource.id` turadi) — hududlar reytingiga qo'shilmaydi.
@@ -286,22 +293,23 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         />
       </div>
 
-      {/* Kategoriya taqsimoti — to'liq kenglik: kartalar chapda, halqa o'ngda */}
+      {/* Kategoriya taqsimoti — to'liq kenglik: kartalar chapda, gorizontal grafik o'ngda (50/50) */}
       <div className="mt-4">
         <ChartCard
           title="Kategoriya taqsimoti"
-          subtitle={`Effektiv kategoriya bo'yicha, ${nf(t.total)} obyekt`}
-          footnote="Har bir kartani yoki halqa bo'lagini bosganda o'sha kategoriyaning obyektlar ro'yxati ochiladi."
+          subtitle={`Jami ${nf(t.total)} obyekt`}
         >
-          {/* ⚠️ Kartalar CHAPDA (2/3), halqa O'NGDA (1/3) — foydalanuvchi tanlovi, 2026-09-06.
-              Flex emas, GRID: `basis-2/3` + `basis-1/3` + gap yig'indisi 100% dan oshib
-              ketardi va nisbat buzilardi; grid'da ustunlar gap'dan keyin bo'linadi. */}
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-3 lg:items-center lg:gap-8">
-            <div className="min-w-0 lg:col-span-2">
-              <CategoryCards data={donut} />
+          {/* ⚠️ Kartalar va grafik YONMA-YON, 50/50 — foydalanuvchi tanlovi (2026-09-12).
+              Faqat `2xl` dan: grafik yorliqlari TO'G'RI yoziladi (qiya emas) va tor
+              yarim kenglikda qo'shni yorliqlar ustma-ust tushardi — undan kichik
+              ekranda grafik kartalar ostiga tushadi.
+              Flex emas, GRID: `basis-1/2` + gap yig'indisi 100% dan oshib ketardi. */}
+          <div className="grid grid-cols-1 gap-6 2xl:grid-cols-2 2xl:items-center 2xl:gap-8">
+            <div className="min-w-0">
+              <CategoryCards data={categoryData} />
             </div>
-            <div className="flex justify-center">
-              <CategoryDonut data={donut} totalLabel={nf(t.total)} showLegend={false} size={280} />
+            <div className="min-w-0">
+              <CategoryBars data={categoryData} />
             </div>
           </div>
         </ChartCard>

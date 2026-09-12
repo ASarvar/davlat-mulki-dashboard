@@ -7,6 +7,15 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.15.2
+
+- **Boshqaruv paneli: "Kategoriya taqsimoti" sonlari endi hisobotning JAMI qatori
+  bilan aynan bir xil.** Ilgari panel effektiv kategoriya bo'yicha sanardi va 3/5/6
+  hisobotdan farq qilardi, 12 ("Bo'sh maydon bor") umuman yo'q edi. Halqa diagramma
+  o'rniga ustunli grafik (kategoriyalar kesishgani uchun "butunning bo'laklari"
+  bo'lolmaydi); kartalar 3 ustunda, grafik yonida (keng ekranda 50/50). Karta yoki
+  ustun bosilganda hisobot katagidagi ro'yxatning o'zi ochiladi.
+
 ## 1.15.1
 
 - **Auksion buyurtmalari: qidiruvga "Lotga qo'yilgan" sana oralig'i qo'shildi**

@@ -730,10 +730,15 @@ brauzerda `1,167` beradi — client grafik komponentiga tayyor SATR uzatiladi
 rejimida ikki marta render bo'ladi va animatsiya yoqiq bo'lsa halqa/ustunlar bo'sh
 `<g>` bo'lib qoladi (donutda aynan shu bo'lgan). `cx`/`cy` ham foiz emas, SON.
 
-⚠️ **Halqa diagramma `effectiveCategory=N` ni ishlatadi, `category=N` NI EMAS.**
-`category=` 3/4/5/6/12 uchun XUSUSIYAT bo'yicha filtrlaydi (hisobot ustunlari
-shunday), halqa esa TAQSIMOT — bo'laklar kesishmasligi va yig'indisi jamiga teng
-bo'lishi shart. Jonli farq katta edi: kat 3 → 522 ↔ 599, kat 12 → 0 ↔ 281.
+⚠️ **Panel "Kategoriya taqsimoti" — hisobotning JAMI qatori bilan AYNAN bir xil**
+(2026-09-12, foydalanuvchi talabi: "izoh qo'shma, xuddi hisobotdagidek chiqar").
+Sonlar `buildDashboardColumns()` ning "Soni" sub-ustunlari yig'indisi, ya'ni
+3/4/5/6/12 XUSUSIYAT bo'yicha va kartalar yig'indisi jamidan katta. Shu sabab halqa
+diagramma olib tashlandi (bo'laklar kesishardi) — o'rniga `CategoryBars` (ustunlar).
+Ilgari halqa effektiv kategoriya taqsimotini ko'rsatardi va hisobotdan farq qilardi
+(kat 3: 546 ↔ 631, kat 12 umuman yo'q edi). Havola sonning o'zi bilan bir mezonda:
+bitta "Soni" → hisobot katagining havolasi (`category=N` + `qsExtra`); `landSplit`
+kat 1–4 (Yer+Bino — effektiv kategoriyadan sanaladi) → `effectiveCategory=N`.
 
 ### Xarita — `services/map.ts` + `components/map/`
 
