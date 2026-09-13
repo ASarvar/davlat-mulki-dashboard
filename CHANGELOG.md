@@ -7,6 +7,12 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.15.3
+
+- **Xaritada obyektlar joylashuv belgisi (pin) bilan ko'rsatiladi** — davijara.uz
+  xaritasidagi shakl (uchi aynan obyekt nuqtasida), rangi kategoriya bo'yicha.
+  Ilgari kichik doira edi. Sichqoncha ustiga kelganda belgi kattalashadi.
+
 ## 1.15.2
 
 - **Boshqaruv paneli: "Kategoriya taqsimoti" sonlari endi hisobotning JAMI qatori

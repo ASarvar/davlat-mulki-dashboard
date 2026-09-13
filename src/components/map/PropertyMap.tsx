@@ -26,8 +26,9 @@ export interface PropertyMapProps {
  *
  * ⚠️ STANDART Leaflet markeri ISHLATILMAYDI. U `marker-icon.png` ni ildizdan qidiradi
  * va `/obyektlar` sub-path ostida 404 beradi (klassik tuzoq) — natijada nuqtalar
- * ko'rinmay qolardi. O'rniga `L.circleMarker` (vektor): rasm umuman kerak emas,
- * kategoriya rangi bilan bo'yaladi va 1800 nuqta uchun yengilroq.
+ * ko'rinmay qolardi. O'rniga `pinIcon()` — ichki SVG'li `divIcon` (davijara.uz
+ * xaritasidagi joylashuv belgisi shakli, 2026-09-12): rasm fayli umuman kerak emas,
+ * kategoriya rangi bilan bo'yaladi. Hudud rejimidagi pufakchalar esa `L.circleMarker`.
  *
  * ⚠️ Leaflet DOM'ga to'g'ridan-to'g'ri tegadi, shuning uchun butun komponent
  * `useEffect` ichida qo'lda boshqariladi (react-leaflet o'rniga) — klaster
@@ -193,6 +194,7 @@ export function PropertyMap({
     const cluster = L.markerClusterGroup({
       maxClusterRadius: 48,
       showCoverageOnHover: false,
+      chunkedLoading: true,
       iconCreateFunction: (c) => {
         const n = c.getChildCount();
         const size = n < 10 ? 34 : n < 100 ? 42 : 52;
@@ -204,14 +206,9 @@ export function PropertyMap({
       },
     });
 
+    const markers: L.Marker[] = [];
     for (const p of points) {
-      const m = L.circleMarker([p.lat, p.lng], {
-        radius: 6,
-        weight: 1.6,
-        color: "#fff",
-        fillColor: categoryColor(p.cat),
-        fillOpacity: 0.95,
-      });
+      const m = L.marker([p.lat, p.lng], { icon: pinIcon(p.cat) });
       // ⚠️ Kadastr raqamida `/` bor — URL faqat `lib/cadastre.ts` orqali quriladi.
       const href = `${basePath}${objectHref(p.cad)}`;
       m.bindPopup(
@@ -221,8 +218,11 @@ export function PropertyMap({
            <a href="${href}" style="color:#1a3a7c;font-weight:500">Obyekt sahifasi →</a>
          </div>`,
       );
-      cluster.addLayer(m);
+      markers.push(m);
     }
+    // Bir yo'la — ~2 400 ta DOM markerni bittalab `addLayer` qilish klasterni
+    // har safar qayta hisoblatadi va sezilarli sekin.
+    cluster.addLayers(markers);
     cluster.addTo(map);
     layerRef.current = cluster;
   }, [mode, points, bubbles, basePath]);
@@ -293,6 +293,34 @@ export function PropertyMap({
       </div>
     </div>
   );
+}
+
+/**
+ * Joylashuv belgisi (pin) — davijara.uz xaritasidagi bilan bir xil shakl va o'lcham
+ * (26×34, UCHI aynan koordinatada: `iconAnchor` pastki markaz). Rang — kategoriya
+ * rangi (panel kartalari bilan bir xil); chegara va markaz OQ, chunki oltin
+ * kategoriyalarda (11/12) oltin chegara ko'rinmay qolardi.
+ *
+ * ⚠️ Rasm fayl EMAS, ichki SVG — `marker-icon.png` `/obyektlar` ostida 404 berardi.
+ * ⚠️ `className` beriladi — busiz Leaflet `leaflet-div-icon` (oq fon + ramka) qo'shadi.
+ * Belgilar kategoriya bo'yicha KESHLANADI: minglab nuqta — o'nga yaqin `DivIcon`.
+ * Hover/soya uslubi `globals.css` → `.dm-pin`.
+ */
+const pinCache = new Map<string, L.DivIcon>();
+function pinIcon(cat: Parameters<typeof categoryColor>[0]): L.DivIcon {
+  const key = String(cat);
+  let icon = pinCache.get(key);
+  if (!icon) {
+    icon = L.divIcon({
+      className: "dm-pin",
+      html: `<svg viewBox="-1 -1 26 34" width="26" height="34" aria-hidden="true"><path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20c0-6.6-5.4-12-12-12z" fill="${categoryColor(cat)}" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="12" r="4.5" fill="#fff"/></svg>`,
+      iconSize: [26, 34],
+      iconAnchor: [13, 34],
+      popupAnchor: [0, -34],
+    });
+    pinCache.set(key, icon);
+  }
+  return icon;
 }
 
 /** Popup HTML'iga kadastr/nom qo'yishdan oldin — ma'lumot bazadan keladi. */
