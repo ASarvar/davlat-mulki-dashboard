@@ -36,7 +36,8 @@ export const NEUTRAL = {
  *
  * ⚠️ Kod 8 mavjud emas (`categories.ts` da izohga olingan), shuning uchun rang
  * xaritasi `1..12` sikli bilan QURILMAYDI — `CATEGORIES` massivi ustidan yuriladi.
- * ⚠️ 11 va 12 oltinlari yaqin — donut'da rangga TAYANMANG, to'g'ridan-to'g'ri yorliq qo'ying.
+ * ⚠️ 11 va 12 oltinlari yaqin — grafikda (`CategoryBars`, xarita pin'lari) faqat rangga
+ *    TAYANMANG, to'g'ridan-to'g'ri yorliq qo'ying.
  */
 export const CATEGORY_COLOR: Record<number, string> = {
   1: "#2e7d5b",

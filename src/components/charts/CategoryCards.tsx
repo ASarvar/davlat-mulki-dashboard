@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { categoryColor } from "@/lib/chartColors";
 import { categoryIcon } from "@/lib/categoryIcons";
 import type { CategorySlice } from "./CategoryBars";
@@ -15,9 +16,12 @@ import type { CategorySlice } from "./CategoryBars";
  *
  * Har bir karta obyektlar ro'yxatiga havola — mezoni sonning o'zi bilan bir xil
  * (qanday qurilishi `dashboard/page.tsx` da).
+ * ⚠️ `next/link`, oddiy `<a>` EMAS: `d.href` basePath'siz (`objHref()`), production'da
+ * esa ilova `/obyektlar` ostida — oddiy `<a>` domen ildizidagi BOSHQA ilovaga olib
+ * ketardi. `Link` basePath'ni o'zi qo'shadi (`KpiCard` bilan bir xil).
  *
  * ⚠️ Matnlar (`countLabel`/`pctLabel`) SERVERDA formatlangan — `CategoryBars` bilan
- * bir xil sabab. Komponent sof server-side — client JS kerak emas.
+ * bir xil sabab. Komponentning o'zi server-side.
  */
 export function CategoryCards({ data }: { data: CategorySlice[] }) {
   const shown = data.filter((d) => d.count > 0);
@@ -29,7 +33,7 @@ export function CategoryCards({ data }: { data: CategorySlice[] }) {
         const color = categoryColor(d.code);
         const Icon = categoryIcon(d.code);
         return (
-          <a
+          <Link
             key={d.code}
             href={d.href}
             className="group/cc flex items-center gap-3 rounded-xl bg-muted/40 px-3 py-2.5 transition-colors duration-150 hover:bg-muted"
@@ -57,7 +61,7 @@ export function CategoryCards({ data }: { data: CategorySlice[] }) {
                 </span>
               </p>
             </div>
-          </a>
+          </Link>
         );
       })}
     </div>

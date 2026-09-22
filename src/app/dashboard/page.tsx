@@ -373,7 +373,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <p className="mt-0.5 text-xs text-muted-foreground">
               {mapMode === "hudud"
                 ? "Hududlar kesimi — barcha obyektlar"
-                : "Auksionga chiqarilgan obyektlarning joylashuvi"}
+                : "Obyektlarning joylashuvi"}
             </p>
           </div>
           {/* Rejim URL'da saqlanadi — sahifa yangilanganda ham qoladi, havolasi ulashiladi. */}

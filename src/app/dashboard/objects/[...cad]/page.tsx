@@ -14,6 +14,7 @@ import {
   Flame,
   Zap,
   AlertTriangle,
+  MapPin,
   type LucideIcon,
 } from "lucide-react";
 import { lotUrl } from "@/server/integrations/auction";
@@ -37,6 +38,8 @@ import { AssignCategoryForm } from "./AssignCategoryForm";
 import { RemoveCategoryButton } from "./RemoveCategoryButton";
 import { CadastreRawData } from "./CadastreRawData";
 import { SyncButton } from "./SyncButton";
+import { ObjectMapSection } from "@/components/map/MapSection";
+import { env } from "@/lib/env";
 
 function Field({ label, value }: { label: string; value: React.ReactNode }) {
   return (
@@ -723,6 +726,33 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
 
         {/* Kategoriya biriktirish + tarix */}
         <section className="space-y-4">
+          {/* Xaritadagi joylashuv — kategoriya biriktirish USTIDA (foydalanuvchi talabi,
+              2026-09-22). Koordinata manbasi ochiq yoziladi (panel xaritasidagi kabi). */}
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <div className="mb-3">
+              <SectionTitle icon={MapPin}>Xaritadagi joylashuvi</SectionTitle>
+            </div>
+            {p.lat != null && p.lng != null ? (
+              <>
+                <ObjectMapSection
+                  lat={p.lat}
+                  lng={p.lng}
+                  cat={effectiveCode}
+                  tileUrl={env.MAP_TILE_URL}
+                  tileAttribution={env.MAP_TILE_ATTRIBUTION}
+                />
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {COORD_SOURCE_LABEL[p.coordSource ?? ""] ?? "Koordinata"} · {p.lat.toFixed(5)},{" "}
+                  {p.lng.toFixed(5)}
+                </p>
+              </>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Koordinata aniqlanmagan — kadastr va auksion ma&apos;lumotlarida joylashuv yo&apos;q.
+              </p>
+            )}
+          </div>
+
           {pendingRequest ? (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-sm shadow-sm">
               <p className="font-medium text-amber-800">Tasdiqlash kutilmoqda</p>
@@ -798,3 +828,9 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
     </div>
   );
 }
+
+/** `Property.coordSource` → xarita ostidagi izoh (manba OCHIQ yoziladi, panel xaritasidagi kabi). */
+const COORD_SOURCE_LABEL: Record<string, string> = {
+  CADASTRE: "Kadastr chegarasining markazi",
+  AUCTION: "Auksion lotining nuqtasi",
+};

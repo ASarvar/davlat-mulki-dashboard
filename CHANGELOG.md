@@ -7,6 +7,17 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.15.4
+
+- **Obyekt sahifasida xaritadagi joylashuv** — "Kategoriya biriktirish" ustida kichik
+  xarita, obyekt panel xaritasidagi pin bilan; ostida koordinata manbasi (kadastr
+  chegarasi markazi yoki auksion loti nuqtasi). Koordinatasi yo'q obyektda shu haqda yoziladi.
+- **Tuzatildi: panelning kategoriya kartalari serverda noto'g'ri sahifaga olib borardi**
+  (`/obyektlar` qismi tushib qolardi). Endi ro'yxat to'g'ri ochiladi.
+- Xarita sarlavhasi tuzatildi ("Obyektlarning joylashuvi" — endi deyarli barcha obyekt
+  kadastr bo'yicha ko'rinadi, faqat auksiondagilar emas); xarita belgilari ekran
+  o'quvchi uchun nomlandi, xarita yuklanishi barqarorlashtirildi.
+
 ## 1.15.3
 
 - **Xaritada obyektlar joylashuv belgisi (pin) bilan ko'rsatiladi** — davijara.uz

@@ -750,8 +750,10 @@ xarita sarlavhasida OCHIQ yoziladi.
 ⚠️ **Koordinata `refreshAuction` blokidan TASHQARIDA yoziladi** — bino auksion
 tugagani uchun joyidan ko'chmaydi, ya'ni lot topilmasa `null` ga qaytarilmasligi kerak.
 ⚠️ **Standart Leaflet markeri ISHLATILMAYDI** — `marker-icon.png` `/obyektlar`
-sub-path ostida 404 beradi. O'rniga ichki SVG'li `L.divIcon` pin (`PropertyMap.tsx` →
+sub-path ostida 404 beradi. O'rniga ichki SVG'li `L.divIcon` pin (`components/map/pin.ts` →
 `pinIcon()`, davijara.uz xaritasidagi shakl, 2026-09-12) — rasm fayli kerak emas.
+Obyekt sahifasida ("Kategoriya biriktirish" ustida) kichik xarita — `ObjectLocationMap.tsx`:
+bitta pin, g'ildirak-zoom o'chiq, o'rami `MapSection.tsx` → `ObjectMapSection` (2026-09-22).
 ⚠️ Hover kattalashtirish ICHKI `svg`da (`globals.css` → `.dm-pin`): marker elementining
 o'z `transform`ini Leaflet joylashtirish uchun ishlatadi.
 ⚠️ `ssr:false` Server Component ichida build xatosi beradi — oraliq `"use client"`

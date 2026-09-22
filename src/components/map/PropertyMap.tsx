@@ -6,7 +6,8 @@ import L from "leaflet";
 // ⚠️ Leaflet CSS'i bu yerda EMAS — `app/globals.css` da (sababi o'sha faylda yozilgan:
 // lazy chunk bilan kelgan CSS xaritadan kechikib, uni buzib qo'yardi).
 import "leaflet.markercluster";
-import { categoryColor, BRAND } from "@/lib/chartColors";
+import { BRAND } from "@/lib/chartColors";
+import { pinIcon, escapeHtml } from "./pin";
 import { UZ_CENTER, UZ_ZOOM } from "@/lib/geo";
 import { objectHref } from "@/lib/cadastre";
 import type { MapPoint, RegionBubble } from "@/server/services/map";
@@ -26,7 +27,7 @@ export interface PropertyMapProps {
  *
  * ⚠️ STANDART Leaflet markeri ISHLATILMAYDI. U `marker-icon.png` ni ildizdan qidiradi
  * va `/obyektlar` sub-path ostida 404 beradi (klassik tuzoq) — natijada nuqtalar
- * ko'rinmay qolardi. O'rniga `pinIcon()` — ichki SVG'li `divIcon` (davijara.uz
+ * ko'rinmay qolardi. O'rniga `pinIcon()` (`pin.ts`) — ichki SVG'li `divIcon` (davijara.uz
  * xaritasidagi joylashuv belgisi shakli, 2026-09-12): rasm fayli umuman kerak emas,
  * kategoriya rangi bilan bo'yaladi. Hudud rejimidagi pufakchalar esa `L.circleMarker`.
  *
@@ -194,7 +195,10 @@ export function PropertyMap({
     const cluster = L.markerClusterGroup({
       maxClusterRadius: 48,
       showCoverageOnHover: false,
-      chunkedLoading: true,
+      // ⚠️ `chunkedLoading` ATAYLAB yo'q: bo'laklar `setTimeout` bilan davom etadi va
+      // qatlam almashtirilganda / xarita o'chirilganda TO'XTATILMAYDI — keyingi bo'lak
+      // `this._map.project()` ni `null` xaritada chaqirib yiqiladi (rejim almashtirish,
+      // sahifadan chiqish, dev StrictMode). Tezlik uchun pastdagi `addLayers` yetarli.
       iconCreateFunction: (c) => {
         const n = c.getChildCount();
         const size = n < 10 ? 34 : n < 100 ? 42 : 52;
@@ -292,40 +296,5 @@ export function PropertyMap({
         <div ref={boxRef} className="h-full w-full bg-slate-100" />
       </div>
     </div>
-  );
-}
-
-/**
- * Joylashuv belgisi (pin) — davijara.uz xaritasidagi bilan bir xil shakl va o'lcham
- * (26×34, UCHI aynan koordinatada: `iconAnchor` pastki markaz). Rang — kategoriya
- * rangi (panel kartalari bilan bir xil); chegara va markaz OQ, chunki oltin
- * kategoriyalarda (11/12) oltin chegara ko'rinmay qolardi.
- *
- * ⚠️ Rasm fayl EMAS, ichki SVG — `marker-icon.png` `/obyektlar` ostida 404 berardi.
- * ⚠️ `className` beriladi — busiz Leaflet `leaflet-div-icon` (oq fon + ramka) qo'shadi.
- * Belgilar kategoriya bo'yicha KESHLANADI: minglab nuqta — o'nga yaqin `DivIcon`.
- * Hover/soya uslubi `globals.css` → `.dm-pin`.
- */
-const pinCache = new Map<string, L.DivIcon>();
-function pinIcon(cat: Parameters<typeof categoryColor>[0]): L.DivIcon {
-  const key = String(cat);
-  let icon = pinCache.get(key);
-  if (!icon) {
-    icon = L.divIcon({
-      className: "dm-pin",
-      html: `<svg viewBox="-1 -1 26 34" width="26" height="34" aria-hidden="true"><path d="M12 0C5.4 0 0 5.4 0 12c0 9 12 20 12 20s12-11 12-20c0-6.6-5.4-12-12-12z" fill="${categoryColor(cat)}" stroke="#fff" stroke-width="1.5"/><circle cx="12" cy="12" r="4.5" fill="#fff"/></svg>`,
-      iconSize: [26, 34],
-      iconAnchor: [13, 34],
-      popupAnchor: [0, -34],
-    });
-    pinCache.set(key, icon);
-  }
-  return icon;
-}
-
-/** Popup HTML'iga kadastr/nom qo'yishdan oldin — ma'lumot bazadan keladi. */
-function escapeHtml(v: string): string {
-  return v.replace(/[&<>"']/g, (c) =>
-    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c] as string,
   );
 }

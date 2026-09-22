@@ -185,7 +185,9 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
   // ⚠️ `wantsRemoved` bu yerga TUSHMASLIGI kerak: 13 haqiqiy kategoriya kodi emas,
   // pastdagi `else` shoxi uni `integrationCategoryCode = 13` deb qidirib, natijani
   // doim bo'sh qaytarardi (holbuki shart yuqorida allaqachon qo'yilgan).
-  // ⚠️ Halqa diagramma uchun: kategoriya ustunlaridan hisoblanadigan EFFEKTIV qiymat.
+  // EFFEKTIV kategoriya (kategoriya ustunlaridan hisoblanadi). ⚠️ O'LIK KOD EMAS: panel
+  // "Kategoriya taqsimoti"ning landSplit kat 1–4 havolalari shunga tayanadi — ularning
+  // Yer+Bino soni effektiv kategoriyadan sanaladi (`stats.ts` → `landCategoryCountRows`).
   // `CAT_VACANT` (11) ikkala ustun ham null bo'lgan holat — bazada literal 11 saqlanmaydi.
   if (f.effectiveCategory && !wantsRemoved) {
     const c = f.effectiveCategory;
