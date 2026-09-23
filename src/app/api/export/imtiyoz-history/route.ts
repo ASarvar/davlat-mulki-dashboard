@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import type { ImtiyozResultCode } from "@prisma/client";
 import { getCurrentUser } from "@/lib/authz";
+import { canAccess } from "@/server/services/sectionAccess";
 import { listChecks } from "@/server/services/imtiyoz/audit";
 
 /**
@@ -45,6 +46,7 @@ function cell(v: unknown): string {
 export async function GET(req: NextRequest) {
   const user = await getCurrentUser();
   if (!user) return new NextResponse("Tizimga kiring", { status: 401 });
+  if (!(await canAccess(user, "imtiyoz"))) return new NextResponse("Ruxsat yo'q", { status: 403 });
 
   const sp = req.nextUrl.searchParams;
   const from = sp.get("from");

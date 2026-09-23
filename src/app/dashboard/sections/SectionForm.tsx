@@ -3,7 +3,7 @@
 import { useRef } from "react";
 import { Lock, Check } from "lucide-react";
 import type { Role, SectionVisibility } from "@prisma/client";
-import { ROLE_LABEL } from "@/lib/roles";
+import { ALL_ROLES, ROLE_LABEL } from "@/lib/roles";
 import { saveSectionAction } from "./actions";
 
 const MODES: { value: SectionVisibility; label: string; hint: string }[] = [
@@ -36,7 +36,7 @@ export function SectionForm(props: SectionFormProps) {
   // ⚠️ SUPER_ADMIN ro'yxatda ko'rsatilmaydi: u har qanday rejimda ham ko'radi
   // (aks holda o'zini shu sahifadan qulflab qo'yishi mumkin bo'lardi).
   const selectable = allowRoles.filter((r) => r !== "SUPER_ADMIN");
-  const limited = allowRoles.length < 6;
+  const limited = allowRoles.length < ALL_ROLES.length;
 
   if (core) {
     return (

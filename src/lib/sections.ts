@@ -1,5 +1,6 @@
 import type { Role } from "@prisma/client";
-import { ALL_ROLES } from "@/lib/roles";
+import { ALL_ROLES, STAFF_ROLES } from "@/lib/roles";
+import { SOHA_AKTIVLAR, SOHA_DIREKSIYA } from "@/lib/sourceLabel";
 
 /**
  * Bo'limlar registri — ilovadagi HAR BIR sahifa/menyu bandi shu yerda e'lon qilinadi.
@@ -48,6 +49,15 @@ export interface SectionDef {
    * Menyudagi band esa `panel` bo'limiga tegishli (u yopilishi mumkin).
    */
   hidden?: true;
+  /**
+   * Shu SOHALARGA (`OrganizationSource.name`) tegishli foydalanuvchidan yashiriladi.
+   *
+   * Faqat tashkilotga bog'langan rollarga (Ijrochi, Moderator) qo'llanadi. Moderatorning
+   * tashkilotlari aralash bo'lsa (masalan Ijara markazi + Direksiya) — ko'radi: yashirish
+   * uchun BARCHA tashkilotlari shu sohalarda bo'lishi kerak. Cheklovsiz rollarga
+   * (rahbariyat, kuzatuvchi, adminlar, "hamma tashkilot" moderatori) ta'sir qilmaydi.
+   */
+  hiddenForSohas?: string[];
 }
 
 const ADMINS: Role[] = ["SUPER_ADMIN", "ADMIN"];
@@ -63,16 +73,19 @@ export const SECTIONS: SectionDef[] = [
   // to'g'ridan-to'g'ri `core` marshrutda edi va shu sabab chiqarilgan zahoti hamma
   // rolga ochilib ketgan edi (foydalanuvchi topdi, 2026-09-05) — aynan `SectionAccess`
   // oldini olishi kerak bo'lgan holat.
-  { key: "panel",          href: "/dashboard",                    label: "Boshqaruv paneli",     exact: true,  allowRoles: ALL_ROLES },
+  { key: "panel",          href: "/dashboard",                    label: "Boshqaruv paneli",     exact: true,  allowRoles: STAFF_ROLES },
   // Rasmiy hisobot shakli (uchta jadval). Ilgari `/dashboard` da edi; vizual panel
   // uning o'rnini egallagach shu yerga ko'chirildi (2026-09-05). Panel yopiq bo'lgan
   // foydalanuvchi `/dashboard` dan SHU YERGA yo'naltiriladi — ya'ni u uchun hech narsa
   // o'zgarmaydi, eski ko'rinish o'z joyida qoladi.
-  { key: "hisobot",        href: "/dashboard/hisobot",            label: "Hisobot",              exact: false, allowRoles: ALL_ROLES },
-  { key: "objects",        href: "/dashboard/objects",            label: "Obyektlar",            exact: false, allowRoles: ALL_ROLES },
-  { key: "requests",       href: "/dashboard/requests",           label: "Tasdiqlash so'rovlari", exact: false, allowRoles: ALL_ROLES },
-  { key: "imtiyoz",        href: "/dashboard/imtiyoz",            label: "Ijara imtiyozi",       exact: false, allowRoles: ALL_ROLES },
-  { key: "notifications",  href: "/dashboard/notifications",      label: "Bildirishnomalar",     exact: false, allowRoles: ALL_ROLES },
+  { key: "hisobot",        href: "/dashboard/hisobot",            label: "Hisobot",              exact: false, allowRoles: STAFF_ROLES },
+  { key: "objects",        href: "/dashboard/objects",            label: "Obyektlar",            exact: false, allowRoles: STAFF_ROLES },
+  { key: "requests",       href: "/dashboard/requests",           label: "Tasdiqlash so'rovlari", exact: false, allowRoles: STAFF_ROLES },
+  // ⚠️ Direksiya va Davlat aktivlari agentligi xodimlariga ko'rinmaydi — imtiyoz faqat
+  // Ijara markazi ijara savdolariga tegishli (foydalanuvchi talabi, 2026-09-23).
+  // `ALL_ROLES` — `IMTIYOZ` roli uchun yagona bo'lim shu.
+  { key: "imtiyoz",        href: "/dashboard/imtiyoz",            label: "Ijara imtiyozi",       exact: false, allowRoles: ALL_ROLES, hiddenForSohas: [SOHA_DIREKSIYA, SOHA_AKTIVLAR] },
+  { key: "notifications",  href: "/dashboard/notifications",      label: "Bildirishnomalar",     exact: false, allowRoles: STAFF_ROLES },
   // ⚠️ Auksion buyurtmalari reyestrida SHAXSIY MA'LUMOT bor (g'olibning F.I.Sh.,
   // passport, JSHSHIR, telefon, manzili). Shuning uchun `allowRoles` ataylab faqat
   // adminlar — bazadagi sozlama uni kengaytira olmaydi (foydalanuvchi qarori,

@@ -3,6 +3,7 @@ import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { SyncStatus } from "@prisma/client";
 import { getCurrentUser } from "@/lib/authz";
+import { canAccess } from "@/server/services/sectionAccess";
 import { CATEGORY_BY_CODE, effectiveCategory } from "@/lib/categories";
 import {
   iteratePropertiesForExport,
@@ -24,6 +25,7 @@ export async function GET(req: Request) {
   // Rol DB'dan (eski sessiya eski rolni saqlaydi) — eksport hudud doirasi shunga bog'liq.
   const user = await getCurrentUser();
   if (!user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
+  if (!(await canAccess(user, "objects"))) return new NextResponse("Ruxsat yo'q", { status: 403 });
 
   const sp = new URL(req.url).searchParams;
   const statusRaw = sp.get("status");

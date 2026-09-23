@@ -98,6 +98,7 @@ export async function requireRole(...roles: Role[]): Promise<SessionUser> {
  *  - SUPER_ADMIN / ADMIN / RAHBARIYAT / VIEWER → null (hamma tashkilot, cheklovsiz)
  *  - MODERATOR → allSources bo'lsa null, aks holda biriktirilgan tashkilotlar
  *  - IJROCHI → [o'z tashkiloti] (aynan bitta)
+ *  - IMTIYOZ → [] (obyektlarga umuman aloqasi yo'q — faqat imtiyoz bo'limi)
  * `null` = cheklov yo'q. Bo'sh massiv = hech qanday tashkilot (ehtiyot uchun —
  * biriktirilmagan ijrochi/moderator hech narsa ko'rmaydi).
  *
@@ -117,7 +118,7 @@ export async function userSourceScope(user: SessionUser): Promise<string[] | nul
     if (u.allSources) return null;
     return u.moderatorSources.map((r) => r.sourceId);
   }
-  return [];
+  return []; // IMTIYOZ — ataylab hech narsa (bo'limga kirolmasa ham, himoya ikki qavat)
 }
 
 // Tashkilotga yozish/tasdiqlash ruxsati.

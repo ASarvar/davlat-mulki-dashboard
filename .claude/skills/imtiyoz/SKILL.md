@@ -132,7 +132,11 @@ arxiv nusxasi ham shuni ishlatadi, shuning uchun ular hech qachon ajralib qolmay
 "faqat tarix uchun" ko'rinish yozmang.
 ⚠️ "Qayta tekshirish" tugmasi FAQAT `inconclusive` holatida chiqadi — rad javobida bo'lmasligi
 kerak, aks holda operator rad javobini "vaqtinchalik nosozlik" deb tushunishi mumkin.
-Menyu **hamma rolga** ochiq (tekshiruv hech narsani o'zgartirmaydi, faqat o'qiydi).
+Menyu hamma rolga ochiq (tekshiruv hech narsani o'zgartirmaydi, faqat o'qiydi), **ikki istisno
+bilan** (2026-09-23): Direksiya va Davlat aktivlari agentligi xodimlariga ko'rinmaydi
+(`lib/sections.ts` → `hiddenForSohas`), va `IMTIYOZ` roli ("Imtiyoz operatori") FAQAT shu
+bo'limni ko'radi. ⚠️ Operator route'lari (`/api/imtiyoz/app/*`, `/api/export/imtiyoz-history`)
+ham `canAccess(user, "imtiyoz")` bilan himoyalangan — ochiq `check-discount` EMAS.
 
 ### Sinov — mock shlyuz
 

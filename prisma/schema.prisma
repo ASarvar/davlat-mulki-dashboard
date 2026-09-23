@@ -28,6 +28,7 @@ enum Role {
   MODERATOR
   IJROCHI
   VIEWER
+  IMTIYOZ // faqat /dashboard/imtiyoz (lib/roles.ts → STAFF_ROLES)
 }
 
 model User {

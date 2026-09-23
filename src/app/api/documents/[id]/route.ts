@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/authz";
+import { canAccess } from "@/server/services/sectionAccess";
 import { prisma } from "@/lib/prisma";
 import { resolveDocumentPath } from "@/server/services/documents";
 
@@ -12,6 +13,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // Rol JWT'dan emas, DB'dan (authz.ts → getCurrentUser) — eski sessiya eski rolni saqlaydi.
   const user = await getCurrentUser();
   if (!user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
+  // Hujjat obyekt sahifasida va so'rovlarda ochiladi — ikkalasi ham yopiq bo'lsa (imtiyoz
+  // operatori) hujjat ham yopiq.
+  if (!(await canAccess(user, "objects")) && !(await canAccess(user, "requests"))) {
+    return new NextResponse("Ruxsat yo'q", { status: 403 });
+  }
 
   const doc = await prisma.document.findUnique({
     where: { id },

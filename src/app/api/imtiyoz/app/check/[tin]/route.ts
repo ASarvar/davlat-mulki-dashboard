@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { getCurrentUser } from "@/lib/authz";
+import { canAccess } from "@/server/services/sectionAccess";
 import { classifySubject } from "@/lib/imtiyoz";
 import { evaluateEligibility } from "@/server/services/imtiyoz/evaluate";
 import { recordCheck } from "@/server/services/imtiyoz/audit";
@@ -19,6 +20,14 @@ export async function GET(req: NextRequest, ctx: { params: Promise<{ tin: string
     return NextResponse.json(
       { success: false, error: { code: "UNAUTHORIZED", message: "Tizimga kiring" } },
       { status: 401 },
+    );
+  }
+  // ⚠️ Bo'lim qorovuli route'da ham — menyudan yashirish API'ni yopmaydi
+  // (Direksiya/Agentlik xodimlari, `lib/sections.ts` → `hiddenForSohas`).
+  if (!(await canAccess(user, "imtiyoz"))) {
+    return NextResponse.json(
+      { success: false, error: { code: "FORBIDDEN", message: "Ruxsat yo'q" } },
+      { status: 403 },
     );
   }
 

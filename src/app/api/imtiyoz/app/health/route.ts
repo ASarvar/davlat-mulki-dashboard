@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/authz";
+import { canAccess } from "@/server/services/sectionAccess";
 import { getServiceSnapshots, yattStatus } from "@/server/services/imtiyoz/health";
 import { getYattState } from "@/server/services/imtiyoz/yattIndex";
 import { imtiyozConfigured } from "@/server/integrations/imtiyoz";
@@ -17,6 +18,14 @@ export async function GET() {
     return NextResponse.json(
       { success: false, error: { code: "UNAUTHORIZED", message: "Tizimga kiring" } },
       { status: 401 },
+    );
+  }
+  // ⚠️ Bo'lim qorovuli route'da ham — menyudan yashirish API'ni yopmaydi
+  // (Direksiya/Agentlik xodimlari, `lib/sections.ts` → `hiddenForSohas`).
+  if (!(await canAccess(user, "imtiyoz"))) {
+    return NextResponse.json(
+      { success: false, error: { code: "FORBIDDEN", message: "Ruxsat yo'q" } },
+      { status: 403 },
     );
   }
 

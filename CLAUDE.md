@@ -110,7 +110,7 @@ process, Next.js emas). Idempotent — qayta ishga tushganda jadval qayta yozila
 Faol run bor bo'lsa `assertNoActiveRun()` xato tashlaydi — kunlik ishga tushirish buni
 `try/catch` bilan jim o'tkazib yuboradi (log'ga yozadi, keyingi kunga qoldiradi).
 
-### Rollar (6 ta)
+### Rollar (7 ta)
 - `SUPER_ADMIN` — hammasi.
 - `ADMIN` — super admin bilan bir xil, lekin super adminni ko'rmaydi/boshqarmaydi.
 - `RAHBARIYAT` — **cheklovsiz**; so'rovni **yakuniy tasdiqlaydi** (2-bosqich);
@@ -127,6 +127,10 @@ Faol run bor bo'lsa `assertNoActiveRun()` xato tashlaydi — kunlik ishga tushir
 - `IJROCHI` — aynan bitta **tashkilot** (`User.sourceId`); "Bo'sh turgan" obyektni Yaroqsiz/Chekka'ga
   biriktirish **so'rovini** yuboradi (darhol emas).
 - `VIEWER` — faqat ko'rish.
+- `IMTIYOZ` ("Imtiyoz operatori", 2026-09-23) — **FAQAT** `/dashboard/imtiyoz`. Tashkilot
+  biriktirilmaydi, `userSourceScope()` → `[]`. Obyektlar/hisobot/so'rovlar bo'limlarining
+  `allowRoles`i `STAFF_ROLES` (= `ALL_ROLES` − `IMTIYOZ`), ya'ni bazada `EVERYONE` bo'lsa ham
+  unga ochilmaydi. Eksport va hujjat route'lari ham `canAccess()` bilan yopilgan.
 
 ⚠️ Enum `NAZORATCHI` → `IJROCHI` deb qayta nomlangan (migratsiya `20260725120000_rahbariyat_two_stage`).
 Yorliqlar `src/lib/roles.ts` → `ROLE_LABEL` da; kodda rol satrini qo'lda yozmang.
@@ -228,6 +232,10 @@ matn bo'yicha ajratib bo'lmasdi — dev'da ishlab, serverda ishlamasdi. Ko'rinis
 ⚠️ **Kesh — `cache()` (so'rov ichida), `unstable_cache` EMAS.** Ruxsat o'zgarishi
 60 soniyalik TTL kutmasligi kerak. Saqlashdan keyin `revalidatePath("/dashboard",
 "layout")` — Sidebar layoutda quriladi.
+
+⚠️ **`SectionDef.hiddenForSohas`** — soha bo'yicha qattiq chegara (2026-09-23): imtiyoz
+Direksiya va Davlat aktivlari agentligi xodimlariga ko'rinmaydi. Faqat tashkilotga bog'langan
+rollarga (Ijrochi, Moderator) va faqat BARCHA tashkilotlari shu sohalarda bo'lsa qo'llanadi.
 
 ⚠️ **Bo'limni yashirish uning API route'ini yashirmaydi.** Yangi bo'limning har bir
 `route.ts` va server action'i ham `requireSection(key)` bilan boshlanishi kerak.

@@ -2,7 +2,8 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import type { Role, SectionVisibility } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { requireUserOrRedirect, type SessionUser } from "@/lib/authz";
+import { requireUserOrRedirect, userSourceScope, type SessionUser } from "@/lib/authz";
+import { sourceMode } from "@/lib/roles";
 import { SECTIONS, sectionDef, type SectionDef } from "@/lib/sections";
 
 /**
@@ -30,22 +31,55 @@ const loadAccess = cache(async (): Promise<Map<string, SectionState>> => {
 });
 
 /**
+ * Foydalanuvchi tashkilotlarining SOHALARI (`OrganizationSource.name`) — `hiddenForSohas` uchun.
+ * `null` — soha cheklovi qo'llanmaydi: tashkilotga bog'lanmaydigan rollar va cheklovsiz
+ * doira ("hamma tashkilot" moderatori).
+ *
+ * ⚠️ `sourceMode` bo'yicha, `userSourceScope() === null` bo'yicha EMAS: imtiyoz operatorining
+ * doirasi `[]` (hech qanday obyekt), va u "sohasi yo'q" deb imtiyozdan ham yashirilib qolardi.
+ */
+function loadUserSohas(user: SessionUser): Promise<string[] | null> {
+  // `cache()` argumentlarni IDENTIKLIK bo'yicha solishtiradi, `getCurrentUser()` esa har
+  // chaqiruvda yangi obyekt qaytaradi — shuning uchun kalit oddiy qiymatlardan.
+  return sohasFor(user.id, user.role, user.sourceId);
+}
+
+const sohasFor = cache(async (id: string, role: Role, sourceId: string | null): Promise<string[] | null> => {
+  if (sourceMode(role) === "none") return null;
+  const ids = await userSourceScope({ id, role, sourceId });
+  if (ids === null) return null;
+  if (ids.length === 0) return [];
+  const rows = await prisma.organizationSource.findMany({
+    where: { id: { in: ids } },
+    select: { name: true },
+    distinct: ["name"],
+  });
+  return rows.map((r) => r.name);
+});
+
+/**
  * Bo'lim shu foydalanuvchiga ochiqmi.
  *
  * Tartib muhim:
  *  1. SUPER_ADMIN — HAR DOIM ochiq. Busiz u `/dashboard/sections` ni o'zidan yopib,
  *     boshqaruv panelini butunlay yo'qotib qo'yishi mumkin bo'lardi.
  *  2. `allowRoles` — koddagi qattiq chegara, bazadagi sozlama uni kengaytira olmaydi.
- *  3. `core` — o'zak bo'lim (`/dashboard`), bazaga bo'ysunmaydi.
- *  4. Qator yo'q — `SUPER_ONLY` (fail-closed).
+ *  3. `hiddenForSohas` — barcha tashkilotlari shu sohalarda bo'lsa yopiq (`sohas` —
+ *     `loadUserSohas()` natijasi). Bu ham koddagi chegara, bazadagi sozlama ocholmaydi.
+ *  4. `core` — o'zak bo'lim (`/dashboard`), bazaga bo'ysunmaydi.
+ *  5. Qator yo'q — `SUPER_ONLY` (fail-closed).
  */
 export function canAccessWith(
   access: Map<string, SectionState>,
   user: SessionUser,
   def: SectionDef,
+  sohas: string[] | null,
 ): boolean {
   if (user.role === "SUPER_ADMIN") return true;
   if (!def.allowRoles.includes(user.role)) return false;
+  if (def.hiddenForSohas && sohas !== null && sohas.every((s) => def.hiddenForSohas!.includes(s))) {
+    return false;
+  }
   if (def.core) return true;
 
   const state = access.get(def.key);
@@ -58,13 +92,14 @@ export function canAccessWith(
 export async function canAccess(user: SessionUser, key: string): Promise<boolean> {
   const def = sectionDef(key);
   if (!def) return false; // registrda yo'q bo'lim — hech kimga ochilmaydi
-  return canAccessWith(await loadAccess(), user, def);
+  const [access, sohas] = await Promise.all([loadAccess(), loadUserSohas(user)]);
+  return canAccessWith(access, user, def, sohas);
 }
 
 /** Menyu uchun: shu foydalanuvchiga ochiq bo'limlar kalitlari (registr tartibida). */
 export async function allowedSectionKeys(user: SessionUser): Promise<string[]> {
-  const access = await loadAccess();
-  return SECTIONS.filter((def) => canAccessWith(access, user, def)).map((d) => d.key);
+  const [access, sohas] = await Promise.all([loadAccess(), loadUserSohas(user)]);
+  return SECTIONS.filter((def) => canAccessWith(access, user, def, sohas)).map((d) => d.key);
 }
 
 /**
@@ -92,8 +127,8 @@ export async function requireSection(key: string): Promise<SessionUser> {
  * olib borardi. Shuning uchun MENYUDAGI birinchi ochiq bo'lim olinadi.
  */
 export async function firstOpenSectionHref(user: SessionUser): Promise<string> {
-  const access = await loadAccess();
-  const first = SECTIONS.find((def) => !def.hidden && canAccessWith(access, user, def));
+  const [access, sohas] = await Promise.all([loadAccess(), loadUserSohas(user)]);
+  const first = SECTIONS.find((def) => !def.hidden && canAccessWith(access, user, def, sohas));
   return first?.href ?? "/dashboard/hisobot";
 }
 

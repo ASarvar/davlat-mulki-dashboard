@@ -1,6 +1,7 @@
 import ExcelJS from "exceljs";
 import { NextResponse } from "next/server";
 import { getCurrentUser, userSourceScope } from "@/lib/authz";
+import { canAccess } from "@/server/services/sectionAccess";
 import {
   computeUtilityStats,
   computeDistrictUtilityStats,
@@ -90,6 +91,7 @@ function writeSheet(
 export async function GET() {
   const user = await getCurrentUser();
   if (!user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
+  if (!(await canAccess(user, "hisobot"))) return new NextResponse("Ruxsat yo'q", { status: 403 });
 
   // ⚠️ Rol doirasi SHART — aks holda cheklangan foydalanuvchi ekranda o'z tashkilotini
   // ko'rib turib, eksport orqali butun bazani yuklab olardi.

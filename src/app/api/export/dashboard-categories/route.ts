@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser, userSourceScope } from "@/lib/authz";
+import { canAccess } from "@/server/services/sectionAccess";
 import { buildDashboardWorkbook } from "@/server/services/dashboardExport";
 import { getDashboardStats, computeDistrictStatsByRegion, type StatsScope } from "@/server/services/stats";
 import { listSourceNames } from "@/server/services/sources";
@@ -8,6 +9,7 @@ import { isLandSplitSoha } from "@/lib/sourceLabel";
 export async function GET(req: Request) {
   const user = await getCurrentUser();
   if (!user) return new NextResponse("Avtorizatsiya talab qilinadi", { status: 401 });
+  if (!(await canAccess(user, "hisobot"))) return new NextResponse("Ruxsat yo'q", { status: 403 });
 
   // Dashboard'dagi manba (soha) kesimi eksportga ham o'tadi — aks holda ekranda
   // bir manba ko'rinib turib, yuklangan faylda hamma manba chiqib ketardi.

@@ -10,6 +10,8 @@ export const ROLE_LABEL: Record<Role, string> = {
   // darajasidagi tashkilot (Direksiya, Agentlik markaziy) barcha hududlarga tarqaladi.
   IJROCHI: "Ijrochi",
   VIEWER: "Kuzatuvchi",
+  // Faqat `/dashboard/imtiyoz` — obyektlar, hisobot va so'rovlarni ko'rmaydi (2026-09-23).
+  IMTIYOZ: "Imtiyoz operatori",
 };
 
 // Barcha rollar — enum tartibida. Ro'yxat/tanlagichlarda va bo'limlar registrida
@@ -21,7 +23,17 @@ export const ALL_ROLES: Role[] = [
   "MODERATOR",
   "IJROCHI",
   "VIEWER",
+  "IMTIYOZ",
 ];
+
+/**
+ * Obyektlar bilan ishlaydigan rollar — `IMTIYOZ` dan boshqa hammasi.
+ *
+ * ⚠️ `lib/sections.ts` da obyektlar/hisobot/so'rovlar bo'limlarining `allowRoles`i
+ * SHU, `ALL_ROLES` EMAS. Bu koddagi qattiq chegara: bazada bo'lim `EVERYONE` bo'lsa
+ * ham imtiyoz operatoriga ochilmaydi ("hamma" = `allowRoles` doirasidagi hamma).
+ */
+export const STAFF_ROLES: Role[] = ALL_ROLES.filter((r) => r !== "IMTIYOZ");
 
 export interface RoleOption {
   value: Role;
@@ -36,6 +48,7 @@ export const ASSIGNABLE_ROLES: RoleOption[] = [
   { value: "MODERATOR", label: "Moderator", desc: "So'rovni qabul qiladi (tashkilot(lar) biriktiriladi)" },
   { value: "IJROCHI", label: "Ijrochi", desc: "Bitta tashkilot, kategoriya so'rovi yuboradi" },
   { value: "VIEWER", label: "Kuzatuvchi", desc: "Faqat ko'rish" },
+  { value: "IMTIYOZ", label: "Imtiyoz operatori", desc: "Faqat Ijara imtiyozi sahifasi" },
 ];
 
 /** Rolga tashkilot kerakmi va qanday shaklda. */

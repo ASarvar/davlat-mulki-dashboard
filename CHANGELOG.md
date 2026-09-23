@@ -7,6 +7,15 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.16.0
+
+- **Yangi rol: "Imtiyoz operatori"** — faqat "Ijara imtiyozi" bo'limini ko'radi
+  (obyektlar, hisobot, so'rovlar unga yopiq); tashkilot biriktirilmaydi. Migratsiya
+  `20260923120000_imtiyoz_role` + `20260923120100_imtiyoz_role_section`.
+- **"Ijara imtiyozi" Direksiya va Davlat aktivlari agentligi xodimlariga ko'rinmaydi**
+  (menyuda ham, URL va API orqali ham).
+- Excel eksportlari va hujjat yuklash manzillari endi bo'lim ruxsatini ham tekshiradi.
+
 ## 1.15.4
 
 - **Obyekt sahifasida xaritadagi joylashuv** — "Kategoriya biriktirish" ustida kichik
