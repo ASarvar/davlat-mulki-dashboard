@@ -60,6 +60,8 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
         coordsAt: new Date(),
       }
     : {};
+  // ⚠️ `undefined` (eski API 2 zaxirasi) — ustunga tegilmaydi, avvalgi sana saqlanadi.
+  const balanceFields = base.balanceDate !== undefined ? { balanceDate: base.balanceDate } : {};
 
   const property = await prisma.property.upsert({
     where: { cadNumber },
@@ -76,6 +78,7 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
       isLand: base.isLand,
       rawApi2: base.raw as Prisma.InputJsonValue,
       ...coordFields,
+      ...balanceFields,
       syncStatus: "SYNCING",
     },
     update: {
@@ -88,6 +91,7 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
       isLand: base.isLand,
       rawApi2: base.raw as Prisma.InputJsonValue,
       ...coordFields,
+      ...balanceFields,
       syncStatus: "SYNCING",
     },
     select: {

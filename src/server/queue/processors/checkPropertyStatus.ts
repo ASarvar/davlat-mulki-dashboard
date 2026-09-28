@@ -182,6 +182,8 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
           buildingArea: b.buildingArea != null ? new Prisma.Decimal(b.buildingArea) : null,
           isLand: b.isLand,
           rawApi2: b.raw as Prisma.InputJsonValue,
+          // ⚠️ `undefined` (eski API 2 zaxirasi) — ustunga tegilmaydi.
+          ...(b.balanceDate !== undefined ? { balanceDate: b.balanceDate } : {}),
         },
       });
       baseBuildingArea = b.buildingArea ?? 0;

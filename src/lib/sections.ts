@@ -80,6 +80,9 @@ export const SECTIONS: SectionDef[] = [
   // o'zgarmaydi, eski ko'rinish o'z joyida qoladi.
   { key: "hisobot",        href: "/dashboard/hisobot",            label: "Hisobot",              exact: false, allowRoles: STAFF_ROLES },
   { key: "objects",        href: "/dashboard/objects",            label: "Obyektlar",            exact: false, allowRoles: STAFF_ROLES },
+  // KPI: oy bo'yicha balansga olingan obyektlar, hududlar kesimida (2026-09-28).
+  // Qator yozilmagan ⇒ avval faqat super admin ko'radi, u `/dashboard/sections` da ochadi.
+  { key: "balans",         href: "/dashboard/balans",             label: "Balansga olinganlar",  exact: false, allowRoles: STAFF_ROLES },
   { key: "requests",       href: "/dashboard/requests",           label: "Tasdiqlash so'rovlari", exact: false, allowRoles: STAFF_ROLES },
   // ⚠️ Direksiya va Davlat aktivlari agentligi xodimlariga ko'rinmaydi — imtiyoz faqat
   // Ijara markazi ijara savdolariga tegishli (foydalanuvchi talabi, 2026-09-23).

@@ -7,6 +7,15 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.17.0
+
+- **Yangi bo'lim "Balansga olinganlar"** (`/dashboard/balans`, KPI uchun) — tanlangan oyda
+  balansga olingan obyektlar hududlar × manba kesimida, o'tgan oy bilan taqqoslash, har bir
+  son ro'yxatga havola, ro'yxatni Excel'ga yuklash. Avval faqat super adminga ko'rinadi.
+- Sana — kadastrdagi huquq ro'yxatdan o'tgan sana (`Property.balanceDate`, migratsiya
+  `20260928120000_property_balance_date` mavjud obyektlarni o'zi to'ldiradi).
+- Obyektlar ro'yxatida "Balansga olingan" sana filtri; Excel eksportiga shu ustun qo'shildi.
+
 ## 1.16.0
 
 - **Yangi rol: "Imtiyoz operatori"** — faqat "Ijara imtiyozi" bo'limini ko'radi

@@ -19,6 +19,7 @@ import {
   SlidersHorizontal,
   Table2,
   Gavel,
+  CalendarPlus,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -53,6 +54,7 @@ const ICONS: Record<string, LucideIcon> = {
   panel: LayoutDashboard,
   hisobot: Table2,
   objects: Building2,
+  balans: CalendarPlus,
   requests: ClipboardCheck,
   imtiyoz: BadgePercent,
   notifications: Bell,

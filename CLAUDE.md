@@ -769,6 +769,22 @@ o'ram (`MapSection.tsx`) shu uchun bor.
 Tile manzili `MAP_TILE_URL` env orqali (standarti OSM); `tileerror` da ogohlantirish
 chiqadi, nuqtalar baribir chiziladi.
 
+### Balansga olinganlar — `/dashboard/balans` (2026-09-28, KPI)
+
+Oy bo'yicha balansga olingan obyektlar, hududlar × soha. Sana — **`Property.balanceDate`**:
+kadastrdagi huquq ro'yxatdan o'tgan ENG OXIRGI sana (`land.legal[].date` /
+`outer[].legal[].date`), `lib/balance.ts` → `balanceRegDate()`.
+⚠️ **`createdAt` EMAS** — u tizim obyektni ko'rgan kun: jonli o'lchovda sentyabrda
+"yaratilgan" 241 obyektdan 185 tasining huquqi ancha oldin ro'yxatdan o'tgan edi.
+⚠️ Migratsiyadagi SQL to'ldirish JS funksiyasi bilan AYNAN bir xil (6093 obyektda 0 farq);
+mavjud bo'lmagan sana ikkalasida ham tashlanadi. Eski API 2 shaklida sana yo'q → `null`,
+yozuvchilar `undefined` bo'lsa ustunga TEGMAYDI.
+- Hudud — obyekt JOYLASHGAN hudud (`regionId`), respublika tashkilotlari ham kiradi, shuning
+  uchun havolalarda `hududiy=1` YO'Q (rasmiy hisobot jadvalidan farqli — ataylab).
+- Sonlar `buildWhere()` bilan (`services/balance.ts`), ro'yxat filtri `balansFrom`/`balansTo`
+  (ikkala chegara kiradi) — son va ro'yxat ajralmaydi. Eksportda "Balansga olingan sana" ustuni.
+- Tashkilotlar orasida o'tkazish huquqni qayta ro'yxatdan o'tkazadi — qabul qiluvchida yangi sana.
+
 ### Kunlik snapshot — `services/snapshots.ts` + `DashboardSnapshot`
 
 `Property` ning statistika ustunlari har sinxronizatsiyada ustidan yoziladi, ya'ni

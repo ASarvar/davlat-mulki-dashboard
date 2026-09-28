@@ -3,6 +3,7 @@ import { httpJson, NotFoundError } from "./http";
 import type { PropertyBaseData } from "./types";
 import { totalBuildingArea, usefulArea, isLandOnly } from "@/lib/area";
 import { pickCadastreCoords } from "@/lib/geo";
+import { balanceRegDate } from "@/lib/balance";
 
 /**
  * `cad_data` — obyektning asosiy ma'lumotlari. **API 2 ning o'rnini bosadi** (2026-09-06).
@@ -164,6 +165,8 @@ export async function fetchCadData(cadNumber: string, tin: string): Promise<CadD
       holderInn: str(holder?.tin),
       // Kadastr poligonining markazi — auksion nuqtasidan ustun (qamrov 95% ↔ 28%).
       coords: pickCadastreCoords(d),
+      // Huquq ro'yxatdan o'tgan eng oxirgi sana — "Balansga olinganlar" hisoboti uchun.
+      balanceDate: balanceRegDate(d),
       raw: d,
     },
   };

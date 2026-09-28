@@ -25,6 +25,11 @@ export interface PropertyBaseData {
    * ⚠️ Yozishda auksion koordinatasidan USTUN (qamrov 95% ↔ 28%).
    */
   coords?: { lat: number; lng: number } | null;
+  /**
+   * Balansga olingan sana (`lib/balance.ts` → `balanceRegDate()`). Faqat `cad_data` beradi;
+   * eski API 2 da `undefined` — yozuvchi uni YOZMAYDI (mavjud qiymat saqlanib qoladi).
+   */
+  balanceDate?: Date | null;
   raw: unknown;
 }
 

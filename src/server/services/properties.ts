@@ -10,6 +10,7 @@ import {
 } from "./classification";
 import { userSourceScope, isAdmin, type SessionUser } from "@/lib/authz";
 import { CAT_REMOVED_FROM_BALANCE } from "@/lib/categories";
+import { parseIsoDay } from "@/lib/balance";
 import {
   parseUtilityRaw,
   formatLastPayment as payDate,
@@ -80,6 +81,12 @@ export interface PropertyFilters {
   myRegionsOnly?: boolean;
   /** Kommunal xizmat kesimi — dashboard'dagi kommunal jadval ustunlaridan drill-down. */
   utility?: UtilityFilter;
+  /**
+   * Balansga olingan sana oralig'i (`"YYYY-MM-DD"`, ikkala chegara ham KIRADI) —
+   * `/dashboard/balans` hisobotidan drill-down. Sanasi yo'q obyekt (`null`) kirmaydi.
+   */
+  balanceFrom?: string;
+  balanceTo?: string;
 }
 
 /**
@@ -259,6 +266,17 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
   // "Auksion savdolarida (Xususiy. va Ijara)" ustuni — xususiylashtirish YOKI ijara savdosida.
   if (f.onAnyAuction) and.push({ OR: [{ hasPrivatizationLot: true }, { hasRentLot: true }] });
 
+  // Balansga olingan sana — hisobot (`services/balance.ts`) aynan shu `buildWhere` bilan
+  // sanaydi, ya'ni jadvaldagi son va ro'yxat hech qachon ajralmaydi.
+  // ⚠️ Noto'g'ri sana e'tiborsiz QOLDIRILMAYDI — natija bo'sh (aks holda filtrsiz butun
+  // ro'yxat chiqib, foydalanuvchi filtr ishladi deb o'ylardi).
+  if (f.balanceFrom || f.balanceTo) {
+    const from = f.balanceFrom ? parseIsoDay(f.balanceFrom) : undefined;
+    const to = f.balanceTo ? parseIsoDay(f.balanceTo) : undefined;
+    if (from === null || to === null) return { id: "__bad_balance_date__" };
+    and.push({ balanceDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}), not: null } });
+  }
+
   // ── Kommunal xizmatlar ──
   // ⚠️ Shartlar `stats.ts` → `utilityRows()` dagi FILTER (...) ifodalari bilan
   // bir xil bo'lishi SHART, aks holda jadvaldagi raqamni bosganda ro'yxatdagi
@@ -348,6 +366,8 @@ export interface PropertyListItem {
   removedAt: Date | null;
   removedToStir: string | null;
   removedToName: string | null;
+  /** Balansga olingan sana (kadastrdagi huquq sanasi) — `lib/balance.ts`. */
+  balanceDate: Date | null;
 }
 
 export interface PropertyListResult {
@@ -509,7 +529,11 @@ export async function listProperties(
 
   const rows = await prisma.property.findMany({
     where,
-    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    // Balans filtri bilan — eng yangi olingan tepada (KPI ro'yxati shunday o'qiladi).
+    orderBy:
+      filters.balanceFrom || filters.balanceTo
+        ? [{ balanceDate: "desc" }, { id: "desc" }]
+        : [{ createdAt: "desc" }, { id: "desc" }],
     take: PAGE_SIZE,
     skip: (page - 1) * PAGE_SIZE,
     select: {
@@ -529,6 +553,7 @@ export async function listProperties(
       removedAt: true,
       removedToStir: true,
       removedToName: true,
+      balanceDate: true,
       region: { select: { name: true } },
       district: { select: { name: true } },
     },
@@ -557,6 +582,7 @@ export async function listProperties(
       removedAt: r.removedAt,
       removedToStir: r.removedToStir,
       removedToName: r.removedToName,
+      balanceDate: r.balanceDate,
     })),
   };
 }
@@ -588,6 +614,8 @@ export interface PropertyExportRow {
   removedAt: Date | null;
   removedToStir: string | null;
   removedToName: string | null;
+  /** Balansga olingan sana (kadastrdagi huquq sanasi) — `lib/balance.ts`. */
+  balanceDate: Date | null;
 }
 
 // Eksport uchun keyset bo'yicha bo'lak-bo'lak o'qish — 80k qatorni
@@ -631,6 +659,7 @@ export async function* iteratePropertiesForExport(
         removedAt: true,
         removedToStir: true,
         removedToName: true,
+        balanceDate: true,
         region: { select: { name: true } },
         district: { select: { name: true } },
         source: { select: { name: true } },
@@ -665,6 +694,7 @@ export async function* iteratePropertiesForExport(
       removedAt: r.removedAt,
       removedToStir: r.removedToStir,
       removedToName: r.removedToName,
+      balanceDate: r.balanceDate,
     }));
 
     if (rows.length < batchSize) return;

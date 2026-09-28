@@ -237,6 +237,12 @@ model Property {
   removedToStir      String?
   removedToName      String?
 
+  // Balansga olingan sana — kadastrdagi huquq ro'yxatdan o'tgan ENG OXIRGI sana
+  // (`cad_data` → `land.legal[].date` / `outer[].legal[].date`). `createdAt` EMAS:
+  // u tizim obyektni ko'rgan kun. Hisoblash `lib/balance.ts` → `balanceRegDate()`.
+  // Eski API 2 shaklida yo'q → null. `/dashboard/balans` hisoboti shunga tayanadi.
+  balanceDate        DateTime? @db.Date
+
   // Hisoblangan holat (materialized — dashboard tezligi uchun)
   integrationCategoryCode Int? // 1–4 (integratsiyadan)
   integrationCategory     Category? @relation("IntegrationCategory", fields: [integrationCategoryCode], references: [code])
@@ -404,6 +410,7 @@ model Property {
   // Balansdan chiqarilganlar HAR BIR ro'yxat/statistika so'roviga shart sifatida
   // qo'shiladi (deyarli hamma joyda `= false`), shuning uchun indeks kerak.
   @@index([removedFromBalance])
+  @@index([balanceDate])
 }
 
 enum AuctionLotType {

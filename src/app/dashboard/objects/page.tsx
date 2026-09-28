@@ -30,6 +30,7 @@ import { CAT_HAS_VACANT_AREA } from "@/server/services/classification";
 import { objectHref } from "@/lib/cadastre";
 import { withBase } from "@/lib/basePath";
 import { sourceScopeLabel } from "@/lib/sourceLabel";
+import { dmy, parseIsoDay } from "@/lib/balance";
 import { CategoryBadge, InefficientBadge, RemovedFromBalanceBadge, SyncStatusBadge } from "@/components/badges";
 import { Pagination } from "@/components/Pagination";
 import { ObjectFilters, type FilterChip } from "./ObjectFilters";
@@ -58,6 +59,9 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   const onAnyAuctionStr = str(sp.onAnyAuction);
   const isLandStr = str(sp.isLand);
   const hududiyStr = str(sp.hududiy);
+  // Balansga olingan sana oralig'i — `/dashboard/balans` hisobotidan drill-down.
+  const balansFrom = str(sp.balansFrom) || undefined;
+  const balansTo = str(sp.balansTo) || undefined;
   const utilityRaw = str(sp.utility);
   const utility = UTILITY_FILTERS.includes(utilityRaw as UtilityFilter)
     ? (utilityRaw as UtilityFilter)
@@ -84,6 +88,8 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     regionBoundSource: hududiyStr === "1" ? true : undefined,
     myRegionsOnly: myRegionsOnly || undefined,
     utility,
+    balanceFrom: balansFrom,
+    balanceTo: balansTo,
   };
 
   // "Bo'sh maydoni bor" (kat 12) filtri tanlansa, maydon ustunida bo'sh maydon ko'rsatiladi.
@@ -93,6 +99,8 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   // yangi egasi va chiqarilgan sana ko'rsatiladi.
   const canSeeRemoved = isAdmin(user.role);
   const showRemoved = canSeeRemoved && filters.categoryCode === CAT_REMOVED_FROM_BALANCE;
+  // Balans hisobotidan kelinganda oxirgi ustunda "Samaradorlik" o'rniga balansga olingan sana.
+  const showBalance = !showRemoved && Boolean(balansFrom || balansTo);
 
   // MODERATOR "Faqat mening tashkilotlarim" bilan o'ziga biriktirilganlar bo'yicha
   // saralay oladi (myRegionsOnly, buildWhere()da qo'llanadi).
@@ -143,6 +151,8 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   if (hududiyStr) baseParams.set("hududiy", hududiyStr);
   if (utility) baseParams.set("utility", utility);
   if (syncStatus) baseParams.set("status", syncStatus);
+  if (balansFrom) baseParams.set("balansFrom", balansFrom);
+  if (balansTo) baseParams.set("balansTo", balansTo);
 
   // Plain <a> (Link emas) — basePath'ni qo'lda qo'shamiz.
   const exportHref = withBase(`/api/export/objects?${baseParams.toString()}`);
@@ -191,6 +201,24 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     });
   if (syncStatus)
     chips.push({ key: "status", value: syncStatus, label: `Sinxronizatsiya: ${syncStatus}`, removeHref: hrefWithout("status") });
+  const chipDay = (v: string) => {
+    const d = parseIsoDay(v);
+    return d ? dmy(d) : v;
+  };
+  if (balansFrom)
+    chips.push({
+      key: "balansFrom",
+      value: balansFrom,
+      label: `Balansga olingan: ${chipDay(balansFrom)} dan`,
+      removeHref: hrefWithout("balansFrom"),
+    });
+  if (balansTo)
+    chips.push({
+      key: "balansTo",
+      value: balansTo,
+      label: `Balansga olingan: ${chipDay(balansTo)} gacha`,
+      removeHref: hrefWithout("balansTo"),
+    });
 
   // Sahifa havolasi — filtrlarni saqlab, faqat `page` ni almashtiradi.
   const hrefFor = (p: number) => {
@@ -261,7 +289,9 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
               <th className="px-4 py-3 font-medium">{showVacant ? "Bo'sh maydon" : "Maydon"}</th>
               <th className="px-4 py-3 font-medium">{showRemoved ? "Yangi egasi (STIR)" : "Lot"}</th>
               <th className="px-4 py-3 font-medium">Kategoriya</th>
-              <th className="px-4 py-3 font-medium">{showRemoved ? "Chiqarilgan sana" : "Samaradorlik"}</th>
+              <th className="px-4 py-3 font-medium">
+                {showRemoved ? "Chiqarilgan sana" : showBalance ? "Balansga olingan" : "Samaradorlik"}
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -333,6 +363,10 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
                     {showRemoved ? (
                       <span className="text-muted-foreground">
                         {p.removedAt ? p.removedAt.toLocaleDateString("uz") : "—"}
+                      </span>
+                    ) : showBalance ? (
+                      <span className="whitespace-nowrap tabular-nums">
+                        {p.balanceDate ? dmy(p.balanceDate) : "—"}
                       </span>
                     ) : (
                       <InefficientBadge value={p.isInefficient} />
