@@ -7,6 +7,15 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.17.1
+
+- **Tuzatildi: tashkilotlar orasida o'tkazilgan obyekt yo'qolib qolardi.** Eski egasida
+  "balansdan chiqarilgan" bo'lib qolar, yangi egasida umuman ko'rinmasdi. Endi sinxronizatsiya
+  uni yangi egasiga ko'chiradi — "Balansga olinganlar"da ham yangi egasida hisoblanadi.
+  Qolib ketganlar keyingi to'liq sinxronizatsiyada o'zi tuzaladi.
+- "Balansga olinganlar": standart manba — Ijara markazi; "Sanasi aniqlanmagan" kartasi
+  bosilsa shu obyektlar ro'yxati ochiladi.
+
 ## 1.17.0
 
 - **Yangi bo'lim "Balansga olinganlar"** (`/dashboard/balans`, KPI uchun) — tanlangan oyda

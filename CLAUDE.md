@@ -783,7 +783,19 @@ yozuvchilar `undefined` bo'lsa ustunga TEGMAYDI.
   uchun havolalarda `hududiy=1` YO'Q (rasmiy hisobot jadvalidan farqli — ataylab).
 - Sonlar `buildWhere()` bilan (`services/balance.ts`), ro'yxat filtri `balansFrom`/`balansTo`
   (ikkala chegara kiradi) — son va ro'yxat ajralmaydi. Eksportda "Balansga olingan sana" ustuni.
-- Tashkilotlar orasida o'tkazish huquqni qayta ro'yxatdan o'tkazadi — qabul qiluvchida yangi sana.
+- Tashkilotlar orasida o'tkazish huquqni qayta ro'yxatdan o'tkazadi — qabul qiluvchida yangi sana
+  (foydalanuvchi qarori: ichki o'tkazish ham "balansga olingan" sanaladi).
+- Standart manba — "Ijara markazi" (hisobot kabi), "Hammasi" — `?soha=__all__`.
+  "Sanasi aniqlanmagan" kartasi → ro'yxat `balansNone=1` (`balanceUnknown`, bir xil `buildWhere`).
+
+⚠️ **O'tkazilgan obyekt yangi egasiga KO'CHIRILADI** (`syncPropertyBase.ts` →
+`isTransferredHere()`, 2026-09-28). Ilgari `upsert`ning `update` qismi `sourceId`ni
+o'zgartirmasdi: eski ega obyektni "balansdan chiqarilgan" deb belgilar, yangi egada u hech
+qachon paydo bo'lmasdi — barcha statistikadan yo'qolardi (jonli: `10:11:40:01:01:0127/0005`,
+Ijara markazi → Direksiya). Shart: eski egada `removedFromBalance` YOKI kadastrdagi
+`hosts[0].tin` = yangi tashkilot STIRi. Shartsiz ko'chirilmaydi — ulushli egalikda obyekt
+ikki tashkilot orasida har kuni o'tib-qaytib yurardi. Qolib ketganlar keyingi to'liq
+sinxronizatsiyada o'zi tuzaladi.
 
 ### Kunlik snapshot — `services/snapshots.ts` + `DashboardSnapshot`
 

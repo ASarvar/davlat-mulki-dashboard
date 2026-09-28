@@ -1,6 +1,9 @@
 import Link from "next/link";
 import { CalendarPlus, CalendarRange, CircleHelp, Download, Layers3, List, MapPin } from "lucide-react";
 import { requireSection } from "@/server/services/sectionAccess";
+import { prisma } from "@/lib/prisma";
+import { userSourceScope } from "@/lib/authz";
+import { ALL_SOHA } from "../SourceFilter";
 import { balanceByRegion } from "@/server/services/balance";
 import { listSourceNames } from "@/server/services/sources";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -52,10 +55,29 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
   const range = monthRange(oy)!;
   const prev = monthRange(prevMonth(oy))!;
 
-  // Soha — faqat mavjud nom qabul qilinadi (aks holda jimgina bo'sh jadval chiqardi).
-  const sohaNames = await listSourceNames();
+  // Soha — hisobot bilan bir xil qoida: standart "Ijara markazi", "Hammasi" uchun ANIQ
+  // `?soha=__all__`. Faqat mavjud nom qabul qilinadi (aks holda jimgina bo'sh jadval).
+  // ⚠️ IJROCHI boshqa tashkilotni ko'rmaydi (`buildWhere`) — unga faqat o'z sohasi
+  // ko'rsatiladi, aks holda Direksiya ijrochisi standart "Ijara markazi"da 0 ko'rardi.
+  const ownScope = user.role === "IJROCHI" ? await userSourceScope(user) : null;
+  const sohaNames = ownScope
+    ? (
+        await prisma.organizationSource.findMany({
+          where: { id: { in: ownScope } },
+          distinct: ["name"],
+          select: { name: true },
+        })
+      ).map((s) => s.name)
+    : await listSourceNames();
   const sohaRaw = str(sp.soha);
-  const soha = sohaRaw && sohaNames.includes(sohaRaw) ? sohaRaw : undefined;
+  const soha =
+    sohaRaw === ALL_SOHA
+      ? undefined
+      : sohaRaw && sohaNames.includes(sohaRaw)
+        ? sohaRaw
+        : sohaNames.includes("Ijara markazi")
+          ? "Ijara markazi"
+          : undefined;
 
   const report = await balanceByRegion(user, {
     from: range.from,
@@ -63,6 +85,7 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
     prevFrom: prev.from,
     prevTo: prev.to,
     soha,
+    sohaList: sohaNames,
   });
 
   // Ro'yxat havolasi — hisobot bilan AYNAN bir xil filtr.
@@ -75,10 +98,10 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
     `/dashboard/objects?${listParams({ soha, ...extra })}`;
   const exportHref = withBase(`/api/export/objects?${listParams({ soha })}`);
 
-  const pageHref = (params: { oy?: string; soha?: string }) => {
+  const pageHref = (params: { oy?: string; soha: string }) => {
     const p = new URLSearchParams();
     if (params.oy && params.oy !== current) p.set("oy", params.oy);
-    if (params.soha) p.set("soha", params.soha);
+    p.set("soha", params.soha);
     const qs = p.toString();
     return qs ? `/dashboard/balans?${qs}` : "/dashboard/balans";
   };
@@ -101,7 +124,7 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
     ...[...sohaNames]
       .sort((a, b) => (a === "Ijara markazi" ? -1 : b === "Ijara markazi" ? 1 : 0))
       .map((n) => ({ key: n, label: n, href: pageHref({ oy, soha: n }) })),
-    { key: "", label: "Hammasi", href: pageHref({ oy }) },
+    { key: ALL_SOHA, label: "Hammasi", href: pageHref({ oy, soha: ALL_SOHA }) },
   ];
 
   return (
@@ -119,7 +142,8 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
 
         {/* Oddiy GET forma — `action` berilmaydi (basePath saqlanadi, CLAUDE.md). */}
         <form className="flex flex-wrap items-end gap-2">
-          {soha ? <input type="hidden" name="soha" value={soha} /> : null}
+          {/* ⚠️ "Hammasi" ham yuboriladi — aks holda oy o'zgarganda standart sohaga qaytib qolardi. */}
+          <input type="hidden" name="soha" value={soha ?? ALL_SOHA} />
           <label className="text-xs font-medium text-slate-600">
             <span className="mb-1 flex items-center gap-1">
               <CalendarRange className="h-3.5 w-3.5" style={{ color: "var(--gold)" }} />
@@ -151,10 +175,10 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
           </span>
           <div className="inline-flex flex-wrap items-center gap-1 rounded-xl border border-border bg-card p-1 shadow-sm">
             {sohaTabs.map((t) => {
-              const active = t.key === (soha ?? "");
+              const active = t.key === (soha ?? ALL_SOHA);
               return (
                 <Link
-                  key={t.key || "all"}
+                  key={t.key}
                   href={t.href}
                   aria-current={active ? "page" : undefined}
                   className={[
@@ -201,6 +225,11 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
           value={nf(report.undated)}
           accent={BRAND.gold}
           icon={CircleHelp}
+          href={
+            report.undated > 0
+              ? `/dashboard/objects?${new URLSearchParams({ balansNone: "1", ...(soha ? { soha } : {}) })}`
+              : undefined
+          }
           footer="kadastrda huquq sanasi yo'q — hisobotga kirmaydi"
         />
       </div>

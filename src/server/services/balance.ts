@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import type { SessionUser } from "@/lib/authz";
 import { buildWhere } from "./properties";
-import { listSourceNames } from "./sources";
 
 /**
  * "Balansga olinganlar" hisoboti — `/dashboard/balans` (2026-09-28, KPI uchun).
@@ -35,22 +34,30 @@ export interface BalanceReport {
 
 export async function balanceByRegion(
   user: SessionUser,
-  opts: { from: string; to: string; prevFrom: string; prevTo: string; soha?: string },
+  opts: {
+    from: string;
+    to: string;
+    prevFrom: string;
+    prevTo: string;
+    soha?: string;
+    /** Ustunlar uchun sohalar ro'yxati (sahifa rol doirasiga qarab beradi). */
+    sohaList: string[];
+  },
 ): Promise<BalanceReport> {
-  const { from, to, prevFrom, prevTo, soha } = opts;
+  const { from, to, prevFrom, prevTo, soha, sohaList } = opts;
 
-  const [where, prevWhere, scopeWhere, allSohas, regions] = await Promise.all([
+  const [where, prevWhere, undatedWhere, regions] = await Promise.all([
     buildWhere(user, { soha, balanceFrom: from, balanceTo: to }),
     buildWhere(user, { soha, balanceFrom: prevFrom, balanceTo: prevTo }),
-    buildWhere(user, { soha }),
-    listSourceNames(),
+    // ⚠️ Ro'yxat filtri (`balansNone=1`) bilan AYNAN bir xil — kartani bosganda shuncha obyekt.
+    buildWhere(user, { soha, balanceUnknown: true }),
     prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
   ]);
 
   const [groups, previousTotal, undated] = await Promise.all([
     prisma.property.groupBy({ by: ["regionId", "sourceId"], where, _count: { _all: true } }),
     prisma.property.count({ where: prevWhere }),
-    prisma.property.count({ where: { AND: [scopeWhere, { balanceDate: null }] } }),
+    prisma.property.count({ where: undatedWhere }),
   ]);
 
   const sourceIds = [...new Set(groups.map((g) => g.sourceId))];
@@ -60,7 +67,7 @@ export async function balanceByRegion(
   });
   const sohaOf = new Map(sources.map((s) => [s.id, s.name]));
 
-  const sohas = (soha ? [soha] : allSohas).slice().sort((a, b) =>
+  const sohas = (soha ? [soha] : sohaList).slice().sort((a, b) =>
     a === "Ijara markazi" ? -1 : b === "Ijara markazi" ? 1 : 0,
   );
   const empty = () => Object.fromEntries(sohas.map((s) => [s, 0])) as Record<string, number>;

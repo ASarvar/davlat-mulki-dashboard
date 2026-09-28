@@ -62,6 +62,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   // Balansga olingan sana oralig'i — `/dashboard/balans` hisobotidan drill-down.
   const balansFrom = str(sp.balansFrom) || undefined;
   const balansTo = str(sp.balansTo) || undefined;
+  const balansNoneStr = str(sp.balansNone);
   const utilityRaw = str(sp.utility);
   const utility = UTILITY_FILTERS.includes(utilityRaw as UtilityFilter)
     ? (utilityRaw as UtilityFilter)
@@ -90,6 +91,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
     utility,
     balanceFrom: balansFrom,
     balanceTo: balansTo,
+    balanceUnknown: balansNoneStr === "1" ? true : undefined,
   };
 
   // "Bo'sh maydoni bor" (kat 12) filtri tanlansa, maydon ustunida bo'sh maydon ko'rsatiladi.
@@ -153,6 +155,7 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
   if (syncStatus) baseParams.set("status", syncStatus);
   if (balansFrom) baseParams.set("balansFrom", balansFrom);
   if (balansTo) baseParams.set("balansTo", balansTo);
+  if (balansNoneStr) baseParams.set("balansNone", balansNoneStr);
 
   // Plain <a> (Link emas) — basePath'ni qo'lda qo'shamiz.
   const exportHref = withBase(`/api/export/objects?${baseParams.toString()}`);
@@ -218,6 +221,13 @@ export default async function ObjectsPage({ searchParams }: { searchParams: Prom
       value: balansTo,
       label: `Balansga olingan: ${chipDay(balansTo)} gacha`,
       removeHref: hrefWithout("balansTo"),
+    });
+  if (balansNoneStr === "1")
+    chips.push({
+      key: "balansNone",
+      value: "1",
+      label: "Balansga olingan sana aniqlanmagan",
+      removeHref: hrefWithout("balansNone"),
     });
 
   // Sahifa havolasi — filtrlarni saqlab, faqat `page` ni almashtiradi.

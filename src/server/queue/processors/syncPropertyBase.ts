@@ -63,6 +63,37 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
   // ⚠️ `undefined` (eski API 2 zaxirasi) — ustunga tegilmaydi, avvalgi sana saqlanadi.
   const balanceFields = base.balanceDate !== undefined ? { balanceDate: base.balanceDate } : {};
 
+  // ── Tashkilotlar orasida o'tkazish (2026-09-28) ──
+  // Obyekt bazada BOSHQA tashkilotimizda turibdi, lekin endi SHU tashkilot ro'yxatida
+  // (API 1) keldi. Ilgari `update` tashkilotni umuman o'zgartirmasdi: eski ega uni
+  // "balansdan chiqarilgan" deb belgilar, yangi egada esa u hech qachon paydo bo'lmasdi —
+  // obyekt barcha statistikadan (jumladan "Balansga olinganlar"dan) jimgina yo'qolardi
+  // (jonli holat: 10:11:40:01:01:0127/0005, Ijara markazi → Direksiya, 17.08.2026).
+  // Ko'chirish sharti — ikkisidan biri:
+  //  1. eski ega uni allaqachon chiqarib tashlagan (`removedFromBalance`);
+  //  2. kadastrdagi joriy egasi (`hosts[0].tin`) aynan shu tashkilot, eskisi emas.
+  // ⚠️ Shartsiz ko'chirilmaydi: ulushli egalikda ikki tashkilot bir kadastrni birga
+  // ro'yxatlaydi va obyekt har sinxronizatsiyada ular orasida o'tib-qaytib yurardi.
+  // 2-shart `hosts[0]` so'rov STIRidan qat'i nazar bir xil bo'lgani uchun barqaror.
+  const existing = await prisma.property.findUnique({
+    where: { cadNumber },
+    select: { id: true, sourceId: true, removedFromBalance: true, source: { select: { stir: true } } },
+  });
+  const transferred = isTransferredHere(existing, sourceId, stir, base.holderInn ?? null);
+  const transferFields = transferred
+    ? {
+        sourceId,
+        regionId,
+        removedFromBalance: false,
+        removedAt: null,
+        removedToStir: null,
+        removedToName: null,
+      }
+    : {};
+  if (transferred) {
+    console.log(`[property-base] ${cadNumber}: boshqa tashkilotdan o'tkazilgan — yangi egasiga ko'chirildi`);
+  }
+
   const property = await prisma.property.upsert({
     where: { cadNumber },
     create: {
@@ -82,6 +113,7 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
       syncStatus: "SYNCING",
     },
     update: {
+      ...transferFields,
       cadNumberOld: base.cadNumberOld,
       districtId,
       name: base.name,
@@ -132,4 +164,19 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
   });
 
   return "pending"; // yakuniy hisob status-check bosqichida
+}
+
+/**
+ * Obyekt boshqa tashkilotimizdan SHU tashkilotga o'tkazilganmi (yuqoridagi izohga qarang).
+ * Sof funksiya — qoida bitta joyda va sinovda tekshiriladi.
+ */
+export function isTransferredHere(
+  existing: { sourceId: string; removedFromBalance: boolean; source: { stir: string } } | null,
+  sourceId: string,
+  stir: string | null,
+  holderInn: string | null,
+): boolean {
+  if (!existing || existing.sourceId === sourceId) return false;
+  if (existing.removedFromBalance) return true;
+  return stir !== null && holderInn === stir && existing.source.stir !== holderInn;
 }

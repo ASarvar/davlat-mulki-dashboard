@@ -87,6 +87,8 @@ export interface PropertyFilters {
    */
   balanceFrom?: string;
   balanceTo?: string;
+  /** Balansga olingan sana ANIQLANMAGAN (kadastrda huquq sanasi yo'q) — hisobotdagi kartadan. */
+  balanceUnknown?: boolean;
 }
 
 /**
@@ -276,6 +278,7 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
     if (from === null || to === null) return { id: "__bad_balance_date__" };
     and.push({ balanceDate: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}), not: null } });
   }
+  if (f.balanceUnknown) and.push({ balanceDate: null });
 
   // ── Kommunal xizmatlar ──
   // ⚠️ Shartlar `stats.ts` → `utilityRows()` dagi FILTER (...) ifodalari bilan

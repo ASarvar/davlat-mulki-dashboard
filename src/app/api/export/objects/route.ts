@@ -69,6 +69,7 @@ export async function GET(req: Request) {
     myRegionsOnly: myRegionsOnly || undefined,
     balanceFrom: sp.get("balansFrom") || undefined,
     balanceTo: sp.get("balansTo") || undefined,
+    balanceUnknown: sp.get("balansNone") === "1" ? true : undefined,
   };
 
   const passThrough = new PassThrough();
