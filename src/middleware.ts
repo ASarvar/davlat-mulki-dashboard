@@ -40,5 +40,8 @@ export const config = {
   // ilova, boshqa origin) sessiyasiz chaqiradi. Middleware uni ushlasa, forma
   // JSON o'rniga login sahifasining HTML'ini olardi. Boshqa `api/imtiyoz/*`
   // yo'llari (operator tekshiruvi, holat) himoyalangan bo'lib qoladi.
-  matcher: ["/((?!api/auth|api/imtiyoz/check-discount|_next/static|_next/image|favicon.ico).*)"],
+  //
+  // ⚠️ `logo-*` (`public/logo-*.svg`) ham ochiq: login sahifasi ularni sessiyasiz ko'rsatadi,
+  // aks holda rasm o'rniga login HTML'iga redirect qaytib, logotip chiqmasdi.
+  matcher: ["/((?!api/auth|api/imtiyoz/check-discount|_next/static|_next/image|favicon.ico|logo-).*)"],
 };

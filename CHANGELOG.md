@@ -7,6 +7,13 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.19.1
+
+- Login sahifasi yangi dizaynda: chapda brend paneli (logotip, "Monitoring"), o'ngda forma;
+  telefonda logotip forma ustida.
+- Tuzatildi: tizimga kirmagan foydalanuvchiga logotip rasmlari ko'rinmasdi (middleware
+  ularni ham login'ga yo'naltirardi).
+
 ## 1.19.0
 
 - **Obyekt sahifasida alohida "Balansga olinganlik" kartasi** — sana, huquq turi yoki
