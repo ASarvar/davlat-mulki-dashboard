@@ -18,6 +18,23 @@
  * (`20260928120000_property_balance_date`): noto'g'ri sana tashlab yuboriladi, qolganlarining eng kattasi.
  */
 export function balanceRegDate(raw: unknown): Date | null {
+  return balanceRegRecord(raw)?.date ?? null;
+}
+
+/** Balansga olish yozuvi — obyekt sahifasida ko'rsatiladi. */
+export interface BalanceRecord {
+  date: Date;
+  /** Huquq turi ("Doimiy foydalanish", ...). */
+  type: string | null;
+  /** Asos hujjatlar (hokim qarori, topshirish-qabul qilish dalolatnomasi, ...). */
+  docs: { type: string | null; number: string | null; date: Date | null }[];
+}
+
+/**
+ * Sanasi ENG OXIRGI huquq yozuvi (`balanceRegDate()` shu yozuvning sanasi — ikkalasi
+ * hech qachon ajralmaydi). Sanasi teng bo'lsa — birinchi uchragani.
+ */
+export function balanceRegRecord(raw: unknown): BalanceRecord | null {
   if (!isObj(raw)) return null;
   const legals: unknown[] = [];
   const land = raw.land;
@@ -26,12 +43,31 @@ export function balanceRegDate(raw: unknown): Date | null {
     for (const o of raw.outer) if (isObj(o) && Array.isArray(o.legal)) legals.push(...o.legal);
   }
 
-  let max: Date | null = null;
+  let best: { date: Date; rec: Record<string, unknown> } | null = null;
   for (const l of legals) {
-    const d = isObj(l) ? parseIsoDay(l.date) : null;
-    if (d && (!max || d > max)) max = d;
+    if (!isObj(l)) continue;
+    const d = parseIsoDay(l.date);
+    if (d && (!best || d > best.date)) best = { date: d, rec: l };
   }
-  return max;
+  if (!best) return null;
+
+  const docs = Array.isArray(best.rec.docs) ? best.rec.docs.filter(isObj) : [];
+  return {
+    date: best.date,
+    type: text(best.rec.type),
+    docs: docs.map((d) => ({
+      type: text(d.type),
+      // ⚠️ Raqam `num` da keladi (`number` jonli javobda doim null); "-" — raqam yo'q.
+      number: text(d.num) ?? text(d.number),
+      date: parseIsoDay(d.date),
+    })),
+  };
+}
+
+function text(v: unknown): string | null {
+  if (typeof v !== "string") return null;
+  const t = v.trim();
+  return t && t !== "-" ? t : null;
 }
 
 /**

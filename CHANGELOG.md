@@ -7,6 +7,11 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.18.0
+
+- **Obyekt sahifasida balansga olinganlik ma'lumoti** — "Asosiy ma'lumotlar"da balansga
+  olingan sana, huquq turi va asos hujjat(lar) (turi, raqami, sanasi) kadastrdan.
+
 ## 1.17.3
 
 - "Balansga olinganlar": hududlar yana rasmiy tartibda (son bo'yicha saralanmaydi).

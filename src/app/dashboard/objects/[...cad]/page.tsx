@@ -40,10 +40,11 @@ import { CadastreRawData } from "./CadastreRawData";
 import { SyncButton } from "./SyncButton";
 import { ObjectMapSection } from "@/components/map/MapSection";
 import { env } from "@/lib/env";
+import { balanceRegRecord, dmy } from "@/lib/balance";
 
-function Field({ label, value }: { label: string; value: React.ReactNode }) {
+function Field({ label, value, className }: { label: string; value: React.ReactNode; className?: string }) {
   return (
-    <div>
+    <div className={className}>
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd className="mt-0.5 text-sm">{value ?? "—"}</dd>
     </div>
@@ -279,6 +280,9 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
   const totalArea = totalBuildingAreaWithSource(rawApi2);
   const objectAreaP = totalArea?.value ?? (p.area ? Number(p.area) : null);
   const objectAreaU = usefulArea(rawApi2) ?? (p.buildingArea ? Number(p.buildingArea) : null);
+  // Balansga olish: sana — DB ustunidan (hisobot bilan bir xil), huquq turi va asos
+  // hujjatlar — o'sha yozuvning o'zidan (`lib/balance.ts`).
+  const balanceRec = balanceRegRecord(rawApi2);
   // Qiymat yer uchastkasi maydonidan (land_area/land_area_i) olingan bo'lsa obyekt aslida
   // bino emas — yorliq "Binoning umumiy maydoni" emas, "Umumiy maydoni" bo'ladi.
   const totalAreaFieldLabel = totalAreaLabel(totalArea?.source);
@@ -416,6 +420,25 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
               <Field label={totalAreaFieldLabel} value={objectAreaP != null ? `${objectAreaP.toLocaleString("uz")} m²` : null} />
               <Field label="Foydali maydon" value={objectAreaU != null ? `${objectAreaU.toLocaleString("uz")} m²` : null} />
               <Field label="Kategoriya" value={<CategoryBadge integrationCode={p.integrationCategoryCode} manualCode={p.manualCategoryCode} />} />
+              <Field label="Balansga olingan sana" value={p.balanceDate ? dmy(p.balanceDate) : null} />
+              <Field label="Huquq turi" value={balanceRec?.type ?? null} />
+              <Field
+                label="Asos hujjat"
+                className="col-span-2 md:col-span-3"
+                value={
+                  balanceRec && balanceRec.docs.length > 0 ? (
+                    <ul className="space-y-0.5">
+                      {balanceRec.docs.map((d, i) => (
+                        <li key={i}>
+                          {d.type ?? "Hujjat"}
+                          {d.number ? ` № ${d.number}` : ""}
+                          {d.date ? `, ${dmy(d.date)}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null
+                }
+              />
             </dl>
             {/* Xom texnik xato matni (masalan "fetch failed") — faqat admin ko'radi.
                 Boshqa rollar buni tuzata olmaydi va matn ular uchun tushunarsiz/
