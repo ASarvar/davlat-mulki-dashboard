@@ -7,6 +7,12 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.17.2
+
+- "Balansga olinganlar" sahifasi qayta ishlandi: hududlar jadval o'rniga ikki ustunli
+  reyting (son + chiziq, "Hammasi"da manbalar bo'yicha rangli bo'laklar); o'zbekcha oy
+  tanlagich (Yanvar 2026 dan boshlab); tushuntirish matnlari olib tashlandi.
+
 ## 1.17.1
 
 - **Tuzatildi: tashkilotlar orasida o'tkazilgan obyekt yo'qolib qolardi.** Eski egasida

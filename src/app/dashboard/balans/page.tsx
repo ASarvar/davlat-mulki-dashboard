@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { CalendarPlus, CalendarRange, CircleHelp, Download, Layers3, List, MapPin } from "lucide-react";
+import { CalendarPlus, CircleHelp, Download, Layers3, List, MapPin } from "lucide-react";
 import { requireSection } from "@/server/services/sectionAccess";
 import { prisma } from "@/lib/prisma";
 import { userSourceScope } from "@/lib/authz";
 import { ALL_SOHA } from "../SourceFilter";
+import { MonthPicker } from "./MonthPicker";
 import { balanceByRegion } from "@/server/services/balance";
 import { listSourceNames } from "@/server/services/sources";
 import { KpiCard } from "@/components/ui/KpiCard";
@@ -28,16 +29,21 @@ import { currentMonthTashkent, dmy, monthLabel, monthRange, parseIsoDay } from "
 type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
-const CELL = "px-3 py-2.5 text-center tabular-nums";
-const ROW_LINE = "border-b border-slate-100";
-const NUM_LINK = "font-medium text-[var(--cobalt)] underline-offset-2 hover:underline";
-const ZERO = "text-slate-300";
-const TOTALS_ROW = "bg-[var(--gold-lighter)] font-bold text-[var(--navy)]";
-const TOTALS_LINE = "border-b-2 border-[var(--gold)]";
 const CARD =
   "mt-6 rounded-2xl bg-card p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/70";
 const BTN =
   "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-900 hover:ring-slate-300";
+
+/** Eng erta tanlanadigan oy (foydalanuvchi talabi, 2026-09-29). */
+const MIN_MONTH = "2026-01";
+
+/** Manba ranglari — hudud chizig'idagi bo'laklar va legenda. */
+const SOHA_COLOR: Record<string, string> = {
+  "Ijara markazi": BRAND.cobalt,
+  "Davlat aktivlari agentligi": BRAND.gold,
+  Direksiya: "#4a90a4",
+};
+const sohaColor = (s: string) => SOHA_COLOR[s] ?? "#94a3b8";
 
 function prevMonth(ym: string): string {
   const [y, m] = ym.split("-").map(Number);
@@ -51,7 +57,8 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
 
   const current = currentMonthTashkent();
   const oyRaw = str(sp.oy);
-  const oy = oyRaw && monthRange(oyRaw) ? oyRaw : current;
+  // Tanlash oralig'i: MIN_MONTH — joriy oy (`"YYYY-MM"` satr sifatida solishtiriladi).
+  const oy = oyRaw && monthRange(oyRaw) && oyRaw >= MIN_MONTH && oyRaw <= current ? oyRaw : current;
   const range = monthRange(oy)!;
   const prev = monthRange(prevMonth(oy))!;
 
@@ -106,19 +113,17 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
     return qs ? `/dashboard/balans?${qs}` : "/dashboard/balans";
   };
 
-  const diff = report.totals.total - report.previousTotal;
   const isCurrent = oy === current;
-  // Bugun — Toshkent vaqti bo'yicha (server UTC'da; "oy tugamagan" izohi uchun).
+  // Bugun — Toshkent vaqti bo'yicha (server UTC'da): joriy oy kartasida sana oralig'i bugun bilan tugaydi.
   const today = parseIsoDay(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date()));
 
-  const num = (n: number, href: string) =>
-    n > 0 ? (
-      <Link href={href} className={NUM_LINK}>
-        {nf(n)}
-      </Link>
-    ) : (
-      <span className={ZERO}>0</span>
-    );
+  // Hududlar reytingi — son bo'yicha kamayish; teng bo'lsa rasmiy tartib (`sortOrder`).
+  const ranked = report.rows
+    .map((r, i) => ({ ...r, order: i }))
+    .sort((a, b) => b.total - a.total || a.order - b.order);
+  const maxTotal = Math.max(1, ...ranked.map((r) => r.total));
+  const half = Math.ceil(ranked.length / 2);
+  const multiSoha = report.sohas.length > 1;
 
   const sohaTabs: { key: string; label: string; href: string }[] = [
     ...[...sohaNames]
@@ -136,30 +141,21 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
             Balansga olinganlar
           </h1>
           <p className="mt-0.5 text-sm text-muted-foreground">
-            {monthLabel(oy)} · {soha ?? "barcha manbalar"} · hududlar kesimida
+            {monthLabel(oy)} · {soha ?? "Barcha manbalar"}
           </p>
         </div>
 
         {/* Oddiy GET forma — `action` berilmaydi (basePath saqlanadi, CLAUDE.md). */}
-        <form className="flex flex-wrap items-end gap-2">
+        <form className="flex flex-wrap items-center gap-2">
           {/* ⚠️ "Hammasi" ham yuboriladi — aks holda oy o'zgarganda standart sohaga qaytib qolardi. */}
           <input type="hidden" name="soha" value={soha ?? ALL_SOHA} />
-          <label className="text-xs font-medium text-slate-600">
-            <span className="mb-1 flex items-center gap-1">
-              <CalendarRange className="h-3.5 w-3.5" style={{ color: "var(--gold)" }} />
-              Oy
-            </span>
-            <input
-              type="month"
-              name="oy"
-              defaultValue={oy}
-              max={current}
-              className="rounded-md border border-slate-300 px-2.5 py-1.5 text-sm"
-            />
-          </label>
+          {/* Yorliqsiz (foydalanuvchi talabi) — ekran o'quvchi uchun `aria-label`.
+              Balandlik tugma bilan bir xil: ikkalasi ham `h-9`. */}
+          {/* `key={oy}` — sahifa boshqa oy bilan qayta chizilganda tanlagich holati yangilanadi. */}
+          <MonthPicker key={oy} name="oy" value={oy} min={MIN_MONTH} max={current} />
           <button
             type="submit"
-            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
+            className="h-9 rounded-lg px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
             style={{ background: "var(--navy)" }}
           >
             Ko'rsatish
@@ -204,21 +200,12 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
           accent={BRAND.cobalt}
           icon={CalendarPlus}
           href={report.totals.total > 0 ? listHref() : undefined}
-          footer={
-            isCurrent && today
-              ? `${dmy(parseIsoDay(range.from)!)} — ${dmy(today)} (oy tugamagan)`
-              : `${dmy(parseIsoDay(range.from)!)} — ${dmy(parseIsoDay(range.to)!)}`
-          }
+          footer={`${dmy(parseIsoDay(range.from)!)} — ${dmy(isCurrent && today ? today : parseIsoDay(range.to)!)}`}
         />
         <KpiCard
           label={`O'tgan oy — ${monthLabel(prevMonth(oy))}`}
           value={nf(report.previousTotal)}
           accent={BRAND.navyMid}
-          footer={
-            diff === 0
-              ? "o'zgarish yo'q"
-              : `${diff > 0 ? "+" : "−"}${nf(Math.abs(diff))} (tanlangan oyda ${diff > 0 ? "ko'proq" : "kamroq"})`
-          }
         />
         <KpiCard
           label="Sanasi aniqlanmagan"
@@ -230,7 +217,6 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
               ? `/dashboard/objects?${new URLSearchParams({ balansNone: "1", ...(soha ? { soha } : {}) })}`
               : undefined
           }
-          footer="kadastrda huquq sanasi yo'q — hisobotga kirmaydi"
         />
       </div>
 
@@ -238,7 +224,7 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="flex items-center gap-2 text-sm font-semibold" style={{ color: "var(--navy)" }}>
             <MapPin className="h-4 w-4" style={{ color: "var(--gold)" }} />
-            Hududlar kesimi — {monthLabel(oy)}
+            Hududlar kesimi
           </h2>
           <div className="flex flex-wrap gap-2">
             <Link href={listHref()} className={BTN}>
@@ -252,63 +238,77 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-xl ring-1 ring-slate-200">
-          <table className="w-full border-separate border-spacing-0 text-sm">
-            <thead className="bg-[var(--navy-mid)] text-white">
-              <tr className="text-xs tracking-wide">
-                <th className="w-14 px-2 py-2.5 text-center font-semibold">№</th>
-                <th className="py-2.5 pl-1 pr-4 text-left font-semibold">Hududlar nomi</th>
-                {report.sohas.length > 1
-                  ? report.sohas.map((s) => (
-                      <th key={s} className="px-3 py-2.5 text-center font-semibold">
-                        {s}
-                      </th>
-                    ))
-                  : null}
-                <th className="px-3 py-2.5 text-center font-semibold">Jami</th>
-              </tr>
-            </thead>
-            <tbody>
-              {/* JAMI — birinchi qator (rasmiy hisobot shakli). */}
-              <tr className={TOTALS_ROW}>
-                <td className={`${TOTALS_LINE} px-2 py-3`} />
-                <td className={`${TOTALS_LINE} whitespace-nowrap py-3 pl-1 pr-4 tracking-wide`}>J A M I:</td>
-                {report.sohas.length > 1
-                  ? report.sohas.map((s) => (
-                      <td key={s} className={`${CELL} ${TOTALS_LINE} py-3`}>
-                        {num(report.totals.bySoha[s] ?? 0, listHref({ soha: s }))}
-                      </td>
-                    ))
-                  : null}
-                <td className={`${CELL} ${TOTALS_LINE} py-3`}>{num(report.totals.total, listHref())}</td>
-              </tr>
-              {report.rows.map((r, i) => (
-                <tr key={r.regionId} className="transition-colors hover:bg-[#eef4fc]">
-                  <td className={`${ROW_LINE} px-2 py-2.5 text-center text-xs text-muted-foreground`}>{i + 1}</td>
-                  <td className={`${ROW_LINE} whitespace-nowrap py-2.5 pl-1 pr-4`}>{r.regionName}</td>
-                  {report.sohas.length > 1
-                    ? report.sohas.map((s) => (
-                        <td key={s} className={`${CELL} ${ROW_LINE}`}>
-                          {num(r.bySoha[s] ?? 0, listHref({ soha: s, region: r.regionId }))}
-                        </td>
-                      ))
-                    : null}
-                  <td className={`${CELL} ${ROW_LINE} font-semibold`}>
-                    {num(r.total, listHref({ region: r.regionId }))}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        {multiSoha ? (
+          <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-slate-600">
+            {report.sohas.map((s) => (
+              <Link
+                key={s}
+                href={listHref({ soha: s })}
+                className="inline-flex items-center gap-1.5 transition hover:text-slate-900"
+              >
+                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: sohaColor(s) }} />
+                {s}
+                <span className="font-semibold tabular-nums text-slate-900">
+                  {nf(report.totals.bySoha[s] ?? 0)}
+                </span>
+              </Link>
+            ))}
+          </div>
+        ) : null}
 
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          <strong>Sana</strong> — kadastrda obyektga huquq (doimiy foydalanish, operativ boshqaruv va h.k.)
-          ro'yxatdan o'tgan eng oxirgi sana. Obyekt bir tashkilotdan boshqasiga o'tkazilganda huquq qayta
-          ro'yxatdan o'tadi va qabul qiluvchi tashkilotda shu oyda hisoblanadi. <strong>Hudud</strong> — obyekt
-          joylashgan hudud (respublika darajasidagi tashkilotlar obyektlari ham shu hududga kiradi). Balansdan
-          chiqarilgan obyektlar kirmaydi. Son bosilsa — ro'yxat ochiladi.
-        </p>
+        {/* Reyting: son bo'yicha kamayish tartibida, katta ekranda ikki ustun (ustun bo'yicha to'ladi). */}
+        <ol
+          className="grid grid-cols-1 gap-x-10 lg:grid-flow-col lg:grid-cols-2"
+          style={{ gridTemplateRows: `repeat(${half}, auto)` }}
+        >
+          {ranked.map((r, i) => {
+            const empty = r.total === 0;
+            const body = (
+              <>
+                <span className="w-5 shrink-0 text-right text-xs tabular-nums text-slate-400">{i + 1}</span>
+                <span
+                  className={`w-28 shrink-0 truncate text-sm sm:w-40 ${empty ? "text-slate-400" : "font-medium text-slate-700"}`}
+                >
+                  {r.regionName}
+                </span>
+                <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
+                  <span className="flex h-full" style={{ width: `${(r.total / maxTotal) * 100}%` }}>
+                    {report.sohas.map((s) => {
+                      const n = r.bySoha[s] ?? 0;
+                      return n > 0 ? (
+                        <span
+                          key={s}
+                          title={`${s}: ${nf(n)}`}
+                          className="h-full first:rounded-l-full last:rounded-r-full"
+                          style={{ width: `${(n / r.total) * 100}%`, background: sohaColor(s) }}
+                        />
+                      ) : null;
+                    })}
+                  </span>
+                </span>
+                <span
+                  className={`w-10 shrink-0 text-right text-sm tabular-nums ${empty ? "text-slate-300" : "font-semibold text-[var(--navy)]"}`}
+                >
+                  {nf(r.total)}
+                </span>
+              </>
+            );
+            return (
+              <li key={r.regionId} className="border-b border-slate-100">
+                {empty ? (
+                  <div className="flex items-center gap-3 px-2 py-2.5">{body}</div>
+                ) : (
+                  <Link
+                    href={listHref({ region: r.regionId })}
+                    className="flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-[#eef4fc]"
+                  >
+                    {body}
+                  </Link>
+                )}
+              </li>
+            );
+          })}
+        </ol>
       </section>
     </div>
   );
