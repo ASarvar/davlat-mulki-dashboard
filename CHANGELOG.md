@@ -7,6 +7,10 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.17.3
+
+- "Balansga olinganlar": hududlar yana rasmiy tartibda (son bo'yicha saralanmaydi).
+
 ## 1.17.2
 
 - "Balansga olinganlar" sahifasi qayta ishlandi: hududlar jadval o'rniga ikki ustunli

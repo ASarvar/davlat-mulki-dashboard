@@ -117,10 +117,9 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
   // Bugun — Toshkent vaqti bo'yicha (server UTC'da): joriy oy kartasida sana oralig'i bugun bilan tugaydi.
   const today = parseIsoDay(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date()));
 
-  // Hududlar reytingi — son bo'yicha kamayish; teng bo'lsa rasmiy tartib (`sortOrder`).
-  const ranked = report.rows
-    .map((r, i) => ({ ...r, order: i }))
-    .sort((a, b) => b.total - a.total || a.order - b.order);
+  // ⚠️ Hududlar RASMIY tartibda (`Region.sortOrder`, `balanceByRegion` shunday qaytaradi) —
+  // son bo'yicha saralanmaydi (foydalanuvchi talabi, 2026-09-29).
+  const ranked = report.rows;
   const maxTotal = Math.max(1, ...ranked.map((r) => r.total));
   const half = Math.ceil(ranked.length / 2);
   const multiSoha = report.sohas.length > 1;
@@ -256,7 +255,7 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
           </div>
         ) : null}
 
-        {/* Reyting: son bo'yicha kamayish tartibida, katta ekranda ikki ustun (ustun bo'yicha to'ladi). */}
+        {/* Rasmiy tartib; katta ekranda ikki ustun (ustun bo'yicha to'ladi: 1–7 chapda, 8–14 o'ngda). */}
         <ol
           className="grid grid-cols-1 gap-x-10 lg:grid-flow-col lg:grid-cols-2"
           style={{ gridTemplateRows: `repeat(${half}, auto)` }}
