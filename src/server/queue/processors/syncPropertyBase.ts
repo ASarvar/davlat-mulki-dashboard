@@ -77,7 +77,13 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
   // 2-shart `hosts[0]` so'rov STIRidan qat'i nazar bir xil bo'lgani uchun barqaror.
   const existing = await prisma.property.findUnique({
     where: { cadNumber },
-    select: { id: true, sourceId: true, removedFromBalance: true, source: { select: { stir: true } } },
+    select: {
+      id: true,
+      sourceId: true,
+      removedFromBalance: true,
+      removedAt: true,
+      source: { select: { stir: true } },
+    },
   });
   const transferred = isTransferredHere(existing, sourceId, stir, base.holderInn ?? null);
   const transferFields = transferred
@@ -94,7 +100,7 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
     console.log(`[property-base] ${cadNumber}: boshqa tashkilotdan o'tkazilgan — yangi egasiga ko'chirildi`);
   }
 
-  const property = await prisma.property.upsert({
+  const upsert = prisma.property.upsert({
     where: { cadNumber },
     create: {
       cadNumber,
@@ -134,6 +140,22 @@ export async function processPropertyBase(data: PropertyBaseJob): Promise<JobOut
       manualCategoryCode: true,
     },
   });
+  // ⚠️ O'tkazish tarixi ko'chirish bilan BITTA tranzaksiyada: aks holda obyekt yangi
+  // egasiga o'tib, eski egasining "Balansdan chiqarilgan" ro'yxatidan izsiz yo'qolishi mumkin edi.
+  const [property] =
+    transferred && existing
+      ? await prisma.$transaction([
+          upsert,
+          prisma.balanceTransfer.create({
+            data: {
+              propertyId: existing.id,
+              fromSourceId: existing.sourceId,
+              toSourceId: sourceId,
+              removedAt: existing.removedAt ?? new Date(),
+            },
+          }),
+        ])
+      : [await upsert];
 
   // Hech qanday holat-tekshiruvi sozlanmagan bo'lsa — ikkinchi bosqich bo'sh ish bo'lardi.
   // Uni navbatga qo'ymaymiz va obyektni shu yerda yakunlaymiz (bir marta kamroq

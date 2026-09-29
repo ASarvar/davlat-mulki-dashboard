@@ -7,6 +7,17 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.19.0
+
+- **Obyekt sahifasida alohida "Balansga olinganlik" kartasi** — sana, huquq turi yoki
+  ro'yxatdan o'tish raqami, oldingi egasi, asos hujjatlar; sana bo'lmasa ham qolgan
+  ma'lumot ko'rsatiladi.
+- "Balansga olinganlar" hisobotida eski formatdagi kadastr javobidagi ro'yxatdan o'tish
+  sanasi ham hisoblanadi — "Sanasi aniqlanmagan" kamayadi.
+- **Ichki o'tkazilgan obyekt eski egasining "Balansdan chiqarilgan" ro'yxatida qoladi**
+  (yangi egasi va sanasi bilan), yangi egasida esa faol obyekt sifatida turadi.
+  Migratsiya `20260929120000_balance_transfer`.
+
 ## 1.18.0
 
 - **Obyekt sahifasida balansga olinganlik ma'lumoti** — "Asosiy ma'lumotlar"da balansga

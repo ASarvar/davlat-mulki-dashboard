@@ -131,6 +131,52 @@ export const UTILITY_FILTER_LABEL: Record<UtilityFilter, string> = {
   unchecked: "Kommunal tekshirilmagan",
 };
 
+/** Oxirgi ichki o'tkazish — "Balansdan chiqarilgan" ro'yxatida yangi egasi va sana uchun. */
+const LAST_TRANSFER = {
+  orderBy: { transferredAt: "desc" },
+  take: 1,
+  select: {
+    removedAt: true,
+    fromSource: { select: { name: true } },
+    toSource: { select: { stir: true, name: true, orgName: true } },
+  },
+} satisfies Prisma.Property$transfersArgs;
+
+type LastTransfer = Prisma.BalanceTransferGetPayload<{ select: (typeof LAST_TRANSFER)["select"] }>;
+
+/**
+ * "Balansdan chiqarilgan" ro'yxatida o'tkazilgan obyekt ESKI egasi nuqtai nazaridan
+ * ko'rsatiladi: chiqarilgan (belgi), sana va yangi egasi — o'tkazish yozuvidan.
+ * Oddiy ro'yxatda qiymatlar o'zgarmaydi.
+ */
+function removedView<
+  T extends {
+    removedFromBalance: boolean;
+    removedAt: Date | null;
+    removedToStir: string | null;
+    removedToName: string | null;
+    transfers: LastTransfer[];
+  },
+>(r: T, wantsRemoved: boolean) {
+  const t = r.transfers[0];
+  if (!wantsRemoved || r.removedFromBalance || !t) {
+    return {
+      removedFromBalance: r.removedFromBalance,
+      removedAt: r.removedAt,
+      removedToStir: r.removedToStir,
+      removedToName: r.removedToName,
+      transferFrom: null as string | null,
+    };
+  }
+  return {
+    removedFromBalance: true,
+    removedAt: t.removedAt,
+    removedToStir: t.toSource.stir,
+    removedToName: t.toSource.orgName ?? t.toSource.name,
+    transferFrom: t.fromSource.name,
+  };
+}
+
 const PAGE_SIZE = 20;
 export const PROPERTY_PAGE_SIZE = PAGE_SIZE;
 
@@ -149,7 +195,22 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
   const wantsRemoved = f.categoryCode === CAT_REMOVED_FROM_BALANCE;
   if (wantsRemoved) {
     if (!isAdmin(user.role)) return { id: "__forbidden__" };
-    and.push({ removedFromBalance: true });
+    // Ikki xil "chiqarilgan": (1) tizimimizdan butunlay chiqqan (`removedFromBalance`);
+    // (2) boshqa tashkilotimizga o'tkazilgan — obyekt yangi egasida faol, lekin ESKI egasining
+    // ro'yxatida qoladi (`BalanceTransfer`, foydalanuvchi talabi, 2026-09-29).
+    // ⚠️ Soha/tashkilot filtri (2) da obyektning JORIY egasiga emas, ESKI egasiga qo'llanadi —
+    // shuning uchun pastdagi umumiy `soha`/`sourceId` sharti bu rejimda qo'shilmaydi.
+    const srcMatch: Prisma.OrganizationSourceWhereInput = {
+      ...(f.soha ? { name: f.soha } : {}),
+      ...(f.sourceId ? { id: f.sourceId } : {}),
+    };
+    const bySource = Boolean(f.soha || f.sourceId);
+    and.push({
+      OR: [
+        { removedFromBalance: true, ...(bySource ? { source: srcMatch } : {}) },
+        { transfers: { some: bySource ? { fromSource: srcMatch } : {} } },
+      ],
+    });
   } else {
     and.push({ removedFromBalance: false });
   }
@@ -241,9 +302,9 @@ export async function buildWhere(user: SessionUser, f: PropertyFilters): Promise
   }
 
   // Soha bo'yicha: obyekt qaysi tashkilot manbasiga tegishli.
-  if (f.soha) and.push({ source: { name: f.soha } });
+  if (f.soha && !wantsRemoved) and.push({ source: { name: f.soha } });
   // Aniq tashkilot (soha ichidagi bitta hudud yoki "Markaziy apparat") — soha filtri bilan AND birikadi.
-  if (f.sourceId) and.push({ sourceId: f.sourceId });
+  if (f.sourceId && !wantsRemoved) and.push({ sourceId: f.sourceId });
   // Faqat hududiy manbalar — hudud/tuman qatoridan kelgan havolalar uchun.
   // ⚠️ Ta'rif `stats.ts` → `NATIONAL_SOURCE` dan, ya'ni jadvalni quruvchi so'rov bilan
   // AYNAN bir xil manbadan (`recentPaymentCutoff()` naqshi).
@@ -557,10 +618,12 @@ export async function listProperties(
       removedToStir: true,
       removedToName: true,
       balanceDate: true,
+      transfers: LAST_TRANSFER,
       region: { select: { name: true } },
       district: { select: { name: true } },
     },
   });
+  const wantsRemoved = filters.categoryCode === CAT_REMOVED_FROM_BALANCE;
 
   return {
     page,
@@ -581,10 +644,7 @@ export async function listProperties(
       lotNumber: r.lotNumber,
       lotStatus: r.lotStatus,
       vacantArea: r.vacantArea ? r.vacantArea.toString() : null,
-      removedFromBalance: r.removedFromBalance,
-      removedAt: r.removedAt,
-      removedToStir: r.removedToStir,
-      removedToName: r.removedToName,
+      ...removedView(r, wantsRemoved),
       balanceDate: r.balanceDate,
     })),
   };
@@ -629,6 +689,7 @@ export async function* iteratePropertiesForExport(
   batchSize = 1000,
 ): AsyncGenerator<PropertyExportRow[]> {
   const where = await buildWhere(user, filters);
+  const wantsRemoved = filters.categoryCode === CAT_REMOVED_FROM_BALANCE;
   let cursor: string | undefined;
 
   for (;;) {
@@ -663,6 +724,7 @@ export async function* iteratePropertiesForExport(
         removedToStir: true,
         removedToName: true,
         balanceDate: true,
+        transfers: LAST_TRANSFER,
         region: { select: { name: true } },
         district: { select: { name: true } },
         source: { select: { name: true } },
@@ -670,35 +732,39 @@ export async function* iteratePropertiesForExport(
     });
     if (rows.length === 0) return;
 
-    yield rows.map((r) => ({
-      cadNumber: r.cadNumber,
-      cadNumberOld: r.cadNumberOld,
-      regionName: r.region.name,
-      districtName: r.district?.name ?? null,
-      sourceName: r.source.name,
-      name: r.name,
-      address: r.address,
-      area: r.area ? Number(r.area) : null,
-      buildingArea: r.buildingArea ? Number(r.buildingArea) : null,
-      integrationCategoryCode: r.integrationCategoryCode,
-      manualCategoryCode: r.manualCategoryCode,
-      isInefficient: r.isInefficient,
-      syncStatus: r.syncStatus,
-      lastSyncedAt: r.lastSyncedAt,
-      lotNumber: r.lotNumber,
-      lotStatus: r.lotStatus,
-      paymentTermMonths: r.paymentTermMonths,
-      auctionGroupName: r.auctionGroupName,
-      rentContractCount: r.rentContractCount,
-      rentTotalSum: r.rentTotalSum ? Number(r.rentTotalSum) : null,
-      rentTotalArea: r.rentTotalArea ? Number(r.rentTotalArea) : null,
-      rentMatchedByOldCad: r.rentMatchedByOldCad,
-      removedFromBalance: r.removedFromBalance,
-      removedAt: r.removedAt,
-      removedToStir: r.removedToStir,
-      removedToName: r.removedToName,
-      balanceDate: r.balanceDate,
-    }));
+    yield rows.map((r) => {
+      const rv = removedView(r, wantsRemoved);
+      return {
+        cadNumber: r.cadNumber,
+        cadNumberOld: r.cadNumberOld,
+        regionName: r.region.name,
+        districtName: r.district?.name ?? null,
+        // O'tkazilgan obyekt chiqarilganlar ro'yxatida ESKI egasining manbasi bilan.
+        sourceName: rv.transferFrom ?? r.source.name,
+        name: r.name,
+        address: r.address,
+        area: r.area ? Number(r.area) : null,
+        buildingArea: r.buildingArea ? Number(r.buildingArea) : null,
+        integrationCategoryCode: r.integrationCategoryCode,
+        manualCategoryCode: r.manualCategoryCode,
+        isInefficient: r.isInefficient,
+        syncStatus: r.syncStatus,
+        lastSyncedAt: r.lastSyncedAt,
+        lotNumber: r.lotNumber,
+        lotStatus: r.lotStatus,
+        paymentTermMonths: r.paymentTermMonths,
+        auctionGroupName: r.auctionGroupName,
+        rentContractCount: r.rentContractCount,
+        rentTotalSum: r.rentTotalSum ? Number(r.rentTotalSum) : null,
+        rentTotalArea: r.rentTotalArea ? Number(r.rentTotalArea) : null,
+        rentMatchedByOldCad: r.rentMatchedByOldCad,
+        removedFromBalance: rv.removedFromBalance,
+        removedAt: rv.removedAt,
+        removedToStir: rv.removedToStir,
+        removedToName: rv.removedToName,
+        balanceDate: r.balanceDate,
+      };
+    });
 
     if (rows.length < batchSize) return;
     cursor = rows[rows.length - 1].id;
@@ -719,6 +785,10 @@ export async function getPropertyDetail(user: SessionUser, cadNumber: string) {
       rentContracts: { orderBy: [{ contractDate: "desc" }, { contractNumber: "asc" }] },
       auctionLots: { orderBy: [{ type: "asc" }, { auctionDate: "desc" }] },
       documents: { orderBy: { createdAt: "desc" } },
+      transfers: {
+        orderBy: { transferredAt: "desc" },
+        include: { fromSource: { select: { name: true, orgName: true } } },
+      },
       assignments: {
         orderBy: { createdAt: "desc" },
         include: { category: true, document: true, assignedBy: { select: { fullName: true } } },

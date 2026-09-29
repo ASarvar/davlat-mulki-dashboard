@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   ArrowLeft,
+  CalendarPlus,
   Info,
   ListChecks,
   FileText,
@@ -283,6 +284,8 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
   // Balansga olish: sana — DB ustunidan (hisobot bilan bir xil), huquq turi va asos
   // hujjatlar — o'sha yozuvning o'zidan (`lib/balance.ts`).
   const balanceRec = balanceRegRecord(rawApi2);
+  // Boshqa tashkilotimizdan o'tkazilgan bo'lsa — eng oxirgi o'tkazish (`BalanceTransfer`).
+  const lastTransfer = p.transfers[0] ?? null;
   // Qiymat yer uchastkasi maydonidan (land_area/land_area_i) olingan bo'lsa obyekt aslida
   // bino emas — yorliq "Binoning umumiy maydoni" emas, "Umumiy maydoni" bo'ladi.
   const totalAreaFieldLabel = totalAreaLabel(totalArea?.source);
@@ -420,25 +423,6 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
               <Field label={totalAreaFieldLabel} value={objectAreaP != null ? `${objectAreaP.toLocaleString("uz")} m²` : null} />
               <Field label="Foydali maydon" value={objectAreaU != null ? `${objectAreaU.toLocaleString("uz")} m²` : null} />
               <Field label="Kategoriya" value={<CategoryBadge integrationCode={p.integrationCategoryCode} manualCode={p.manualCategoryCode} />} />
-              <Field label="Balansga olingan sana" value={p.balanceDate ? dmy(p.balanceDate) : null} />
-              <Field label="Huquq turi" value={balanceRec?.type ?? null} />
-              <Field
-                label="Asos hujjat"
-                className="col-span-2 md:col-span-3"
-                value={
-                  balanceRec && balanceRec.docs.length > 0 ? (
-                    <ul className="space-y-0.5">
-                      {balanceRec.docs.map((d, i) => (
-                        <li key={i}>
-                          {d.type ?? "Hujjat"}
-                          {d.number ? ` № ${d.number}` : ""}
-                          {d.date ? `, ${dmy(d.date)}` : ""}
-                        </li>
-                      ))}
-                    </ul>
-                  ) : null
-                }
-              />
             </dl>
             {/* Xom texnik xato matni (masalan "fetch failed") — faqat admin ko'radi.
                 Boshqa rollar buni tuzata olmaydi va matn ular uchun tushunarsiz/
@@ -456,6 +440,46 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
               </div>
             ) : null}
             <CadastreRawData rawApi2={p.rawApi2} />
+          </div>
+
+          {/* ── Balansga olinganlik ── (alohida karta, foydalanuvchi talabi 2026-09-29).
+              Sana — DB ustunidan (hisobot bilan bir xil); qolgani — kadastr yozuvidan. */}
+          <div className="rounded-xl border border-border bg-card p-5 shadow-sm">
+            <div className="mb-4">
+              <SectionTitle icon={CalendarPlus}>Balansga olinganlik</SectionTitle>
+            </div>
+            <dl className="grid grid-cols-2 gap-4 md:grid-cols-3">
+              <Field label="Balansga olingan sana" value={p.balanceDate ? dmy(p.balanceDate) : null} />
+              {balanceRec?.registrationNumber ? (
+                <Field label="Ro'yxatdan o'tish raqami" value={balanceRec.registrationNumber} />
+              ) : (
+                <Field label="Huquq turi" value={balanceRec?.type ?? null} />
+              )}
+              {lastTransfer ? (
+                <Field
+                  label="Oldingi egasi"
+                  value={`${lastTransfer.fromSource.orgName ?? lastTransfer.fromSource.name} · ${dmy(lastTransfer.transferredAt)}`}
+                />
+              ) : null}
+              <Field
+                label="Asos hujjatlar"
+                className="col-span-2 md:col-span-3"
+                value={
+                  balanceRec && balanceRec.docs.length > 0 ? (
+                    <ul className="space-y-1">
+                      {balanceRec.docs.map((d, i) => (
+                        <li key={i}>
+                          {d.type ?? "Hujjat"}
+                          {d.number ? ` № ${d.number}` : ""}
+                          {d.date ? `, ${dmy(d.date)}` : ""}
+                          {d.issuer ? <span className="text-muted-foreground"> · {d.issuer}</span> : null}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null
+                }
+              />
+            </dl>
           </div>
 
           {/* ── Kommunal xizmatlar ──

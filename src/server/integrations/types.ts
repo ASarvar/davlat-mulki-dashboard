@@ -26,8 +26,8 @@ export interface PropertyBaseData {
    */
   coords?: { lat: number; lng: number } | null;
   /**
-   * Balansga olingan sana (`lib/balance.ts` → `balanceRegDate()`). Faqat `cad_data` beradi;
-   * eski API 2 da `undefined` — yozuvchi uni YOZMAYDI (mavjud qiymat saqlanib qoladi).
+   * Balansga olingan sana (`lib/balance.ts` → `balanceRegDate()`): `cad_data` — huquq
+   * yozuvidan, eski API 2 — `registration_date` dan. `undefined` bo'lsa yozuvchi ustunga TEGMAYDI.
    */
   balanceDate?: Date | null;
   raw: unknown;

@@ -13,26 +13,31 @@
  * ⚠️ Tashkilotlar orasida o'tkazilganda huquq QAYTA ro'yxatdan o'tadi va sana
  * yangilanadi — bu qabul qiluvchi tashkilot uchun haqiqatan "balansga olish".
  *
- * ⚠️ Eski API 2 shaklida (`land`/`outer` yo'q) sana yo'q → `null`.
- * ⚠️ Mantiq migratsiyadagi SQL bilan AYNAN bir xil
- * (`20260928120000_property_balance_date`): noto'g'ri sana tashlab yuboriladi, qolganlarining eng kattasi.
+ * ⚠️ Eski API 2 shaklida (`land`/`outer` yo'q) — `registration_date` (o'sha ma'nodagi
+ * sana: hujjatlardan keyin ro'yxatdan o'tish), faqat huquq yozuvlari UMUMAN bo'lmasa.
+ * ⚠️ Mantiq migratsiyalardagi SQL bilan AYNAN bir xil (`20260928120000_property_balance_date`,
+ * `20260929120000_balance_transfer`): noto'g'ri sana tashlab yuboriladi, qolganlarining eng kattasi.
  */
 export function balanceRegDate(raw: unknown): Date | null {
   return balanceRegRecord(raw)?.date ?? null;
 }
 
-/** Balansga olish yozuvi — obyekt sahifasida ko'rsatiladi. */
+/** Balansga olish yozuvi — obyekt sahifasidagi "Balansga olinganlik" kartasi. */
 export interface BalanceRecord {
-  date: Date;
-  /** Huquq turi ("Doimiy foydalanish", ...). */
+  /** `null` — kadastrda sana yo'q, lekin boshqa ma'lumot bor (kartada baribir ko'rsatiladi). */
+  date: Date | null;
+  /** Huquq turi ("Doimiy foydalanish", ...) — faqat yangi shaklda. */
   type: string | null;
-  /** Asos hujjatlar (hokim qarori, topshirish-qabul qilish dalolatnomasi, ...). */
-  docs: { type: string | null; number: string | null; date: Date | null }[];
+  /** Ro'yxatdan o'tish raqami — faqat eski shaklda (`registration_number`). */
+  registrationNumber: string | null;
+  /** Asos hujjatlar (hokim qarori, dalolatnoma, ...). `issuer` — faqat eski shaklda (`owner`). */
+  docs: { type: string | null; number: string | null; date: Date | null; issuer: string | null }[];
 }
 
 /**
- * Sanasi ENG OXIRGI huquq yozuvi (`balanceRegDate()` shu yozuvning sanasi — ikkalasi
- * hech qachon ajralmaydi). Sanasi teng bo'lsa — birinchi uchragani.
+ * Yangi shakl: sanasi ENG OXIRGI huquq yozuvi (sanasi teng bo'lsa — birinchisi; hech
+ * birida sana bo'lmasa — birinchi yozuv, sanasiz). Eski shakl: `registration_date` +
+ * `documents`. `balanceRegDate()` shu yozuvning sanasi — ikkalasi hech qachon ajralmaydi.
  */
 export function balanceRegRecord(raw: unknown): BalanceRecord | null {
   if (!isObj(raw)) return null;
@@ -43,25 +48,49 @@ export function balanceRegRecord(raw: unknown): BalanceRecord | null {
     for (const o of raw.outer) if (isObj(o) && Array.isArray(o.legal)) legals.push(...o.legal);
   }
 
-  let best: { date: Date; rec: Record<string, unknown> } | null = null;
-  for (const l of legals) {
-    if (!isObj(l)) continue;
-    const d = parseIsoDay(l.date);
-    if (d && (!best || d > best.date)) best = { date: d, rec: l };
+  if (legals.length > 0) {
+    let best: { date: Date | null; rec: Record<string, unknown> } | null = null;
+    for (const l of legals) {
+      if (!isObj(l)) continue;
+      const d = parseIsoDay(l.date);
+      if (!best || (d && (!best.date || d > best.date))) best = { date: d, rec: l };
+    }
+    if (!best) return null;
+    const docs = Array.isArray(best.rec.docs) ? best.rec.docs.filter(isObj) : [];
+    return {
+      date: best.date,
+      type: text(best.rec.type),
+      registrationNumber: null,
+      docs: docs.map((d) => ({
+        type: text(d.type),
+        // ⚠️ Raqam `num` da keladi (`number` jonli javobda doim null); "-" — raqam yo'q.
+        number: text(d.num) ?? text(d.number),
+        date: parseIsoDay(d.date),
+        issuer: null,
+      })),
+    };
   }
-  if (!best) return null;
 
-  const docs = Array.isArray(best.rec.docs) ? best.rec.docs.filter(isObj) : [];
-  return {
-    date: best.date,
-    type: text(best.rec.type),
-    docs: docs.map((d) => ({
+  // Eski API 2 shakli. Hujjat sanasi `"16.04.2026"` (DD.MM.YYYY) formatida keladi.
+  const docs = (Array.isArray(raw.documents) ? raw.documents.filter(isObj) : [])
+    .map((d) => ({
       type: text(d.type),
-      // ⚠️ Raqam `num` da keladi (`number` jonli javobda doim null); "-" — raqam yo'q.
-      number: text(d.num) ?? text(d.number),
-      date: parseIsoDay(d.date),
-    })),
-  };
+      number: text(d.num),
+      date: parseDmyDay(d.date),
+      issuer: text(d.owner),
+    }))
+    .filter((d) => d.type || d.number || d.date || d.issuer);
+  const date = parseIsoDay(raw.registration_date);
+  const registrationNumber = text(raw.registration_number);
+  if (!date && !registrationNumber && docs.length === 0) return null;
+  return { date, type: null, registrationNumber, docs };
+}
+
+/** `"16.04.2026"` → UTC yarim tun; noto'g'ri sana — `null`. */
+function parseDmyDay(v: unknown): Date | null {
+  if (typeof v !== "string") return null;
+  const m = /^(\d{2})\.(\d{2})\.(\d{4})/.exec(v.trim());
+  return m ? parseIsoDay(`${m[3]}-${m[2]}-${m[1]}`) : null;
 }
 
 function text(v: unknown): string | null {

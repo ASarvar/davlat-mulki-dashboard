@@ -157,6 +157,8 @@ model OrganizationSource {
   ijrochilar         User[]              @relation("UserSource1")
   moderatorLinks     UserSource[]        @relation("UserSourceMany")
   snapshots          DashboardSnapshot[]
+  transfersOut       BalanceTransfer[]   @relation("TransferFrom")
+  transfersIn        BalanceTransfer[]   @relation("TransferTo")
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -240,8 +242,8 @@ model Property {
   // Balansga olingan sana — kadastrdagi huquq ro'yxatdan o'tgan ENG OXIRGI sana
   // (`cad_data` → `land.legal[].date` / `outer[].legal[].date`). `createdAt` EMAS:
   // u tizim obyektni ko'rgan kun. Hisoblash `lib/balance.ts` → `balanceRegDate()`.
-  // Eski API 2 shaklida yo'q → null. `/dashboard/balans` hisoboti shunga tayanadi.
-  balanceDate        DateTime? @db.Date
+  // Eski API 2 shaklida — `registration_date`. `/dashboard/balans` hisoboti shunga tayanadi.
+  balanceDate DateTime? @db.Date
 
   // Hisoblangan holat (materialized — dashboard tezligi uchun)
   integrationCategoryCode Int? // 1–4 (integratsiyadan)
@@ -338,6 +340,7 @@ model Property {
    * /**
    * /**
    * /**
+   * /**
    * Oxirgi `ELECTRIC_CONSUMING_MONTHS` oyda `SALDO_PERIOD.CURRENT_EE_KWH > 0` —
    * ya'ni hisoblagich bo'yicha HAQIQIY elektr sarfi qayd etilgan. Gazdagi
    * `gasConsuming` ning elektr muqobili, lekin ishonchliroq: elektrda hisoblagichsiz
@@ -387,6 +390,7 @@ model Property {
   assignments    PropertyCategoryAssignment[]
   documents      Document[]
   changeRequests CategoryChangeRequest[]
+  transfers      BalanceTransfer[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1046,9 +1050,11 @@ model AuctionOrder {
    * `null`, 2026-09-10) — bular har bir buyurtma uchun ALOHIDA so'rov bilan
    * olinadi (`services/auctionOrderDetails.ts`). Ommaviy upsert ularga tegmaydi.
    */
-  rentArea       Decimal? @db.Decimal(12, 2)
-  cadastreNumber String?
-  /** Tafsilotlar oxirgi so'ralgan vaqt — kalit topilmasa ham yoziladi. */
+  rentArea         Decimal?  @db.Decimal(12, 2)
+  cadastreNumber   String?
+  /**
+   * Tafsilotlar oxirgi so'ralgan vaqt — kalit topilmasa ham yoziladi.
+   */
   detailsCheckedAt DateTime?
 
   protocolFileUrl    String?
@@ -1109,7 +1115,9 @@ model AuctionSyncRun {
   saved   Int @default(0)
   skipped Int @default(0)
 
-  /** Sana filtri tufayli yozilmagan (API'dan olingan, lekin oraliqqa tushmagan). */
+  /**
+   * Sana filtri tufayli yozilmagan (API'dan olingan, lekin oraliqqa tushmagan).
+   */
   filtered Int @default(0)
 
   // ── Run doirasi (nima yangilangani) ──
@@ -1119,7 +1127,9 @@ model AuctionSyncRun {
   scopeFrom DateTime?
   scopeTo   DateTime?
 
-  /** Bo'sh massiv = barcha akkauntlar. */
+  /**
+   * Bo'sh massiv = barcha akkauntlar.
+   */
   scopeCredentials String[]
 
   /**
@@ -1148,4 +1158,25 @@ enum AuctionSyncStatus {
    */
   PARTIAL
   FAILED
+}
+
+// ─────────────────────── Ichki o'tkazish tarixi ───────────────────────
+// Obyekt bir tashkilotimizdan boshqasiga o'tkazilgani (masalan Ijara markazi → Direksiya,
+// `syncPropertyBase.ts` → `isTransferredHere()`). `Property` yangi egasiga ko'chiriladi,
+// lekin eski egasining "Balansdan chiqarilgan" ro'yxatida SHU jadval orqali qoladi
+// (foydalanuvchi talabi, 2026-09-29) — `buildWhere()` → `wantsRemoved`.
+model BalanceTransfer {
+  id            String             @id @default(cuid())
+  propertyId    String
+  property      Property           @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  fromSourceId  String
+  fromSource    OrganizationSource @relation("TransferFrom", fields: [fromSourceId], references: [id], onDelete: Cascade)
+  toSourceId    String
+  toSource      OrganizationSource @relation("TransferTo", fields: [toSourceId], references: [id], onDelete: Cascade)
+  /// Eski egasi ro'yxatidan chiqqan vaqt (`Property.removedAt`, bo'lmasa o'tkazish vaqti).
+  removedAt     DateTime
+  transferredAt DateTime           @default(now())
+
+  @@index([propertyId])
+  @@index([fromSourceId])
 }

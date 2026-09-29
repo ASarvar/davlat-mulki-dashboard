@@ -2,6 +2,7 @@ import { API2 } from "./config";
 import { httpJson, NotFoundError } from "./http";
 import type { PropertyBaseData } from "./types";
 import { totalBuildingArea, usefulArea, isLandOnly } from "@/lib/area";
+import { balanceRegDate } from "@/lib/balance";
 
 // API 2 ning HAQIQIY javob shakli (UZKAD). To'liq javob rawApi2'ga saqlanadi,
 // bu yerda faqat bizga kerakli maydonlar tiplangan.
@@ -118,6 +119,8 @@ export async function fetchPropertyBase(cadNumber: string): Promise<Api2Result> 
       districtCode: num(res.district_id),
       holderName: str(holder?.name),
       holderInn: str(holder?.inn),
+      // Eski shaklda — `registration_date` (`lib/balance.ts`).
+      balanceDate: balanceRegDate(res),
       raw: res,
     },
   };
