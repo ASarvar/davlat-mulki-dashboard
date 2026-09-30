@@ -7,6 +7,11 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.20.1
+
+- "Balansga olinganlar" jadvaliga "Yil boshidan" ustuni va kartasi — 1-yanvardan tanlangan
+  sanagacha balansga olingan obyektlar.
+
 ## 1.20.0
 
 - "Balansga olinganlar" sahifasi yana jadval ko'rinishida: hududlar × uch ustun — tanlangan

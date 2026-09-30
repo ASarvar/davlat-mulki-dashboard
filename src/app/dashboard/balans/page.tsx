@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { CalendarCheck, CalendarPlus, CircleHelp, Download, History, Layers3, List, MapPin } from "lucide-react";
+import { CalendarCheck, CalendarPlus, CalendarRange, CircleHelp, Download, History, Layers3, List, MapPin } from "lucide-react";
 import { requireSection } from "@/server/services/sectionAccess";
 import { prisma } from "@/lib/prisma";
 import { userSourceScope } from "@/lib/authz";
@@ -16,7 +16,8 @@ import { dmy, monthLabel, monthRange, parseIsoDay, todayTashkent } from "@/lib/b
 /**
  * Balansga olingan obyektlar — hududlar kesimida (KPI uchun, 2026-09-28).
  *
- * Jadvalda uch ustun (2026-09-30): tanlangan kunning oyi, o'tgan oy va tanlangan kun.
+ * Jadval ustunlari (2026-09-30): yil boshidan tanlangan kungacha, tanlangan kunning oyi,
+ * o'tgan oy va tanlangan kun.
  * Sana — kadastrdagi huquq ro'yxatdan o'tgan sana (`Property.balanceDate`,
  * `lib/balance.ts`), tizim obyektni ko'rgan kun EMAS. Har bir son obyektlar
  * ro'yxatiga havola: `balansFrom`/`balansTo` filtri AYNAN shu `buildWhere()` bilan
@@ -89,6 +90,7 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
           : undefined;
 
   const periods: Record<PeriodKey, Period> = {
+    ytd: { from: `${kun.slice(0, 4)}-01-01`, to: kun },
     month: monthRange(oy)!,
     prev: monthRange(po)!,
     day: { from: kun, to: kun },
@@ -124,7 +126,9 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
       <span className={ZERO}>0</span>
     );
 
-  const columns: { key: PeriodKey; label: string }[] = [
+  const ytdRange = `01.01 — ${kunLabel}`;
+  const columns: { key: PeriodKey; label: string; sub?: string }[] = [
+    { key: "ytd", label: "Yil boshidan", sub: ytdRange },
     { key: "month", label: monthLabel(oy) },
     { key: "prev", label: monthLabel(po) },
     { key: "day", label: kunLabel },
@@ -196,7 +200,15 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
         </div>
       ) : null}
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+        <KpiCard
+          label="Yil boshidan"
+          value={nf(report.totals.ytd)}
+          accent={BRAND.navyMid}
+          icon={CalendarRange}
+          href={report.totals.ytd > 0 ? listHref("ytd") : undefined}
+          footer={ytdRange}
+        />
         <KpiCard
           label={monthLabel(oy)}
           value={nf(report.totals.month)}
@@ -257,8 +269,9 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
                 <th className="w-14 px-2 py-2.5 text-center font-semibold">№</th>
                 <th className="py-2.5 pl-1 pr-4 text-left font-semibold">Hududlar nomi</th>
                 {columns.map((c) => (
-                  <th key={c.key} className="w-40 px-3 py-2.5 text-center font-semibold">
+                  <th key={c.key} className="w-36 px-3 py-2.5 text-center font-semibold">
                     {c.label}
+                    {c.sub ? <span className="block whitespace-nowrap text-[10px] font-normal text-white/60">{c.sub}</span> : null}
                   </th>
                 ))}
               </tr>

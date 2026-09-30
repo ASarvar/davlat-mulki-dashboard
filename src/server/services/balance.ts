@@ -9,8 +9,8 @@ import { buildWhere } from "./properties";
  * `lib/balance.ts`). Hudud — obyekt JOYLASHGAN hudud (`Property.regionId`, kadastr
  * prefiksi), respublika darajasidagi tashkilotlar obyektlari ham shu hududga kiradi.
  *
- * Uch davr (2026-09-30): tanlangan oy, o'tgan oy va tanlangan kun — har biri hudud
- * kesimida alohida ustun.
+ * Davrlar (2026-09-30): yil boshidan tanlangan kungacha, tanlangan oy, o'tgan oy va
+ * tanlangan kun — har biri hudud kesimida alohida ustun.
  *
  * ⚠️ Sonlar `buildWhere()` bilan sanaladi — obyektlar ro'yxati ham aynan shu
  * funksiyani ishlatadi, ya'ni katakdagi son va bosilganda ochiladigan ro'yxat hech
@@ -23,7 +23,7 @@ export interface Period {
   to: string;
 }
 
-export type PeriodKey = "month" | "prev" | "day";
+export type PeriodKey = "ytd" | "month" | "prev" | "day";
 export type PeriodCounts = Record<PeriodKey, number>;
 
 export interface BalanceRow extends PeriodCounts {
@@ -65,9 +65,9 @@ export async function balanceByRegion(
     for (const g of groups[i]) counts.set(`${k}:${g.regionId}`, g._count._all);
   });
 
-  const totals: PeriodCounts = { month: 0, prev: 0, day: 0 };
+  const totals: PeriodCounts = { ytd: 0, month: 0, prev: 0, day: 0 };
   const rows = regions.map((r) => {
-    const row: BalanceRow = { regionId: r.id, regionName: r.name, month: 0, prev: 0, day: 0 };
+    const row: BalanceRow = { regionId: r.id, regionName: r.name, ytd: 0, month: 0, prev: 0, day: 0 };
     for (const k of keys) {
       row[k] = counts.get(`${k}:${r.id}`) ?? 0;
       totals[k] += row[k];
