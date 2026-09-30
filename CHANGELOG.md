@@ -7,6 +7,12 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.20.0
+
+- "Balansga olinganlar" sahifasi yana jadval ko'rinishida: hududlar × uch ustun — tanlangan
+  oy, o'tgan oy va tanlangan kun. Oy tanlagich o'rniga o'zbekcha kun tanlagich (oy tanlangan
+  kundan olinadi), tepada kun uchun alohida karta.
+
 ## 1.19.1
 
 - Login sahifasi yangi dizaynda: chapda brend paneli (logotip, "Monitoring"), o'ngda forma;

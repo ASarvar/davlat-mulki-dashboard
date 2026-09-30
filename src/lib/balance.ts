@@ -140,6 +140,11 @@ export function currentMonthTashkent(now = new Date()): string {
     .slice(0, 7);
 }
 
+/** Bugungi kun (`"YYYY-MM-DD"`) — Toshkent vaqti bo'yicha. */
+export function todayTashkent(now = new Date()): string {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(now);
+}
+
 const MONTHS_UZ = [
   "Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
   "Iyul", "Avgust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr",

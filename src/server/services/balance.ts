@@ -9,86 +9,71 @@ import { buildWhere } from "./properties";
  * `lib/balance.ts`). Hudud — obyekt JOYLASHGAN hudud (`Property.regionId`, kadastr
  * prefiksi), respublika darajasidagi tashkilotlar obyektlari ham shu hududga kiradi.
  *
+ * Uch davr (2026-09-30): tanlangan oy, o'tgan oy va tanlangan kun — har biri hudud
+ * kesimida alohida ustun.
+ *
  * ⚠️ Sonlar `buildWhere()` bilan sanaladi — obyektlar ro'yxati ham aynan shu
  * funksiyani ishlatadi, ya'ni katakdagi son va bosilganda ochiladigan ro'yxat hech
  * qachon ajralmaydi (rol doirasi ham, balansdan chiqarilganlarni tashlash ham bir xil).
  */
 
-export interface BalanceRow {
+/** Davr — ikkala chegara ham kiradi (`"YYYY-MM-DD"`). */
+export interface Period {
+  from: string;
+  to: string;
+}
+
+export type PeriodKey = "month" | "prev" | "day";
+export type PeriodCounts = Record<PeriodKey, number>;
+
+export interface BalanceRow extends PeriodCounts {
   regionId: string;
   regionName: string;
-  bySoha: Record<string, number>;
-  total: number;
 }
 
 export interface BalanceReport {
-  /** Ustunlar — soha nomlari (Ijara markazi birinchi). Soha tanlangan bo'lsa faqat o'sha. */
-  sohas: string[];
+  /** Hududlar rasmiy tartibda (`Region.sortOrder`). */
   rows: BalanceRow[];
-  totals: { bySoha: Record<string, number>; total: number };
-  /** O'tgan oy jami — taqqoslash uchun (xuddi shu doira va soha). */
-  previousTotal: number;
+  totals: PeriodCounts;
   /** Doiradagi, lekin kadastrda huquq sanasi yo'q obyektlar (hisobotga kira olmaydi). */
   undated: number;
 }
 
 export async function balanceByRegion(
   user: SessionUser,
-  opts: {
-    from: string;
-    to: string;
-    prevFrom: string;
-    prevTo: string;
-    soha?: string;
-    /** Ustunlar uchun sohalar ro'yxati (sahifa rol doirasiga qarab beradi). */
-    sohaList: string[];
-  },
+  opts: { periods: Record<PeriodKey, Period>; soha?: string },
 ): Promise<BalanceReport> {
-  const { from, to, prevFrom, prevTo, soha, sohaList } = opts;
+  const { periods, soha } = opts;
+  const keys = Object.keys(periods) as PeriodKey[];
 
-  const [where, prevWhere, undatedWhere, regions] = await Promise.all([
-    buildWhere(user, { soha, balanceFrom: from, balanceTo: to }),
-    buildWhere(user, { soha, balanceFrom: prevFrom, balanceTo: prevTo }),
+  const [wheres, undatedWhere, regions] = await Promise.all([
+    Promise.all(
+      keys.map((k) => buildWhere(user, { soha, balanceFrom: periods[k].from, balanceTo: periods[k].to })),
+    ),
     // ⚠️ Ro'yxat filtri (`balansNone=1`) bilan AYNAN bir xil — kartani bosganda shuncha obyekt.
     buildWhere(user, { soha, balanceUnknown: true }),
     prisma.region.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true } }),
   ]);
 
-  const [groups, previousTotal, undated] = await Promise.all([
-    prisma.property.groupBy({ by: ["regionId", "sourceId"], where, _count: { _all: true } }),
-    prisma.property.count({ where: prevWhere }),
+  const [groups, undated] = await Promise.all([
+    Promise.all(wheres.map((where) => prisma.property.groupBy({ by: ["regionId"], where, _count: { _all: true } }))),
     prisma.property.count({ where: undatedWhere }),
   ]);
 
-  const sourceIds = [...new Set(groups.map((g) => g.sourceId))];
-  const sources = await prisma.organizationSource.findMany({
-    where: { id: { in: sourceIds } },
-    select: { id: true, name: true },
+  const counts = new Map<string, number>(); // `${key}:${regionId}` → son
+  keys.forEach((k, i) => {
+    for (const g of groups[i]) counts.set(`${k}:${g.regionId}`, g._count._all);
   });
-  const sohaOf = new Map(sources.map((s) => [s.id, s.name]));
 
-  const sohas = (soha ? [soha] : sohaList).slice().sort((a, b) =>
-    a === "Ijara markazi" ? -1 : b === "Ijara markazi" ? 1 : 0,
-  );
-  const empty = () => Object.fromEntries(sohas.map((s) => [s, 0])) as Record<string, number>;
-
-  const byRegion = new Map<string, Record<string, number>>();
-  for (const g of groups) {
-    const name = sohaOf.get(g.sourceId);
-    if (!name) continue;
-    const cell = byRegion.get(g.regionId) ?? empty();
-    cell[name] = (cell[name] ?? 0) + g._count._all;
-    byRegion.set(g.regionId, cell);
-  }
-
-  const totals = { bySoha: empty(), total: 0 };
+  const totals: PeriodCounts = { month: 0, prev: 0, day: 0 };
   const rows = regions.map((r) => {
-    const bySoha = byRegion.get(r.id) ?? empty();
-    const total = Object.values(bySoha).reduce((a, b) => a + b, 0);
-    for (const s of sohas) totals.bySoha[s] += bySoha[s] ?? 0;
-    totals.total += total;
-    return { regionId: r.id, regionName: r.name, bySoha, total };
+    const row: BalanceRow = { regionId: r.id, regionName: r.name, month: 0, prev: 0, day: 0 };
+    for (const k of keys) {
+      row[k] = counts.get(`${k}:${r.id}`) ?? 0;
+      totals[k] += row[k];
+    }
+    return row;
   });
 
-  return { sohas, rows, totals, previousTotal, undated };
+  return { rows, totals, undated };
 }

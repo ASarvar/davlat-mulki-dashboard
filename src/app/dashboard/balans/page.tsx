@@ -1,21 +1,22 @@
 import Link from "next/link";
-import { CalendarPlus, CircleHelp, Download, Layers3, List, MapPin } from "lucide-react";
+import { CalendarCheck, CalendarPlus, CircleHelp, Download, History, Layers3, List, MapPin } from "lucide-react";
 import { requireSection } from "@/server/services/sectionAccess";
 import { prisma } from "@/lib/prisma";
 import { userSourceScope } from "@/lib/authz";
 import { ALL_SOHA } from "../SourceFilter";
-import { MonthPicker } from "./MonthPicker";
-import { balanceByRegion } from "@/server/services/balance";
+import { DatePicker } from "./DatePicker";
+import { balanceByRegion, type Period, type PeriodKey } from "@/server/services/balance";
 import { listSourceNames } from "@/server/services/sources";
 import { KpiCard } from "@/components/ui/KpiCard";
 import { BRAND } from "@/lib/chartColors";
 import { nf } from "@/lib/format";
 import { withBase } from "@/lib/basePath";
-import { currentMonthTashkent, dmy, monthLabel, monthRange, parseIsoDay } from "@/lib/balance";
+import { dmy, monthLabel, monthRange, parseIsoDay, todayTashkent } from "@/lib/balance";
 
 /**
- * Balansga olingan obyektlar — oy bo'yicha, hududlar kesimida (KPI uchun, 2026-09-28).
+ * Balansga olingan obyektlar — hududlar kesimida (KPI uchun, 2026-09-28).
  *
+ * Jadvalda uch ustun (2026-09-30): tanlangan kunning oyi, o'tgan oy va tanlangan kun.
  * Sana — kadastrdagi huquq ro'yxatdan o'tgan sana (`Property.balanceDate`,
  * `lib/balance.ts`), tizim obyektni ko'rgan kun EMAS. Har bir son obyektlar
  * ro'yxatiga havola: `balansFrom`/`balansTo` filtri AYNAN shu `buildWhere()` bilan
@@ -29,21 +30,19 @@ import { currentMonthTashkent, dmy, monthLabel, monthRange, parseIsoDay } from "
 type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
 
+const CELL = "px-3 py-2.5 text-center tabular-nums";
+const ROW_LINE = "border-b border-slate-100";
+const NUM_LINK = "font-medium text-[var(--cobalt)] underline-offset-2 hover:underline";
+const ZERO = "text-slate-300";
+const TOTALS_ROW = "bg-[var(--gold-lighter)] font-bold text-[var(--navy)]";
+const TOTALS_LINE = "border-b-2 border-[var(--gold)]";
 const CARD =
   "mt-6 rounded-2xl bg-card p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04),0_12px_32px_-16px_rgba(15,23,42,0.18)] ring-1 ring-slate-200/70";
 const BTN =
   "inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium text-slate-600 ring-1 ring-slate-200 transition hover:bg-slate-50 hover:text-slate-900 hover:ring-slate-300";
 
-/** Eng erta tanlanadigan oy (foydalanuvchi talabi, 2026-09-29). */
-const MIN_MONTH = "2026-01";
-
-/** Manba ranglari — hudud chizig'idagi bo'laklar va legenda. */
-const SOHA_COLOR: Record<string, string> = {
-  "Ijara markazi": BRAND.cobalt,
-  "Davlat aktivlari agentligi": BRAND.gold,
-  Direksiya: "#4a90a4",
-};
-const sohaColor = (s: string) => SOHA_COLOR[s] ?? "#94a3b8";
+/** Eng erta tanlanadigan sana (foydalanuvchi talabi, 2026-09-29: 2026-yil yanvaridan). */
+const MIN_DAY = "2026-01-01";
 
 function prevMonth(ym: string): string {
   const [y, m] = ym.split("-").map(Number);
@@ -55,12 +54,15 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
   const user = await requireSection("balans");
   const sp = await searchParams;
 
-  const current = currentMonthTashkent();
-  const oyRaw = str(sp.oy);
-  // Tanlash oralig'i: MIN_MONTH — joriy oy (`"YYYY-MM"` satr sifatida solishtiriladi).
-  const oy = oyRaw && monthRange(oyRaw) && oyRaw >= MIN_MONTH && oyRaw <= current ? oyRaw : current;
-  const range = monthRange(oy)!;
-  const prev = monthRange(prevMonth(oy))!;
+  const today = todayTashkent();
+  // Tanlash oralig'i: MIN_DAY — bugun (`"YYYY-MM-DD"` satr sifatida solishtiriladi).
+  // Eski `?oy=YYYY-MM` havolalari ham ishlaydi: o'sha oyning oxirgi kuni (joriy oyda — bugun).
+  const kunRaw = str(sp.kun);
+  const oyRaw = monthRange(str(sp.oy));
+  const candidate = kunRaw && parseIsoDay(kunRaw) ? kunRaw.slice(0, 10) : oyRaw?.to;
+  const kun = candidate && candidate >= MIN_DAY ? (candidate > today ? today : candidate) : today;
+  const oy = kun.slice(0, 7);
+  const po = prevMonth(oy);
 
   // Soha — hisobot bilan bir xil qoida: standart "Ijara markazi", "Hammasi" uchun ANIQ
   // `?soha=__all__`. Faqat mavjud nom qabul qilinadi (aks holda jimgina bo'sh jadval).
@@ -86,49 +88,53 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
           ? "Ijara markazi"
           : undefined;
 
-  const report = await balanceByRegion(user, {
-    from: range.from,
-    to: range.to,
-    prevFrom: prev.from,
-    prevTo: prev.to,
-    soha,
-    sohaList: sohaNames,
-  });
+  const periods: Record<PeriodKey, Period> = {
+    month: monthRange(oy)!,
+    prev: monthRange(po)!,
+    day: { from: kun, to: kun },
+  };
+  const report = await balanceByRegion(user, { periods, soha });
 
   // Ro'yxat havolasi — hisobot bilan AYNAN bir xil filtr.
-  const listParams = (extra: Record<string, string | undefined>) => {
-    const p = new URLSearchParams({ balansFrom: range.from, balansTo: range.to });
-    for (const [k, v] of Object.entries(extra)) if (v) p.set(k, v);
+  const listParams = (period: Period, extra: Record<string, string | undefined> = {}) => {
+    const p = new URLSearchParams({ balansFrom: period.from, balansTo: period.to });
+    for (const [k, v] of Object.entries({ soha, ...extra })) if (v) p.set(k, v);
     return p.toString();
   };
-  const listHref = (extra: Record<string, string | undefined> = {}) =>
-    `/dashboard/objects?${listParams({ soha, ...extra })}`;
-  const exportHref = withBase(`/api/export/objects?${listParams({ soha })}`);
+  const listHref = (key: PeriodKey, extra?: Record<string, string | undefined>) =>
+    `/dashboard/objects?${listParams(periods[key], extra)}`;
+  const exportHref = withBase(`/api/export/objects?${listParams(periods.month)}`);
 
-  const pageHref = (params: { oy?: string; soha: string }) => {
+  const pageHref = (params: { kun: string; soha: string }) => {
     const p = new URLSearchParams();
-    if (params.oy && params.oy !== current) p.set("oy", params.oy);
+    if (params.kun !== today) p.set("kun", params.kun);
     p.set("soha", params.soha);
-    const qs = p.toString();
-    return qs ? `/dashboard/balans?${qs}` : "/dashboard/balans";
+    return `/dashboard/balans?${p}`;
   };
 
-  const isCurrent = oy === current;
-  // Bugun — Toshkent vaqti bo'yicha (server UTC'da): joriy oy kartasida sana oralig'i bugun bilan tugaydi.
-  const today = parseIsoDay(new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Tashkent" }).format(new Date()));
+  const kunLabel = dmy(parseIsoDay(kun)!);
+  const monthEnd = oy === today.slice(0, 7) ? today : periods.month.to;
 
-  // ⚠️ Hududlar RASMIY tartibda (`Region.sortOrder`, `balanceByRegion` shunday qaytaradi) —
-  // son bo'yicha saralanmaydi (foydalanuvchi talabi, 2026-09-29).
-  const ranked = report.rows;
-  const maxTotal = Math.max(1, ...ranked.map((r) => r.total));
-  const half = Math.ceil(ranked.length / 2);
-  const multiSoha = report.sohas.length > 1;
+  const num = (n: number, href: string) =>
+    n > 0 ? (
+      <Link href={href} className={NUM_LINK}>
+        {nf(n)}
+      </Link>
+    ) : (
+      <span className={ZERO}>0</span>
+    );
+
+  const columns: { key: PeriodKey; label: string }[] = [
+    { key: "month", label: monthLabel(oy) },
+    { key: "prev", label: monthLabel(po) },
+    { key: "day", label: kunLabel },
+  ];
 
   const sohaTabs: { key: string; label: string; href: string }[] = [
     ...[...sohaNames]
       .sort((a, b) => (a === "Ijara markazi" ? -1 : b === "Ijara markazi" ? 1 : 0))
-      .map((n) => ({ key: n, label: n, href: pageHref({ oy, soha: n }) })),
-    { key: ALL_SOHA, label: "Hammasi", href: pageHref({ oy, soha: ALL_SOHA }) },
+      .map((n) => ({ key: n, label: n, href: pageHref({ kun, soha: n }) })),
+    { key: ALL_SOHA, label: "Hammasi", href: pageHref({ kun, soha: ALL_SOHA }) },
   ];
 
   return (
@@ -146,12 +152,10 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
 
         {/* Oddiy GET forma — `action` berilmaydi (basePath saqlanadi, CLAUDE.md). */}
         <form className="flex flex-wrap items-center gap-2">
-          {/* ⚠️ "Hammasi" ham yuboriladi — aks holda oy o'zgarganda standart sohaga qaytib qolardi. */}
+          {/* ⚠️ "Hammasi" ham yuboriladi — aks holda sana o'zgarganda standart sohaga qaytib qolardi. */}
           <input type="hidden" name="soha" value={soha ?? ALL_SOHA} />
-          {/* Yorliqsiz (foydalanuvchi talabi) — ekran o'quvchi uchun `aria-label`.
-              Balandlik tugma bilan bir xil: ikkalasi ham `h-9`. */}
-          {/* `key={oy}` — sahifa boshqa oy bilan qayta chizilganda tanlagich holati yangilanadi. */}
-          <MonthPicker key={oy} name="oy" value={oy} min={MIN_MONTH} max={current} />
+          {/* `key={kun}` — sahifa boshqa sana bilan qayta chizilganda tanlagich holati yangilanadi. */}
+          <DatePicker key={kun} name="kun" value={kun} min={MIN_DAY} max={today} />
           <button
             type="submit"
             className="h-9 rounded-lg px-4 text-sm font-semibold text-white shadow-sm transition hover:opacity-90"
@@ -192,19 +196,28 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
         </div>
       ) : null}
 
-      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+      <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <KpiCard
-          label={`Balansga olingan — ${monthLabel(oy)}`}
-          value={nf(report.totals.total)}
+          label={monthLabel(oy)}
+          value={nf(report.totals.month)}
           accent={BRAND.cobalt}
           icon={CalendarPlus}
-          href={report.totals.total > 0 ? listHref() : undefined}
-          footer={`${dmy(parseIsoDay(range.from)!)} — ${dmy(isCurrent && today ? today : parseIsoDay(range.to)!)}`}
+          href={report.totals.month > 0 ? listHref("month") : undefined}
+          footer={`${dmy(parseIsoDay(periods.month.from)!)} — ${dmy(parseIsoDay(monthEnd)!)}`}
         />
         <KpiCard
-          label={`O'tgan oy — ${monthLabel(prevMonth(oy))}`}
-          value={nf(report.previousTotal)}
+          label={`O'tgan oy — ${monthLabel(po)}`}
+          value={nf(report.totals.prev)}
           accent={BRAND.navyMid}
+          icon={History}
+          href={report.totals.prev > 0 ? listHref("prev") : undefined}
+        />
+        <KpiCard
+          label={kunLabel}
+          value={nf(report.totals.day)}
+          accent={BRAND.cobalt}
+          icon={CalendarCheck}
+          href={report.totals.day > 0 ? listHref("day") : undefined}
         />
         <KpiCard
           label="Sanasi aniqlanmagan"
@@ -226,7 +239,7 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
             Hududlar kesimi
           </h2>
           <div className="flex flex-wrap gap-2">
-            <Link href={listHref()} className={BTN}>
+            <Link href={listHref("month")} className={BTN}>
               <List className="h-3.5 w-3.5" />
               Ro'yxatni ko'rish
             </Link>
@@ -237,77 +250,44 @@ export default async function BalansPage({ searchParams }: { searchParams: Promi
           </div>
         </div>
 
-        {multiSoha ? (
-          <div className="mb-3 flex flex-wrap gap-x-5 gap-y-1.5 text-xs text-slate-600">
-            {report.sohas.map((s) => (
-              <Link
-                key={s}
-                href={listHref({ soha: s })}
-                className="inline-flex items-center gap-1.5 transition hover:text-slate-900"
-              >
-                <span className="h-2.5 w-2.5 rounded-sm" style={{ background: sohaColor(s) }} />
-                {s}
-                <span className="font-semibold tabular-nums text-slate-900">
-                  {nf(report.totals.bySoha[s] ?? 0)}
-                </span>
-              </Link>
-            ))}
-          </div>
-        ) : null}
-
-        {/* Rasmiy tartib; katta ekranda ikki ustun (ustun bo'yicha to'ladi: 1–7 chapda, 8–14 o'ngda). */}
-        <ol
-          className="grid grid-cols-1 gap-x-10 lg:grid-flow-col lg:grid-cols-2"
-          style={{ gridTemplateRows: `repeat(${half}, auto)` }}
-        >
-          {ranked.map((r, i) => {
-            const empty = r.total === 0;
-            const body = (
-              <>
-                <span className="w-5 shrink-0 text-right text-xs tabular-nums text-slate-400">{i + 1}</span>
-                <span
-                  className={`w-28 shrink-0 truncate text-sm sm:w-40 ${empty ? "text-slate-400" : "font-medium text-slate-700"}`}
-                >
-                  {r.regionName}
-                </span>
-                <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
-                  <span className="flex h-full" style={{ width: `${(r.total / maxTotal) * 100}%` }}>
-                    {report.sohas.map((s) => {
-                      const n = r.bySoha[s] ?? 0;
-                      return n > 0 ? (
-                        <span
-                          key={s}
-                          title={`${s}: ${nf(n)}`}
-                          className="h-full first:rounded-l-full last:rounded-r-full"
-                          style={{ width: `${(n / r.total) * 100}%`, background: sohaColor(s) }}
-                        />
-                      ) : null;
-                    })}
-                  </span>
-                </span>
-                <span
-                  className={`w-10 shrink-0 text-right text-sm tabular-nums ${empty ? "text-slate-300" : "font-semibold text-[var(--navy)]"}`}
-                >
-                  {nf(r.total)}
-                </span>
-              </>
-            );
-            return (
-              <li key={r.regionId} className="border-b border-slate-100">
-                {empty ? (
-                  <div className="flex items-center gap-3 px-2 py-2.5">{body}</div>
-                ) : (
-                  <Link
-                    href={listHref({ region: r.regionId })}
-                    className="flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-[#eef4fc]"
-                  >
-                    {body}
-                  </Link>
-                )}
-              </li>
-            );
-          })}
-        </ol>
+        <div className="overflow-x-auto rounded-xl ring-1 ring-slate-200">
+          <table className="w-full border-separate border-spacing-0 text-sm">
+            <thead className="bg-[var(--navy-mid)] text-white">
+              <tr className="text-xs tracking-wide">
+                <th className="w-14 px-2 py-2.5 text-center font-semibold">№</th>
+                <th className="py-2.5 pl-1 pr-4 text-left font-semibold">Hududlar nomi</th>
+                {columns.map((c) => (
+                  <th key={c.key} className="w-40 px-3 py-2.5 text-center font-semibold">
+                    {c.label}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {/* JAMI — birinchi qator (rasmiy hisobot shakli). */}
+              <tr className={TOTALS_ROW}>
+                <td className={`${TOTALS_LINE} px-2 py-3`} />
+                <td className={`${TOTALS_LINE} whitespace-nowrap py-3 pl-1 pr-4 tracking-wide`}>J A M I:</td>
+                {columns.map((c) => (
+                  <td key={c.key} className={`${CELL} ${TOTALS_LINE} py-3`}>
+                    {num(report.totals[c.key], listHref(c.key))}
+                  </td>
+                ))}
+              </tr>
+              {report.rows.map((r, i) => (
+                <tr key={r.regionId} className="transition-colors hover:bg-[#eef4fc]">
+                  <td className={`${ROW_LINE} px-2 py-2.5 text-center text-xs text-muted-foreground`}>{i + 1}</td>
+                  <td className={`${ROW_LINE} whitespace-nowrap py-2.5 pl-1 pr-4`}>{r.regionName}</td>
+                  {columns.map((c) => (
+                    <td key={c.key} className={`${CELL} ${ROW_LINE}`}>
+                      {num(r[c.key], listHref(c.key, { region: r.regionId }))}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
     </div>
   );

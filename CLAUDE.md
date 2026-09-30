@@ -790,6 +790,9 @@ ham qolgan ma'lumot ko'rsatiladi.
   (ikkala chegara kiradi) — son va ro'yxat ajralmaydi. Eksportda "Balansga olingan sana" ustuni.
 - Tashkilotlar orasida o'tkazish huquqni qayta ro'yxatdan o'tkazadi — qabul qiluvchida yangi sana
   (foydalanuvchi qarori: ichki o'tkazish ham "balansga olingan" sanaladi).
+- Jadval: hududlar × uch ustun — tanlangan kunning oyi, o'tgan oy, tanlangan kun
+  (`?kun=YYYY-MM-DD`, standart bugun, Toshkent; eski `?oy=` ham qabul qilinadi).
+  Tanlagich `balans/DatePicker.tsx` — o'zbekcha, brauzer `input type=date` emas.
 - Standart manba — "Ijara markazi" (hisobot kabi), "Hammasi" — `?soha=__all__`.
   "Sanasi aniqlanmagan" kartasi → ro'yxat `balansNone=1` (`balanceUnknown`, bir xil `buildWhere`).
 
