@@ -36,31 +36,29 @@ export const PRE_AUCTION_STATUSES: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Lot HOZIR savdodami (2026-10-09, foydalanuvchi qarori).
+ * Lot HOZIR savdodami — ya'ni haqiqatan TAKLIF etilyaptimi (2026-10-09, foydalanuvchi qarori).
  *
  * API 3 kadastr bo'yicha OXIRGI buyurtmani qaytaradi — savdosi tugagan bo'lsa ham.
  * Ilgari "lot bor + sotilmagan" yetarli edi va "Mol-mulk (obyekt) sotilmadi",
- * "Vaqtincha to'xtatildi", "Lot bekor qilindi" holatidagi va savdo sanasi o'tib
- * ketgan lotlar ham "Savdoda xususiylashtirish"da turardi (jonli: 793 tadan ~110 ta).
- * Endi ular kat 3 dan chiqib, keyingi qoidaga tushadi: ijara shartnomasi bo'lsa 5/6,
- * aks holda 11 (Bo'sh turgan).
+ * "Vaqtincha to'xtatildi", "Lot bekor qilindi", "yakunlandi", komissiyaga topshirilgan
+ * va sanasiz "Савдода" lotlar ham "Savdoda xususiylashtirish"da turardi (jonli: 793 tadan
+ * ~110, keyin yana 14 ta). Endi ular kat 3 dan chiqib, keyingi qoidaga tushadi: ijara
+ * shartnomasi bo'lsa 5/6, aks holda 11 (Bo'sh turgan).
  *
- * ⚠️ Tugagan holatlar ANIQ sanaladi (oq ro'yxat emas): komissiyaga topshirilgan,
- * zaxiradagi g'olibga taklif kabi oraliq bosqichlar savdo jarayoni hisoblanadi.
- * Ariza qabul qilinayotgan / "Savdoda" lotning sanasi o'tgan bo'lsa — eskirgan.
+ * ⚠️ OQ RO'YXAT: faqat "arizalarni qabul qilish" holati VA savdo sanasi bugun yoki keyin.
+ * Bu davijara.uz "taklif etilayotgan" mezoni bilan AYNAN bir xil — ikki son faqat
+ * obyekt/lot farqi bilan ajraladi (bitta lot ikki kadastrda kelishi mumkin).
+ * Sanasiz lot ham ochiq EMAS (qachon savdo bo'lishi noma'lum).
  */
-const ENDED_LOT_RE = /sotilmadi|сотилмади|to'xtatil|тўхтатил|тухтатил|bekor qilin|бекор қилин|бекор килин/;
-const OPEN_LOT_RE = /arizalarni qabul|аризаларни қабул|^savdoda$|^савдода$/;
+const OPEN_LOT_RE = /arizalarni qabul|аризаларни қабул/;
 
 /** Kun — jarayon soatida (`parseApi4Date` sanani shu soatda o'qiydi, ya'ni yozilgan kun). */
 const localDay = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 export function isLotOpen(lotStatus: string | null, auctionDate: Date | null, today = todayTashkent()): boolean {
-  const s = (lotStatus ?? "").replace(/[`‘’ʻʼ]/g, "'").trim().toLowerCase();
-  if (s && ENDED_LOT_RE.test(s)) return false;
-  if (auctionDate && (!s || OPEN_LOT_RE.test(s)) && localDay(auctionDate) < today) return false;
-  return true;
+  const s = (lotStatus ?? "").trim().toLowerCase();
+  return OPEN_LOT_RE.test(s) && auctionDate !== null && localDay(auctionDate) >= today;
 }
 
 // Auksion (API 3+4) natijasidan integratsiya kategoriyasini aniqlaydi.

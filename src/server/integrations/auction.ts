@@ -98,6 +98,15 @@ export interface AuctionInfo {
 /** API 4 da bu qiymat "sotilgan" degani (foydalanuvchi tomonidan tasdiqlangan). */
 export const ORDER_STATUS_SOLD = 6;
 
+/**
+ * Lot holati "Сотилган" — buyurtma holati hali 6 ga o'tmagan bo'lsa ham SOTILGAN
+ * (2026-10-09, foydalanuvchi qarori). Aks holda bunday obyekt "Savdoda xususiy."da
+ * qolib ketardi (jonli: 5 ta). Faqat ANIQ moslik — "sotilmadi" bilan adashmasin.
+ */
+const SOLD_LOT_STATUSES: ReadonlySet<string> = new Set(["сотилган", "sotilgan"]);
+export const isSoldLotStatus = (status: string | null | undefined): boolean =>
+  SOLD_LOT_STATUSES.has((status ?? "").trim().toLowerCase());
+
 export const EMPTY_AUCTION: AuctionInfo = {
   found: false,
   lotNumber: null,
@@ -279,6 +288,7 @@ export async function checkAuction(cadNumber: string): Promise<AuctionInfo> {
       lotNumber: lotStr(asset.lot_number),
       lotStatus: str(asset.status_name),
       assetStatus: str(asset.status_name),
+      isSold: isSoldLotStatus(str(asset.status_name)),
       raw: { api3: asset },
     };
   }
@@ -291,6 +301,7 @@ export async function checkAuction(cadNumber: string): Promise<AuctionInfo> {
       lotNumber: lotStr(asset.lot_number),
       lotStatus: str(asset.status_name),
       assetStatus: str(asset.status_name),
+      isSold: isSoldLotStatus(str(asset.status_name)),
       orderId,
       raw: { api3: asset },
     };
@@ -298,6 +309,7 @@ export async function checkAuction(cadNumber: string): Promise<AuctionInfo> {
 
   const { order, groupName } = fetched;
   const orderStatusId = int(order.order_statuses_id);
+  const lotStatus = str(order.lot_status) ?? str(asset.status_name);
   // Oylar: avval term_month, bo'lmasa details "tulov_muddati" (ko'rsatish uchun).
   const months = int(order.term_month) ?? int(detailValue(order, "tulov_muddati"));
 
@@ -305,13 +317,13 @@ export async function checkAuction(cadNumber: string): Promise<AuctionInfo> {
     found: true,
     // Havola API 4 dagi lot raqamiga quriladi; yo'q bo'lsa API 3 dagisi.
     lotNumber: lotStr(order.lot_number) ?? lotStr(asset.lot_number),
-    lotStatus: str(order.lot_status) ?? str(asset.status_name),
+    lotStatus,
     orderId: int(order.order_id) ?? orderId,
     orderStatusId,
     orderStatus: str(order.order_status),
     termPayment: int(order.term_payment),
     paymentTermMonths: months && months > 0 ? months : null,
-    isSold: orderStatusId === ORDER_STATUS_SOLD,
+    isSold: orderStatusId === ORDER_STATUS_SOLD || isSoldLotStatus(lotStatus),
     groupName,
     assetStatus: str(asset.status_name),
     startPrice: numLoose(order.start_price),

@@ -7,6 +7,13 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.22.1
+
+- "Savdoda xususiylashtirish" mezoni davijara.uz bilan bir xil: faqat "arizalarni qabul qilish"
+  holatidagi va savdo sanasi oldinda turgan lotlar ("yakunlandi", komissiyaga topshirilgan,
+  sanasiz "Савдода" chiqadi). Lot holati "Сотилган" bo'lsa obyekt sotilgan hisoblanadi
+  (buyurtma holati hali o'zgarmagan bo'lsa ham).
+
 ## 1.22.0
 
 - "Savdoda xususiylashtirish" (kat 3) endi faqat OCHIQ lotlar: "Mol-mulk (obyekt) sotilmadi",

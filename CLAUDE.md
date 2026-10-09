@@ -714,19 +714,22 @@ siklda `colIdx`ni mustaqil hisoblashdan ko'ra xavfsizroq (kategoriyalardan biri 
 olinganda/qo'shilganda — masalan kat 8 — barcha sikllar avtomatik izchil qoladi).
 
 Aniqlash qoidalari (`classification.ts` → `deriveAuctionCategory`, tartib muhim):
-1. `order_statuses_id === 6` ⇒ sotilgan; `term_payment === 1` ⇒ kat 1, aks holda kat 2
+1. `order_statuses_id === 6` **yoki lot holati "Сотилган"** (`isSoldLotStatus`, 2026-10-09 —
+   buyurtma holati kechikib o'tadi, jonli 5 ta) ⇒ sotilgan; `term_payment === 1` ⇒ kat 1, aks holda kat 2
    (⚠️ mezon `term_payment`, `details.tulov_muddati` **emas** — u sotuv bo'lib to'lash bo'lsa ham bo'sh keladi)
 2. **API 6 da faol ijara loti** topilsa ⇒ kat 4 (Savdoda ijara). Bu kat 4 ning ASOSIY mezoni —
    API 4 dagi `group_name` real ma'lumotda hech qachon "ijaraga berish" bo'lmagan, va API 3/4
    ijara lotini umuman ko'rmasligi mumkin (shuning uchun `found` shartidan oldin tekshiriladi).
 3. **haqiqiy** lot bor, sotilmagan **va lot ochiq** ⇒ kat 3 (Savdoda xususiylashtirish).
-   ⚠️ `isLotOpen()` (2026-10-09, foydalanuvchi qarori): API 3 OXIRGI buyurtmani qaytaradi,
-   tugagan bo'lsa ham — "Mol-mulk (obyekt) sotilmadi", "Vaqtincha to'xtatildi", "Lot bekor
-   qilindi" va savdo sanasi o'tgan "ariza qabul qilish"/"Savdoda" lot kat 3 dan CHIQADI va
-   keyingi qoidaga tushadi (ijara shartnomasi → 5/6, aks holda 11). Oraliq bosqichlar
-   (komissiya, zaxiradagi g'olib) ochiq hisoblanadi. `hasPrivatizationLot` ham AYNAN shu
-   shart bilan (`checkPropertyStatus.ts`); `AuctionLot` yozuvi esa saqlanaveradi (tarix).
-   Jonli: 793 tadan ~110 tasi tugagan lot edi.
+   ⚠️ `isLotOpen()` (2026-10-09, foydalanuvchi qarori) — OQ RO'YXAT: lot holati
+   "...arizalarni qabul qilish" VA savdo sanasi bugun yoki keyin. Boshqa hamma holat
+   (sotilmadi, to'xtatildi, bekor qilindi, yakunlandi, komissiyaga topshirildi, sanasiz
+   "Савдода") kat 3 dan CHIQADI → ijara shartnomasi bo'lsa 5/6, aks holda 11. Sabab: API 3
+   OXIRGI buyurtmani qaytaradi, tugagan bo'lsa ham (jonli: 793 tadan ~124 ta). Mezon davijara
+   "taklif etilayotgan" bilan AYNAN bir xil — farq faqat obyekt/lot (bitta lot 2 kadastrda).
+   `hasPrivatizationLot` ham shu shart bilan (`checkPropertyStatus.ts`); `AuctionLot` yozuvi
+   saqlanaveradi (tarix). Bayroq sync paytida hisoblanadi — savdo kuni o'tgach keyingi
+   sync'gacha (kuniga bir marta) kat 3 da turadi.
 4. lot yo'q, API 3 `status_name` ∈ {`Экспертиза`, `Баҳолашда`, `Хатловда`} ⇒ kat 7
 5. ijara shartnomasi bor ⇒ jami summa 0 ? kat 5 : kat 6
 - **Ustuvorlik:** auksion > ijara > boshqa
@@ -917,15 +920,16 @@ davijara.uz (shu domen ildizidagi ommaviy sayt) xususiylashtirish savdosidagi ob
   dashboard jadvalidagi "Savdoda xususiy." ustuni shu soha tanlanganda ko'rsatadigan to'plam.
   `?soha=<nom>` boshqa soha, `?soha=all` barchasi. Soha admin UI'da qayta nomlansa,
   route'dagi `DEFAULT_SOHA` ham o'zgartirilsin.
-- `hasPrivatizationLot` 1.22.0 dan boshlab faqat OCHIQ lotlar (`isLotOpen`). Oraliq
-  bosqichlar (komissiya va h.k.) ham kiradi, shuning uchun `lotStatus`/`auctionDate` baribir
-  beriladi — "ariza qabul qilinmoqda"ni davijara o'zi ajratadi.
+- `hasPrivatizationLot` 1.22.1 dan boshlab AYNAN davijara mezoni (`isLotOpen`: ariza qabul
+  qilinmoqda + sana oldinda). `lotStatus`/`auctionDate` baribir beriladi.
 - Bitta lot bir nechta kadastrda kelishi mumkin (API 3 da alohida aktiv yozuvlari bitta
   buyurtmaga bog'langan, masalan bino + "MULKIY MAJMUA") — davijara `lotNumber` bo'yicha
   birlashtiradi.
 - ⚠️ **Javob ommaviy saytga chiqadi** — `select` da shaxsiy ma'lumot ham, STIR ham YO'Q.
   Maydon qo'shsangiz shu qoidani saqlang.
-- davijara uni hostdan chaqiradi: `http://127.0.0.1:3000/obyektlar/api/davijara/privatization`;
+- davijara uni OMMAVIY manzildan chaqiradi: `https://davijara.uz/obyektlar/api/davijara/privatization`.
+  ⚠️ `127.0.0.1:3000` EMAS: bu ilova chekka serverda (`markazsrv`), davijara esa `markaz` da —
+  u yerdagi :3000 boshqa ilova (09.10.2026 deploy'dan keyin shu sabab 0 chiqqan);
   token davijara'ning `shared/.env` → `PRIVATIZATION_API_TOKEN` bilan bir xil.
 
 ## Ishlash tartibi — MUHIM
