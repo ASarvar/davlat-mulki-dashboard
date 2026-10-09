@@ -27,6 +27,13 @@ import { AUCTION_GROUP_RENT } from "@/server/services/classification";
  * qilinardi. Shuning uchun HAMMASI holati bilan beriladi va "savdoda" deb
  * qaysini ko'rsatishni davijara o'zi hal qiladi (`lotStatus`, `auctionDate`).
  *
+ * ── Qaysi soha ──
+ * Standart — "Ijara markazi" (davijara.uz o'sha Markazning sayti), ya'ni dashboard
+ * jadvalidagi "Savdoda xususiy." ustuni shu soha tanlanganda ko'rsatadigan son bilan
+ * BIR XIL shart (`stats.ts` → `sourceCond` + `hasPrivatizationLot`). `?soha=` bilan
+ * boshqa soha, `?soha=all` bilan barcha sohalar. Soha nomi admin UI'da qayta
+ * nomlansa, standart shu yerda ham o'zgartirilishi kerak.
+ *
  * ── Nima BERILMAYDI ──
  * Shaxsga doir ma'lumot ham, STIR ham yo'q: g'olib, balansda saqlovchining
  * F.I.O./STIR'i, ijarachi — hech biri `select` da emas. Faqat obyekt va lot.
@@ -34,6 +41,8 @@ import { AUCTION_GROUP_RENT } from "@/server/services/classification";
  */
 
 export const dynamic = "force-dynamic";
+
+const DEFAULT_SOHA = "Ijara markazi";
 
 function authorized(req: NextRequest): "ok" | "unconfigured" | "denied" {
   const expected = env.DAVIJARA_API_TOKEN;
@@ -59,12 +68,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ success: false, error: "FORBIDDEN" }, { status: 403 });
   }
 
+  const sohaParam = req.nextUrl.searchParams.get("soha")?.trim();
+  const soha = sohaParam === "all" ? null : sohaParam || DEFAULT_SOHA;
+
   try {
     const rows = await prisma.property.findMany({
       where: {
         hasPrivatizationLot: true,
         removedFromBalance: false,
         OR: [{ auctionGroupName: null }, { auctionGroupName: { not: AUCTION_GROUP_RENT } }],
+        ...(soha ? { source: { name: soha } } : {}),
       },
       select: {
         cadNumber: true,
@@ -133,6 +146,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       generatedAt: new Date().toISOString(),
+      soha,
       count: objects.length,
       objects,
     });

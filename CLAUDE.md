@@ -906,6 +906,10 @@ davijara.uz (shu domen ildizidagi ommaviy sayt) xususiylashtirish savdosidagi ob
 - Qaysi obyektlar: `hasPrivatizationLot` + `removedFromBalance = false` + `auctionGroupName`
   **ijara EMAS** (null — kat 3 bilan bir xil, xususiylashtirish). Guruh sharti shart:
   `hasPrivatizationLot` guruhga qaramay yoziladi.
+- Soha: standart **"Ijara markazi"** (davijara — Markaz sayti; foydalanuvchi talabi 09.10) —
+  dashboard jadvalidagi "Savdoda xususiy." ustuni shu soha tanlanganda ko'rsatadigan to'plam.
+  `?soha=<nom>` boshqa soha, `?soha=all` barchasi. Soha admin UI'da qayta nomlansa,
+  route'dagi `DEFAULT_SOHA` ham o'zgartirilsin.
 - ⚠️ `hasPrivatizationLot` ≠ "hozir ariza qabul qilinmoqda" (06.09 bazasida 631 tadan 488 tasi
   "Mol-mulk (obyekt) sotilmadi"). Shuning uchun HAMMASI `lotStatus`/`auctionDate` bilan
   beriladi, "taklif etilayotgan"ni davijara o'zi aniqlaydi.

@@ -7,6 +7,12 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.21.2
+
+- davijara.uz API (`/api/davijara/privatization`) endi faqat "Ijara markazi" sohasi
+  obyektlarini qaytaradi (dashboard jadvalidagi "Savdoda xususiy." bilan bir xil to'plam);
+  `?soha=` bilan boshqa soha yoki `?soha=all`.
+
 ## 1.21.1
 
 - Tuzatildi: osilib qolgan sinxronizatsiya kunlik avtomatik sync va snapshotni cheksiz
