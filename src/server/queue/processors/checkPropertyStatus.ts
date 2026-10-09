@@ -23,6 +23,7 @@ import {
   deriveIntegrationCategory,
   deriveAuctionCategory,
   deriveRentCategory,
+  isLotOpen,
   computeIsInefficient,
   type StatusResultBySource,
 } from "@/server/services/classification";
@@ -316,8 +317,15 @@ export async function processStatusCheck(data: StatusCheckJob): Promise<JobOutco
     // uning `AuctionLot` qatori HAR safar qayta sinxronlanganda o'chirilib, qayta
     // yaratilmasdi — ro'yxatda (Property.lotNumber, pastda alohida yoziladi) lot
     // ko'rinardi, obyekt sahifasida (auctionLots relation) esa "0" chiqardi.
+    // ⚠️ `isLotOpen` — `deriveAuctionCategory` bilan BIR XIL shart: tugagan/to'xtatilgan
+    // lot ("sotilmadi", "to'xtatildi", sanasi o'tgan) savdoda hisoblanmaydi (2026-10-09).
     const hasPrivatizationLot = refreshAuction
-      ? Boolean(auction!.found && auction!.lotNumber && !auction!.isSold)
+      ? Boolean(
+          auction!.found &&
+            auction!.lotNumber &&
+            !auction!.isSold &&
+            isLotOpen(auction!.lotStatus, auction!.auctionDate),
+        )
       : current.hasPrivatizationLot;
     // Tarixiy yozuv uchun: lot mavjudligining o'zi yetarli — sotilgan-sotilmaganidan qat'i nazar.
     const auctionLotExists = refreshAuction ? Boolean(auction!.found && auction!.lotNumber) : false;

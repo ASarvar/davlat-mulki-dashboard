@@ -719,7 +719,14 @@ Aniqlash qoidalari (`classification.ts` → `deriveAuctionCategory`, tartib muhi
 2. **API 6 da faol ijara loti** topilsa ⇒ kat 4 (Savdoda ijara). Bu kat 4 ning ASOSIY mezoni —
    API 4 dagi `group_name` real ma'lumotda hech qachon "ijaraga berish" bo'lmagan, va API 3/4
    ijara lotini umuman ko'rmasligi mumkin (shuning uchun `found` shartidan oldin tekshiriladi).
-3. **haqiqiy** lot bor, sotilmagan ⇒ kat 3 (Savdoda xususiylashtirish)
+3. **haqiqiy** lot bor, sotilmagan **va lot ochiq** ⇒ kat 3 (Savdoda xususiylashtirish).
+   ⚠️ `isLotOpen()` (2026-10-09, foydalanuvchi qarori): API 3 OXIRGI buyurtmani qaytaradi,
+   tugagan bo'lsa ham — "Mol-mulk (obyekt) sotilmadi", "Vaqtincha to'xtatildi", "Lot bekor
+   qilindi" va savdo sanasi o'tgan "ariza qabul qilish"/"Savdoda" lot kat 3 dan CHIQADI va
+   keyingi qoidaga tushadi (ijara shartnomasi → 5/6, aks holda 11). Oraliq bosqichlar
+   (komissiya, zaxiradagi g'olib) ochiq hisoblanadi. `hasPrivatizationLot` ham AYNAN shu
+   shart bilan (`checkPropertyStatus.ts`); `AuctionLot` yozuvi esa saqlanaveradi (tarix).
+   Jonli: 793 tadan ~110 tasi tugagan lot edi.
 4. lot yo'q, API 3 `status_name` ∈ {`Экспертиза`, `Баҳолашда`, `Хатловда`} ⇒ kat 7
 5. ijara shartnomasi bor ⇒ jami summa 0 ? kat 5 : kat 6
 - **Ustuvorlik:** auksion > ijara > boshqa
@@ -910,9 +917,12 @@ davijara.uz (shu domen ildizidagi ommaviy sayt) xususiylashtirish savdosidagi ob
   dashboard jadvalidagi "Savdoda xususiy." ustuni shu soha tanlanganda ko'rsatadigan to'plam.
   `?soha=<nom>` boshqa soha, `?soha=all` barchasi. Soha admin UI'da qayta nomlansa,
   route'dagi `DEFAULT_SOHA` ham o'zgartirilsin.
-- ⚠️ `hasPrivatizationLot` ≠ "hozir ariza qabul qilinmoqda" (06.09 bazasida 631 tadan 488 tasi
-  "Mol-mulk (obyekt) sotilmadi"). Shuning uchun HAMMASI `lotStatus`/`auctionDate` bilan
-  beriladi, "taklif etilayotgan"ni davijara o'zi aniqlaydi.
+- `hasPrivatizationLot` 1.22.0 dan boshlab faqat OCHIQ lotlar (`isLotOpen`). Oraliq
+  bosqichlar (komissiya va h.k.) ham kiradi, shuning uchun `lotStatus`/`auctionDate` baribir
+  beriladi — "ariza qabul qilinmoqda"ni davijara o'zi ajratadi.
+- Bitta lot bir nechta kadastrda kelishi mumkin (API 3 da alohida aktiv yozuvlari bitta
+  buyurtmaga bog'langan, masalan bino + "MULKIY MAJMUA") — davijara `lotNumber` bo'yicha
+  birlashtiradi.
 - ⚠️ **Javob ommaviy saytga chiqadi** — `select` da shaxsiy ma'lumot ham, STIR ham YO'Q.
   Maydon qo'shsangiz shu qoidani saqlang.
 - davijara uni hostdan chaqiradi: `http://127.0.0.1:3000/obyektlar/api/davijara/privatization`;

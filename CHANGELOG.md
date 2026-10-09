@@ -7,6 +7,14 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.22.0
+
+- "Savdoda xususiylashtirish" (kat 3) endi faqat OCHIQ lotlar: "Mol-mulk (obyekt) sotilmadi",
+  "Vaqtincha to'xtatildi", "Lot bekor qilindi" va savdo sanasi o'tib ketgan lotli obyektlar
+  kat 3 dan chiqadi — ijara shartnomasi bo'lsa kat 5/6, aks holda kat 11 (Bo'sh turgan).
+  "Auksion savdolarida" ustuni, panel va davijara API ham shunga mos. Natija keyingi auksion
+  yangilanishida (kunlik sync yoki "Holat yangilash" → Auksion) ko'rinadi.
+
 ## 1.21.2
 
 - davijara.uz API (`/api/davijara/privatization`) endi faqat "Ijara markazi" sohasi

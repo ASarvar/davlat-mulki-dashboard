@@ -1,5 +1,6 @@
 import type { FallbackResult } from "@/server/integrations/withCadFallback";
 import type { StatusApiSource } from "@/server/integrations/types";
+import { todayTashkent } from "@/lib/balance";
 
 export interface StatusResultBySource extends FallbackResult {
   source: StatusApiSource;
@@ -34,6 +35,34 @@ export const PRE_AUCTION_STATUSES: ReadonlySet<string> = new Set([
   "Хатловда",
 ]);
 
+/**
+ * Lot HOZIR savdodami (2026-10-09, foydalanuvchi qarori).
+ *
+ * API 3 kadastr bo'yicha OXIRGI buyurtmani qaytaradi — savdosi tugagan bo'lsa ham.
+ * Ilgari "lot bor + sotilmagan" yetarli edi va "Mol-mulk (obyekt) sotilmadi",
+ * "Vaqtincha to'xtatildi", "Lot bekor qilindi" holatidagi va savdo sanasi o'tib
+ * ketgan lotlar ham "Savdoda xususiylashtirish"da turardi (jonli: 793 tadan ~110 ta).
+ * Endi ular kat 3 dan chiqib, keyingi qoidaga tushadi: ijara shartnomasi bo'lsa 5/6,
+ * aks holda 11 (Bo'sh turgan).
+ *
+ * ⚠️ Tugagan holatlar ANIQ sanaladi (oq ro'yxat emas): komissiyaga topshirilgan,
+ * zaxiradagi g'olibga taklif kabi oraliq bosqichlar savdo jarayoni hisoblanadi.
+ * Ariza qabul qilinayotgan / "Savdoda" lotning sanasi o'tgan bo'lsa — eskirgan.
+ */
+const ENDED_LOT_RE = /sotilmadi|сотилмади|to'xtatil|тўхтатил|тухтатил|bekor qilin|бекор қилин|бекор килин/;
+const OPEN_LOT_RE = /arizalarni qabul|аризаларни қабул|^savdoda$|^савдода$/;
+
+/** Kun — jarayon soatida (`parseApi4Date` sanani shu soatda o'qiydi, ya'ni yozilgan kun). */
+const localDay = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+export function isLotOpen(lotStatus: string | null, auctionDate: Date | null, today = todayTashkent()): boolean {
+  const s = (lotStatus ?? "").replace(/[`‘’ʻʼ]/g, "'").trim().toLowerCase();
+  if (s && ENDED_LOT_RE.test(s)) return false;
+  if (auctionDate && (!s || OPEN_LOT_RE.test(s)) && localDay(auctionDate) < today) return false;
+  return true;
+}
+
 // Auksion (API 3+4) natijasidan integratsiya kategoriyasini aniqlaydi.
 //   order_statuses_id === 6 => SOTILGAN
 //     - order.term_payment === 1 => 1 (bo'lib to'lash sharti bilan sotilgan)
@@ -50,6 +79,9 @@ export function deriveAuctionCategory(a: {
   isSold: boolean;
   termPayment: number | null;
   lotNumber: string | null;
+  /** API 4 lot holati — tugagan lot "savdoda" emas (`isLotOpen`). */
+  lotStatus?: string | null;
+  auctionDate?: Date | null;
   groupName: string | null;
   /** API 3 dagi xom `status_name` (lot yaratilgunga qadar shu yagona signal). */
   assetStatus?: string | null;
@@ -66,7 +98,7 @@ export function deriveAuctionCategory(a: {
   if (!a.found) return null;
   // Savdoda turgan (xususiylashtirish). `group_name` real ma'lumotda hech qachon
   // "ijaraga berish" bo'lmagan — ijara endi API 6 orqali aniqlanadi.
-  if (a.lotNumber) {
+  if (a.lotNumber && isLotOpen(a.lotStatus ?? null, a.auctionDate ?? null)) {
     return a.groupName === AUCTION_GROUP_RENT ? CAT_ON_AUCTION_RENT : CAT_ON_AUCTION;
   }
   // Lot yo'q, lekin savdoga tayyorgarlik bosqichida (ekspertiza/baholash/xatlov).
