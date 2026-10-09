@@ -256,6 +256,20 @@ const schema = z.object({
    */
   AUCTION_DETAILS_BUDGET_MINUTES: z.coerce.number().int().positive().max(25).default(20),
 
+  // ── davijara.uz uchun API (`/api/davijara/*`) ──
+  /**
+   * davijara.uz SERVERI `x-davijara-token` sarlavhasida shu qiymatni yuboradi.
+   * ⚠️ Sozlanmagan bo'lsa endpoint 503 qaytaradi — ochiq qolmaydi (yo'l
+   * middleware'dan ISTISNO qilingan, himoya faqat shu token).
+   * Kamida 32 belgi: `openssl rand -hex 32`.
+   * ⚠️ Bo'sh satr (`DAVIJARA_API_TOKEN=""`, namunadagidek) = sozlanmagan. Usiz
+   * `min(32)` bo'sh qiymatni rad etib, BUTUN ilovani ishga tushirmasdi.
+   */
+  DAVIJARA_API_TOKEN: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z.string().min(32).optional(),
+  ),
+
   // Rate-limit / retry
   API_RATE_MAX: z.coerce.number().int().positive().default(10),
   API_RATE_DURATION_MS: z.coerce.number().int().positive().default(1000),

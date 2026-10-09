@@ -43,5 +43,10 @@ export const config = {
   //
   // ⚠️ `logo-*` (`public/logo-*.svg`) ham ochiq: login sahifasi ularni sessiyasiz ko'rsatadi,
   // aks holda rasm o'rniga login HTML'iga redirect qaytib, logotip chiqmasdi.
-  matcher: ["/((?!api/auth|api/imtiyoz/check-discount|_next/static|_next/image|favicon.ico|logo-).*)"],
+  //
+  // ⚠️ `api/davijara/` — davijara.uz SERVERI chaqiradi (sessiyasiz). Himoya
+  // middleware'da EMAS, route'ning o'zida: `DAVIJARA_API_TOKEN` (sozlanmagan bo'lsa 503).
+  matcher: [
+    "/((?!api/auth|api/imtiyoz/check-discount|api/davijara/|_next/static|_next/image|favicon.ico|logo-).*)",
+  ],
 };

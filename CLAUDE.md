@@ -881,6 +881,26 @@ To'liq hujjat — **`auksion` skill'ida** (`.claude/skills/auksion/SKILL.md`):
 API tuzoqlari, sinxronlash mexanikasi, o'lchangan tezlik raqamlari va filtr.
 Shu quyi tizimga tegsangiz o'sha skill'ni oching.
 
+## davijara.uz uchun API — `/api/davijara/privatization` (2026-10-09)
+
+davijara.uz (shu domen ildizidagi ommaviy sayt) xususiylashtirish savdosidagi obyektlarni
+**shu yerdan** oladi — API 3/4 zanjirini qayta yurgizmaydi. Route:
+`src/app/api/davijara/privatization/route.ts`.
+
+- ⚠️ **Sessiyasiz, middleware'dan ISTISNO** (`matcher` → `api/davijara/`). Himoya — route
+  ichida: `x-davijara-token` == `DAVIJARA_API_TOKEN` (`timingSafeEqual`). Token sozlanmagan
+  bo'lsa **503** — yo'l hech qachon ochiq qolmaydi. Bo'sh satr ham "sozlanmagan" (`env.ts`).
+- Qaysi obyektlar: `hasPrivatizationLot` + `removedFromBalance = false` + `auctionGroupName`
+  **ijara EMAS** (null — kat 3 bilan bir xil, xususiylashtirish). Guruh sharti shart:
+  `hasPrivatizationLot` guruhga qaramay yoziladi.
+- ⚠️ `hasPrivatizationLot` ≠ "hozir ariza qabul qilinmoqda" (06.09 bazasida 631 tadan 488 tasi
+  "Mol-mulk (obyekt) sotilmadi"). Shuning uchun HAMMASI `lotStatus`/`auctionDate` bilan
+  beriladi, "taklif etilayotgan"ni davijara o'zi aniqlaydi.
+- ⚠️ **Javob ommaviy saytga chiqadi** — `select` da shaxsiy ma'lumot ham, STIR ham YO'Q.
+  Maydon qo'shsangiz shu qoidani saqlang.
+- davijara uni hostdan chaqiradi: `http://127.0.0.1:3000/obyektlar/api/davijara/privatization`;
+  token davijara'ning `shared/.env` → `PRIVATIZATION_API_TOKEN` bilan bir xil.
+
 ## Ishlash tartibi — MUHIM
 
 1. **Kod o'zgargach worker'ni qayta ishga tushiring.** `tsx` watch emas — ishlab turgan worker eski

@@ -7,6 +7,13 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.21.0
+
+- davijara.uz uchun API: `GET /api/davijara/privatization` — xususiylashtirish savdosidagi
+  obyektlar (lot holati, narx, savdo sanasi, koordinata). Sessiyasiz, `x-davijara-token`
+  sarlavhasi bilan (`DAVIJARA_API_TOKEN`; sozlanmagan bo'lsa 503). Shaxsiy ma'lumot va STIR
+  berilmaydi.
+
 ## 1.20.1
 
 - "Balansga olinganlar" jadvaliga "Yil boshidan" ustuni va kartasi — 1-yanvardan tanlangan
