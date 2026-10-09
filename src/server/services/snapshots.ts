@@ -1,6 +1,7 @@
 import { Prisma } from "@prisma/client";
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
+import { closeStaleRuns } from "./runProgress";
 import { sourceCond, type StatsScope } from "./stats";
 
 /**
@@ -55,6 +56,8 @@ export interface SnapshotResult {
  * soxta sakrash berardi. Shuning uchun cron 02:00 da — kunlik sync (03:00) dan OLDIN.
  */
 export async function takeDashboardSnapshot(): Promise<SnapshotResult> {
+  // Osilib qolgan run snapshotni ham har kuni bloklardi (29.09 dan 12 kun snapshot yo'q).
+  await closeStaleRuns();
   const active = await prisma.syncRun.findFirst({
     where: { status: { in: ["QUEUED", "RUNNING"] } },
     select: { type: true },

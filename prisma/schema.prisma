@@ -644,6 +644,17 @@ model SyncRun {
    * keyin ham o'zgarmaydi.
    */
   failureSummary Json?
+  /**
+   * Fan-out (sync-source) bosqichi: nechta tashkilot navbatga qo'yilgan, nechtasi
+   * ishlab bo'lingan va nechtasi xato bergan (2026-10-09). Busiz barcha tashkilot
+   * xato bergan run hech qachon yopilmasdi: 29.09 dagi FULL_ALL `QUEUED` holatida
+   * osilib qolib, 12 kun davomida har kungi avtomatik sync'ni bloklagan.
+   */
+  sourcesTotal   Int           @default(0)
+  sourcesDone    Int           @default(0)
+  sourcesFailed  Int           @default(0)
+  /** Oxirgi o'sish (job tugashi) vaqti — osilib qolgan run'ni aniqlash uchun. */
+  progressAt     DateTime?
   startedAt      DateTime?
   finishedAt     DateTime?
   createdAt      DateTime      @default(now())

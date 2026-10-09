@@ -7,6 +7,13 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.21.1
+
+- Tuzatildi: osilib qolgan sinxronizatsiya kunlik avtomatik sync va snapshotni cheksiz
+  bloklardi (29.09 dan 12 kun yangilanish bo'lmagan). Barcha tashkilot xato bersa run darhol
+  yopiladi; 6 soat o'sishsiz turgan run avtomatik `FAILED` qilinadi (audit log'ga yoziladi).
+  Migratsiya `20261009120000_sync_run_source_progress` (faqat ustun qo'shadi).
+
 ## 1.21.0
 
 - davijara.uz uchun API: `GET /api/davijara/privatization` — xususiylashtirish savdosidagi

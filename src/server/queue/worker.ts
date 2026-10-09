@@ -15,7 +15,7 @@ import { prisma } from "@/lib/prisma";
 import { processSyncSource } from "./processors/syncSource";
 import { processPropertyBase } from "./processors/syncPropertyBase";
 import { processStatusCheck } from "./processors/checkPropertyStatus";
-import { incrementSuccess, incrementFail, finalizeIfComplete } from "@/server/services/runProgress";
+import { incrementSuccess, incrementFail, finalizeIfComplete, sourceFinished } from "@/server/services/runProgress";
 import { triggerFullSync } from "./enqueue";
 import { isYattIndexFresh, syncYattIndex } from "@/server/services/imtiyoz/yattIndex";
 import { takeDashboardSnapshot } from "@/server/services/snapshots";
@@ -78,11 +78,19 @@ async function main() {
     async (jobs: PgBoss.Job<SyncSourceJob>[]) => {
       await Promise.allSettled(
         jobs.map(async (job) => {
+          let error: string | undefined;
           try {
             await processSyncSource(job.data);
           } catch (err) {
+            // `API1:` prefiksi — `/dashboard/sync` xato sababini shu bo'yicha guruhlaydi.
+            const m = msg(err);
+            error = /^[A-Z0-9_]+:/.test(m) ? m : `API1: ${m}`;
             console.error(`[sync-source] stir=${job.data.stir}:`, msg(err));
           }
+          // ⚠️ Har doim (xato bo'lsa ham) — barcha tashkilot xato bersa run shu yerda yopiladi.
+          await sourceFinished(job.data.syncRunId, error).catch((err) =>
+            console.error(`[sync-source] run=${job.data.syncRunId}: progress yozilmadi:`, msg(err)),
+          );
         }),
       );
     },

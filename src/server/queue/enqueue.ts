@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { closeStaleRuns } from "@/server/services/runProgress";
 import { enqueuePropertyBase, enqueueSyncSources, insertStatusCheckBulk } from "./dispatch";
 import type { SyncSourceJob, StatusCheckJob } from "./jobs";
 
@@ -9,7 +10,10 @@ import type { SyncSourceJob, StatusCheckJob } from "./jobs";
 // tugmani qayta bosish o'nlab run va minglab job to'planishiga olib keladi
 // (jonli testda 23 ta run / ~1350 job to'plangan edi).
 // Shu sababli faol run bo'lsa yangisini boshlamaymiz.
+// ⚠️ Avval OSILIB QOLGAN run'lar yopiladi (`closeStaleRuns`) — aks holda bitta osilgan
+// run kunlik avtomatik sync'ni ham cheksiz bloklardi (29.09 dan 12 kun shunday bo'lgan).
 async function assertNoActiveRun(): Promise<void> {
+  await closeStaleRuns();
   const active = await prisma.syncRun.findFirst({
     where: { status: { in: ["QUEUED", "RUNNING"] } },
     select: { id: true, type: true, createdAt: true, totalCount: true, successCount: true, failCount: true },
@@ -30,6 +34,7 @@ export async function triggerFullSync(userId?: string, sourceName?: string) {
   const sources = await prisma.organizationSource.findMany({
     where: { isActive: true, ...(sourceName ? { name: sourceName } : {}) },
   });
+  if (sources.length === 0) throw new Error("Faol manba topilmadi");
   const run = await prisma.syncRun.create({
     // ⚠️ `refreshUtility: false` — kommunal umumiy sinxronizatsiyaga kirmaydi
     // (checkPropertyStatus.ts izohiga qarang). Yozuv haqiqatga mos bo'lishi uchun
@@ -37,6 +42,7 @@ export async function triggerFullSync(userId?: string, sourceName?: string) {
     data: {
       type: "FULL_ALL",
       status: "QUEUED",
+      sourcesTotal: sources.length,
       triggeredById: userId ?? null,
       sourceName: sourceName ?? null,
       refreshUtility: false,
@@ -76,10 +82,12 @@ export async function triggerRegionSync(regionId: string, userId?: string, sourc
       ...(sourceName ? { name: sourceName } : {}),
     },
   });
+  if (sources.length === 0) throw new Error("Faol manba topilmadi");
   const run = await prisma.syncRun.create({
     data: {
       type: "REGION",
       status: "QUEUED",
+      sourcesTotal: sources.length,
       regionId,
       sourceName: sourceName ?? null,
       triggeredById: userId ?? null,

@@ -28,6 +28,8 @@ const API_LABEL: Record<string, string> = {
   // yozadi. API 2 ning o'rnini bosgan (2026-09-06), shuning uchun yorlig'i ham
   // o'sha ma'noda.
   cad_data: "cad_data — kadastr asosiy ma'lumoti (API 2 o'rniga)",
+  // Tashqi API emas — run'ning o'zi (`runProgress.ts` → `closeStaleRuns`).
+  SYNC: "Sinxronizatsiya jarayoni",
 };
 
 export interface SyncErrorInfo {
@@ -61,6 +63,14 @@ function explain(message: string): Pick<SyncErrorInfo, "reason" | "blame"> {
     return {
       reason: "Login yoki parol noto'g'ri — API kirish ma'lumotlarini tekshirish kerak",
       blame: "config",
+    };
+  }
+  if (/osilib qoldi/.test(m)) {
+    return {
+      reason:
+        "Sinxronizatsiya uzoq vaqt oldinga siljimadi va avtomatik yopildi — worker to'xtagan " +
+        "yoki tashqi API javob bermagan bo'lishi mumkin",
+      blame: "unknown",
     };
   }
   if (/sozlanmagan/.test(m)) {

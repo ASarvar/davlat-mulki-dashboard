@@ -110,6 +110,19 @@ process, Next.js emas). Idempotent — qayta ishga tushganda jadval qayta yozila
 Faol run bor bo'lsa `assertNoActiveRun()` xato tashlaydi — kunlik ishga tushirish buni
 `try/catch` bilan jim o'tkazib yuboradi (log'ga yozadi, keyingi kunga qoldiradi).
 
+⚠️ **Osilib qolgan run — butun jadvalni bloklaydi** (jonli hodisa: 29.09 dagi FULL_ALL
+`QUEUED`/`totalCount=0` holatida qolib, 12 kun birorta avtomatik sync ham, snapshot ham
+o'tmagan; worker ishlab turgan, cron har kuni "completed"). Ikki himoya (2026-10-09,
+`services/runProgress.ts`):
+- **Fan-out hisobi:** `SyncRun.sourcesTotal/sourcesDone/sourcesFailed`. Har bir
+  `sync-source` jobi (xato bo'lsa ham) `sourceFinished()` chaqiradi; hammasi tugab
+  `totalCount = 0` bo'lsa run shu yerda yopiladi (xato bo'lsa `FAILED`, sabab `API1: …`).
+  `finalizeIfComplete()` endi `sourcesDone >= sourcesTotal` ni ham talab qiladi.
+- **`closeStaleRuns()`** — `progressAt ?? startedAt ?? createdAt` dan beri
+  `STALE_RUN_HOURS` (6) soat o'sish bo'lmagan faol run'ni `FAILED` qiladi
+  (`failureSummary` → `SYNC: Osilib qoldi…`, audit `CLOSE_STALE_SYNC`). Chaqiriladi:
+  `assertNoActiveRun()` (har bir trigger, kunlik cron ham) va `takeDashboardSnapshot()`.
+
 ### Rollar (7 ta)
 - `SUPER_ADMIN` — hammasi.
 - `ADMIN` — super admin bilan bir xil, lekin super adminni ko'rmaydi/boshqarmaydi.
