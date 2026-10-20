@@ -1,6 +1,6 @@
 ---
 name: sync
-description: Sinxronizatsiya — SyncRunType (FULL_ALL/REGION/SINGLE/STATUS_REFRESH), to'rt modul (refreshBase/Auction/Rent/Utility), kommunal umumiy sync'ga kirmasligi, yangilanmagan modul hissasini tiklash, kunlik 03:00 cron, osilib qolgan run himoyasi (runProgress.ts) va ijara auksioni hodisalari (online-ijara auction_logs, har daqiqada — rentAuctionEvents.ts). src/server/queue yoki sync sahifasiga tegadigan ish uchun oching.
+description: Sinxronizatsiya — SyncRunType (FULL_ALL/REGION/SINGLE/STATUS_REFRESH), to'rt modul (refreshBase/Auction/Rent/Utility), kommunal umumiy sync'ga kirmasligi, yangilanmagan modul hissasini tiklash, kunlik 03:00 cron, osilib qolgan run himoyasi (runProgress.ts) ijara auksioni hodisalari (online-ijara auction_logs, har daqiqada — rentAuctionEvents.ts) va xususiylashtirish ish kuni jadvali (privatizationRefresh.ts). src/server/queue yoki sync sahifasiga tegadigan ish uchun oching.
 ---
 # Sinxronizatsiya (pg-boss navbati)
 
@@ -97,3 +97,33 @@ auctions.id = e-auksion order_id ─▶ AuctionLot.orderId / Property.auctionOrd
   birga ishlashi mumkin. Job xato tashlamaydi — bir xil xato log'ga bir marta yoziladi.
 - Ma'lum cheklov: `id` tartibi commit tartibi emas — bir soniyada parallel commit bo'lgan
   kichik `id` o'tkazib yuborilishi mumkin; kunlik 03:00 sync qoplaydi.
+
+### Xususiylashtirish lotlari — ish kuni jadvali (2026-10-20, `services/privatizationRefresh.ts`)
+
+Xususiylashtirish uchun hodisa manbai YO'Q (online-ijara va reyestr — faqat ijara), Davlat
+aktivlari agentligidan manba olinguncha API 3/4 ni o'zimiz jadval bo'yicha so'raymiz.
+Jonli taqsimot (2026-10-20): savdolar HAR DOIM **10:00** da va faqat **ish kunlari**.
+
+| Queue | Cron (Toshkent, Du–Ju) | Kimlar |
+|---|---|---|
+| `priv-refresh-due` | 10:20, 11:20, 12:20, 14:20, 17:20 | ochiq lot, savdo sanasi bugun yoki o'tgan |
+| `priv-refresh-open` | 13:00, 18:00 | barcha ochiq lotli (`hasPrivatizationLot`) |
+| `priv-refresh-discover` | 12:00, 16:00 | ochiq loti yo'q (yangi lotni topish) |
+
+- Hammasi `status-check` ga `refreshAuction` bilan (API 3/4 + API 6; base/ijara/kommunal yo'q),
+  `syncRunId` siz, `removedFromBalance = false`.
+- `due` sanasi o'tib yangilanmay qolgan eski lotlarni ham tozalaydi (jonli: 2024–2026 yillar
+  sanali 17 ta "savdoda" obyekt bor edi).
+- `open`/`discover` faol `SyncRun` bo'lsa o'tkazib yuboriladi (ikki marta so'ralmasin), `due` — doim.
+- Kunlik 03:00 to'liq sync o'zgarishsiz qoladi.
+
+### Avtomatik yangilanishga kirmaydigan sohalar (2026-10-20)
+
+`lib/sourceLabel.ts` → **`MANUAL_ONLY_SOHAS`** = Davlat aktivlari agentligi + Direksiya — faqat
+qo'lda (`/dashboard/sync`). Foydalanuvchi qarori: tashqi API yuklamasi (jonli: balansdagi
+6 608 obyektdan Agentlik — yarmidan ko'pi). Uchala avtomatik yo'l ularni o'tkazib yuboradi:
+- kunlik 03:00 — `triggerFullSync(…, { automatic: true })` (qolgan yagona soha `SyncRun.sourceName`
+  ga yoziladi — sync sahifasida "Hammasi" emas, "Ijara markazi" ko'rinadi);
+- `priv-refresh-*` — `whereFor()` da `source.name notIn`;
+- `rent-auction-events` — navbatga qo'yishdan oldin.
+Qo'lda boshlanadigan sync'larga (`triggerFullSync` `automatic`siz, REGION, STATUS_REFRESH, SINGLE) ta'sir YO'Q.

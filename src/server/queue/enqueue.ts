@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { closeStaleRuns } from "@/server/services/runProgress";
+import { MANUAL_ONLY_SOHAS } from "@/lib/sourceLabel";
 import { enqueuePropertyBase, enqueueSyncSources, insertStatusCheckBulk } from "./dispatch";
 import type { SyncSourceJob, StatusCheckJob } from "./jobs";
 
@@ -29,12 +30,20 @@ async function assertNoActiveRun(): Promise<void> {
 }
 
 // Barcha manbalarni (yoki bitta soha bo'yicha barchasini) sinxronlash.
-export async function triggerFullSync(userId?: string, sourceName?: string) {
+// `automatic` — kunlik cron: `MANUAL_ONLY_SOHAS` (Agentlik, Direksiya) kirmaydi.
+export async function triggerFullSync(userId?: string, sourceName?: string, opts: { automatic?: boolean } = {}) {
   await assertNoActiveRun();
   const sources = await prisma.organizationSource.findMany({
-    where: { isActive: true, ...(sourceName ? { name: sourceName } : {}) },
+    where: {
+      isActive: true,
+      ...(sourceName ? { name: sourceName } : {}),
+      ...(opts.automatic ? { NOT: { name: { in: MANUAL_ONLY_SOHAS } } } : {}),
+    },
   });
   if (sources.length === 0) throw new Error("Faol manba topilmadi");
+  // Avtomatik run'da bitta soha qolsa — sync sahifasida "Hammasi" emas, o'sha soha ko'rinsin.
+  const names = [...new Set(sources.map((s) => s.name))];
+  if (opts.automatic && !sourceName && names.length === 1) sourceName = names[0];
   const run = await prisma.syncRun.create({
     // ⚠️ `refreshUtility: false` — kommunal umumiy sinxronizatsiyaga kirmaydi
     // (checkPropertyStatus.ts izohiga qarang). Yozuv haqiqatga mos bo'lishi uchun

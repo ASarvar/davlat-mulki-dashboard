@@ -38,6 +38,13 @@ export const QUEUE = {
    * (`services/rentAuctionEvents.ts`). O'zgargan buyurtmaning obyekti qayta tekshiriladi.
    */
   RENT_AUCTION_EVENTS: "rent-auction-events",
+  /**
+   * Xususiylashtirish lotlari — ish kuni jadvali (`services/privatizationRefresh.ts`).
+   * ⚠️ Uchta ALOHIDA queue: pg-boss'da bitta queue'ga faqat bitta cron bog'lanadi.
+   */
+  PRIV_REFRESH_DUE: "priv-refresh-due",
+  PRIV_REFRESH_OPEN: "priv-refresh-open",
+  PRIV_REFRESH_DISCOVER: "priv-refresh-discover",
 } as const;
 
 /**

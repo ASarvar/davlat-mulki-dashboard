@@ -58,8 +58,8 @@ export function SyncControls({
             To'liq sinxronizatsiya
           </h2>
           <p className="mt-1 mb-3 text-sm text-muted-foreground">
-            API 1 → 2 → 3–8 zanjiri — yangi kadastrlarni ham qidiradi. Kamdan-kam kerak: har kuni
-            03:00 da avtomatik ishlaydi.{" "}
+            API 1 → 2 → 3–8 zanjiri — yangi kadastrlarni ham qidiradi. Har kuni 03:00 da avtomatik
+            ishlaydi, Davlat aktivlari agentligi va Direksiya bundan mustasno — ular faqat qo&apos;lda.{" "}
             <span className="text-amber-700">
               Kommunal (suv/gaz/elektr) bunga KIRMAYDI — uni pastdagi &quot;Faqat holat
               yangilash&quot;dan qo&apos;lda ishga tushiring.

@@ -7,6 +7,15 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.24.0
+
+- Xususiylashtirish lotlari ish kuni davomida yangilanadi (Du–Ju, savdolar 10:00 da):
+  bugungi/o'tgan sanali ochiq lotlar 10:20, 11:20, 12:20, 14:20, 17:20 da; barcha ochiq lotlar
+  13:00 va 18:00 da; yangi lotlarni topish 12:00 va 16:00 da. Sotilgan obyekt kat 3 va
+  davijara API'dan savdo kunining o'zida chiqadi; sanasi o'tib qolgan eski lotlar ham tozalanadi.
+- Davlat aktivlari agentligi va Direksiya sohalari avtomatik yangilanishga (kunlik 03:00 sync,
+  xususiylashtirish jadvali, ijara hodisalari) kirmaydi — faqat qo'lda.
+
 ## 1.23.0
 
 - Ijara auksioni lotlari deyarli real vaqtda: worker har daqiqada online-ijara bazasidagi

@@ -24,6 +24,10 @@ import { auctionConfigured } from "@/server/integrations/auctionOrders";
 import { syncAuctionOrders, currentYearStart } from "@/server/services/auctionOrders";
 import { syncAuctionOrderDetails } from "@/server/services/auctionOrderDetails";
 import { pollRentAuctionEvents } from "@/server/services/rentAuctionEvents";
+import {
+  enqueuePrivatizationRefresh,
+  type PrivatizationRefreshMode,
+} from "@/server/services/privatizationRefresh";
 
 const leafOpts: PgBoss.WorkOptions = {
   batchSize: env.WORKER_CONCURRENCY,
@@ -126,7 +130,8 @@ async function main() {
   // Faqat WORKER process chaqiradi (Next.js web process'da emas) — ishga tushirish shu yerda.
   await boss.work(QUEUE.DAILY_FULL_SYNC, async () => {
     try {
-      await triggerFullSync();
+      // ⚠️ `automatic` — Agentlik va Direksiya kirmaydi, ular faqat qo'lda (`MANUAL_ONLY_SOHAS`).
+      await triggerFullSync(undefined, undefined, { automatic: true });
       console.log("[daily-full-sync] navbatga qo'yildi");
     } catch (err) {
       // Odatiy sabab: shu payt boshqa sync allaqachon ketayotgan edi — bu xato emas,
@@ -292,6 +297,39 @@ async function main() {
     }
   });
   await boss.schedule(QUEUE.RENT_AUCTION_EVENTS, "* * * * *", {}, { tz: "Asia/Tashkent" });
+
+  // ── Xususiylashtirish lotlari: ish kuni jadvali (Du–Ju, Toshkent) ──
+  //
+  // ⚠️ Savdolar HAR DOIM 10:00 da, faqat ish kunlari (jonli taqsimot, 2026-10-20) —
+  // shuning uchun `due` savdodan 20 daqiqa keyin boshlanadi va natija chiqmagan lotni
+  // kun davomida yana tekshiradi. `open`/`discover` qo'lda boshlangan sync paytida
+  // o'tkazib yuboriladi (o'sha obyektlar ikki marta so'ralmasin); `due` kichik — doim.
+  const privSchedules: [string, string, PrivatizationRefreshMode][] = [
+    [QUEUE.PRIV_REFRESH_DUE, "20 10,11,12,14,17 * * 1-5", "due"],
+    [QUEUE.PRIV_REFRESH_OPEN, "0 13,18 * * 1-5", "open"],
+    [QUEUE.PRIV_REFRESH_DISCOVER, "0 12,16 * * 1-5", "discover"],
+  ];
+  for (const [queue, cron, mode] of privSchedules) {
+    await boss.work(queue, async () => {
+      try {
+        if (mode !== "due") {
+          const active = await prisma.syncRun.findFirst({
+            where: { status: { in: ["QUEUED", "RUNNING"] } },
+            select: { type: true },
+          });
+          if (active) {
+            console.log(`[priv-refresh] ${mode} o'tkazib yuborildi: ${active.type} sync ketmoqda`);
+            return;
+          }
+        }
+        const n = await enqueuePrivatizationRefresh(mode);
+        console.log(`[priv-refresh] ${mode}: ${n} obyekt auksion tekshiruviga`);
+      } catch (err) {
+        console.warn(`[priv-refresh] ${mode} xato:`, msg(err));
+      }
+    });
+    await boss.schedule(queue, cron, {}, { tz: "Asia/Tashkent" });
+  }
 
   console.log(
     `🚀 Worker (pg-boss) ishga tushdi. batchSize=${env.WORKER_CONCURRENCY}, poll=${env.WORKER_POLL_SECONDS}s. Queue'lar: ${Object.values(QUEUE).join(", ")}`,

@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { MANUAL_ONLY_SOHAS } from "@/lib/sourceLabel";
 import { auctionDb } from "@/server/db/auctionDb";
 import {
   auctionConfigured,
@@ -238,7 +239,12 @@ export async function pollRentAuctionEvents(
   if (propertyIds.size > 0) {
     const targets = await prisma.property.findMany({
       // Balansdan chiqarilganlarni yangilashning ma'nosi yo'q (`triggerStatusRefresh` bilan bir xil).
-      where: { id: { in: [...propertyIds] }, removedFromBalance: false },
+      // Agentlik va Direksiya — faqat qo'lda (`MANUAL_ONLY_SOHAS`).
+      where: {
+        id: { in: [...propertyIds] },
+        removedFromBalance: false,
+        source: { name: { notIn: MANUAL_ONLY_SOHAS } },
+      },
       select: { id: true, cadNumber: true, cadNumberOld: true },
     });
     // ⚠️ `syncRunId` YO'Q: bu SyncRun emas — `assertNoActiveRun()` ni bloklamaydi va

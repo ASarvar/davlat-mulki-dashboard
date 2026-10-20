@@ -70,7 +70,10 @@ status-check   API 3+4 (auksion zanjiri) + API 5 (ijara) + API 6 (ijara loti) �
 Sync turlari, modullar, kunlik cron, osilib qolgan run himoyasi va ijara auksioni
 hodisalari (online-ijara `auction_logs`, har daqiqada) — to'liq hujjat
 **`sync` skill'ida** (`.claude/skills/sync/SKILL.md`). `src/server/queue/` ga tegsangiz oching.
-⚠️ Real vaqt FAQAT IJARA uchun — online-ijara jadvallarida xususiylashtirish yo'q (kat 3 kunlik).
+⚠️ Real vaqt FAQAT IJARA uchun — online-ijara jadvallarida xususiylashtirish yo'q. Kat 3 —
+ish kuni jadvali (`priv-refresh-*`, savdolar 10:00 da) + kunlik 03:00.
+⚠️ Agentlik va Direksiya sohalari HECH QANDAY avtomatik yangilanishga kirmaydi — faqat qo'lda
+(`MANUAL_ONLY_SOHAS`, `lib/sourceLabel.ts`).
 
 ### Rollar (7 ta)
 - `SUPER_ADMIN` — hammasi.

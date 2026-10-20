@@ -5,6 +5,14 @@ export const SOHA_DIREKSIYA = "Direksiya";
 export const SOHA_AKTIVLAR = "Davlat aktivlari agentligi";
 
 /**
+ * AVTOMATIK yangilanishga kirmaydigan sohalar — faqat qo'lda (`/dashboard/sync`).
+ * Kunlik 03:00 sync, xususiylashtirish ish kuni jadvali va ijara hodisalari ularni
+ * o'tkazib yuboradi (foydalanuvchi qarori, 2026-10-20: tashqi API yuklamasi —
+ * Agentlik obyektlari umumiy sonning yarmidan ko'pi).
+ */
+export const MANUAL_ONLY_SOHAS = [SOHA_AKTIVLAR, SOHA_DIREKSIYA];
+
+/**
  * Dashboard jadvalida Yer/Bino ajratilgan ustun ko'rinishi FAQAT shu ikki soha
  * tanlanganda ishlaydi (Ijara markazi va "Hammasi" — o'zgarmagan ko'rinishda qoladi).
  * `stats.ts` (buildDashboardColumns varianti + qimmat qo'shimcha so'rov), dashboard
