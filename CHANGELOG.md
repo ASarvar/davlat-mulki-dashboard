@@ -7,6 +7,11 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.24.1
+
+- Auksion `get-order`: "buyurtma aniqlanmadi" javobi kirill yozuvida ham taniladi (serverda shunday
+  keladi) — ijara hodisalarida yangi buyurtmaning kadastri akkauntlar bo'yicha to'g'ri qidiriladi.
+
 ## 1.24.0
 
 - Xususiylashtirish lotlari ish kuni davomida yangilanadi (Du–Ju, savdolar 10:00 da):

@@ -91,7 +91,8 @@ auctions.id = e-auksion order_id ─▶ AuctionLot.orderId / Property.auctionOrd
 - **Yangi buyurtma** (bizda lot yo'q): avval `AuctionOrder.cadastreNumber`, bo'lmasa
   `get-order` (`customerInn` akkaunti, noma'lum bo'lsa 14 akkaunt birma-bir, ~75 ms dan)
   → kadastr → `Property`. Topilmagani 6 soat qayta so'ralmaydi (boshqa tashkilot obyekti).
-- `get-order` "Foydalanuvchinig buyurtmasi aniqlanmadi" (begona akkaunt) → `not_found`,
+- `get-order` "Foydalanuvchinig buyurtmasi aniqlanmadi" (begona akkaunt; serverda KIRILLDA keladi —
+  "Фойдаланувчининг буюртмаси аниқланмади", ikkalasi tekshiriladi) → `not_found`,
   xato emas (ilgari 3 marta backoff bilan qayta so'ralardi).
 - `syncRunId` yo'qligi sababli `assertNoActiveRun()` ni bloklamaydi; qo'lda sync bilan
   birga ishlashi mumkin. Job xato tashlamaydi — bir xil xato log'ga bir marta yoziladi.

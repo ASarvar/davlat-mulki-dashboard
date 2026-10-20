@@ -214,7 +214,11 @@ export async function fetchOrderDetails(
         // ⚠️ Buyurtma bu akkauntniki emas (yoki yo'q) — xato EMAS, "topilmadi".
         // Busiz u 3 marta backoff bilan qayta so'ralardi va akkauntlarni birma-bir
         // sinash (`rentAuctionEvents.ts`) birinchi begona akkauntda to'xtab qolardi.
-        if (/buyurtmasi aniqlanmadi/i.test(data.result_msg ?? "")) return { status: "not_found" };
+        // ⚠️ Matn ikki yozuvda keladi: lokalda lotin ("Foydalanuvchinig buyurtmasi
+        // aniqlanmadi"), serverda kirill ("Фойдаланувчининг буюртмаси аниқланмади").
+        if (/buyurtmasi aniqlanmadi|буюртмаси аниқланмади/iu.test(data.result_msg ?? "")) {
+          return { status: "not_found" };
+        }
         throw new Error(`get-order xatosi (buyurtma ${orderId}): ${data.result_msg ?? data.result_code}`);
       }
 
