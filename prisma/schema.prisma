@@ -1191,3 +1191,15 @@ model BalanceTransfer {
   @@index([propertyId])
   @@index([fromSourceId])
 }
+
+// ─────────────────────── Tashqi jadval kursorlari ───────────────────────
+// Tashqi bazadagi jurnalni (online-ijara `auction_logs`) qayerigacha o'qiganimiz.
+// ⚠️ Kursor bizning bazada: worker qayta ishga tushsa ham hodisa yo'qolmaydi va
+// eskisi qayta o'qilmaydi (`services/rentAuctionEvents.ts`).
+model ExternalCursor {
+  /// Kursor nomi, masalan "online-ijara:auction_logs".
+  key       String   @id
+  /// Oxirgi qayta ishlangan yozuvning `id` si.
+  lastId    BigInt
+  updatedAt DateTime @updatedAt
+}

@@ -33,6 +33,11 @@ export const QUEUE = {
    * (`AUCTION_DETAILS_BUDGET_MINUTES`) yetsa o'zini davom ettiradi.
    */
   AUCTION_DETAILS_SYNC: "auction-details-sync",
+  /**
+   * Ijara auksioni hodisalari — online-ijara `auction_logs` dan har daqiqada
+   * (`services/rentAuctionEvents.ts`). O'zgargan buyurtmaning obyekti qayta tekshiriladi.
+   */
+  RENT_AUCTION_EVENTS: "rent-auction-events",
 } as const;
 
 /**

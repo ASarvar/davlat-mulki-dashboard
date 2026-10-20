@@ -65,63 +65,12 @@ status-check   API 3+4 (auksion zanjiri) + API 5 (ijara) + API 6 (ijara loti) �
 - **Eski kadastr fallback:** har bir tekshiruv avval yangi, topilmasa eski kadastr bilan urinadi.
   Real ma'lumotda obyektlarning ~86% ida eski kadastr bor — bu asosiy yo'l, istisno emas.
 
-### Sinxronizatsiya turlari (`SyncRunType`) — 2026-07-27
+### Sinxronizatsiya
 
-`FULL_ALL`/`REGION`/`SINGLE` — to'liq zanjir (kashfiyot: API1/2 + holat: API3-6), o'zgarmagan.
-Yangi **`STATUS_REFRESH`** — kashfiyotni (API1/2 fan-out) o'tkazib, MAVJUD obyektlarga
-to'g'ridan-to'g'ri holat-API qo'yadi (`triggerStatusRefresh()`). Doirasi hudud **va/yoki**
-soha (`OrganizationSource.name`) bilan cheklanadi, ikkalasi ham ixtiyoriy va birga ishlaydi.
-
-**To'rtta mustaqil modul** (`SyncRun.refreshBase/refreshAuction/refreshRent/refreshUtility`,
-har biri checkbox):
-- `refreshBase` — API2 (asosiy ma'lumot: maydon, manzil, `rawApi2`)
-- `refreshAuction` — API3/4 (auksion) **+** API6 (ijara loti) **BIRGA** — ajratib bo'lmaydi,
-  chunki ikkalasi ham bitta `deriveAuctionCategory()` chaqiruviga kiradi va `AuctionLot`
-  jadvalida birga saqlanadi (PRIVATIZATION + RENT turlari, bitta deleteMany+createMany).
-- `refreshRent` — API5 (ijara shartnomalari), mustaqil (5/6 kod diapazoni auksiondan alohida)
-- `refreshUtility` — suv/gaz/elektr (kommunal abonent tekshiruvi). **Kategoriyaga ta'sir
-  qilmaydi**, shuning uchun quyidagi "diapazondan tiklash" mantig'i unga tegishli emas.
-
-⚠️ **Kommunal UMUMIY sinxronizatsiyaga KIRMAYDI** (2026-08-24). `checkPropertyStatus.ts`da
-`refreshUtility` standarti — qolgan uchtasidan farqli — **`false`**. Ya'ni
-`FULL_ALL`/`REGION`/`SINGLE` va kunlik avtomatik sync uni butunlay o'tkazib yuboradi;
-u FAQAT `/dashboard/sync` → "Faqat holat yangilash"da "Kommunal" belgisi **qo'lda**
-tanlanganda ishlaydi (o'sha belgi ham endi standart holatda yoqilmagan).
-`triggerFullSync/RegionSync/SingleSync` `SyncRun.refreshUtility: false` deb ham yozadi —
-sxemadagi standart `true` bo'lgani uchun buni aniq berish shart.
-**Sabab:** kommunal API'lar barqaror emas va ular auksion/ijara bilan bitta `Promise.all`
-ichida bo'lgani uchun bitta HTTP 500 BUTUN obyekt tekshiruvini yiqitardi — obyektning
-auksion/ijara ma'lumoti ham yangilanmay qolardi (jonli o'lchov: bir run'da 35 xatodan
-34 tasi aynan kommunaldan; `UTIL_GAS`/`UTIL_ELECTRIC` HTTP 500 qaytargan).
-
-⚠️ **Yangilanmagan modul tashqi API'ga UMUMAN chaqirilmaydi** — uning oldingi hissasi
-`checkPropertyStatus.ts`dagi `AUCTION_RANGE`/`RENT_RANGE` orqali bazadagi joriy
-`integrationCategoryCode`dan tiklanadi (auksion={1,2,3,4,7}, ijara={5,6} — kesishmaydi,
-ustuvorlik har doim auksion>ijara>boshqa bo'lgani uchun joriy qiymat qaysi diapazonda
-ekani o'sha modulning oxirgi natijasini aniq bildiradi — qayta hisoblash shart emas).
-`refreshBase=false` bo'lsa `rawApi2`/maydon o'zgarmaydi; live API4dan `rentedArea` kerak
-bo'lganda (maydon tuzatish) `refreshRent=false` bo'lsa saqlangan `rentTotalArea` ishlatiladi.
-Jonli API bilan ikki yo'nalishda tekshirildi (auksion-ustuvor va ijara-ustuvor obyektlarda) —
-qisman yangilash boshqa modulning kategoriyasini **hech qachon** `null`ga almashtirmaydi.
-
-**Kunlik avtomatik to'liq sinxronizatsiya** — `worker.ts` ishga tushganda pg-boss
-`.schedule("daily-full-sync", "0 3 * * *", {}, {tz:"Asia/Tashkent"})` chaqiradi (faqat worker
-process, Next.js emas). Idempotent — qayta ishga tushganda jadval qayta yozilaveradi.
-Faol run bor bo'lsa `assertNoActiveRun()` xato tashlaydi — kunlik ishga tushirish buni
-`try/catch` bilan jim o'tkazib yuboradi (log'ga yozadi, keyingi kunga qoldiradi).
-
-⚠️ **Osilib qolgan run — butun jadvalni bloklaydi** (jonli hodisa: 29.09 dagi FULL_ALL
-`QUEUED`/`totalCount=0` holatida qolib, 12 kun birorta avtomatik sync ham, snapshot ham
-o'tmagan; worker ishlab turgan, cron har kuni "completed"). Ikki himoya (2026-10-09,
-`services/runProgress.ts`):
-- **Fan-out hisobi:** `SyncRun.sourcesTotal/sourcesDone/sourcesFailed`. Har bir
-  `sync-source` jobi (xato bo'lsa ham) `sourceFinished()` chaqiradi; hammasi tugab
-  `totalCount = 0` bo'lsa run shu yerda yopiladi (xato bo'lsa `FAILED`, sabab `API1: …`).
-  `finalizeIfComplete()` endi `sourcesDone >= sourcesTotal` ni ham talab qiladi.
-- **`closeStaleRuns()`** — `progressAt ?? startedAt ?? createdAt` dan beri
-  `STALE_RUN_HOURS` (6) soat o'sish bo'lmagan faol run'ni `FAILED` qiladi
-  (`failureSummary` → `SYNC: Osilib qoldi…`, audit `CLOSE_STALE_SYNC`). Chaqiriladi:
-  `assertNoActiveRun()` (har bir trigger, kunlik cron ham) va `takeDashboardSnapshot()`.
+Sync turlari, modullar, kunlik cron, osilib qolgan run himoyasi va ijara auksioni
+hodisalari (online-ijara `auction_logs`, har daqiqada) — to'liq hujjat
+**`sync` skill'ida** (`.claude/skills/sync/SKILL.md`). `src/server/queue/` ga tegsangiz oching.
+⚠️ Real vaqt FAQAT IJARA uchun — online-ijara jadvallarida xususiylashtirish yo'q (kat 3 kunlik).
 
 ### Rollar (7 ta)
 - `SUPER_ADMIN` — hammasi.
@@ -178,81 +127,16 @@ sessiyalar bekor. ⚠️ Sahifa qo'riqchisi `requireUserOrRedirect()` (`/session
 `signOut` → login); `requireUser()` esa XATO tashlaydi — uni redirect qiladigan qilmang,
 server action'lar uni `try/catch` ichida chaqiradi va redirect yutilardi.
 
-### Bo'limlar ko'rinishi — `SectionAccess` (2026-09-05)
+### Bo'limlar ko'rinishi — `SectionAccess`
 
-Qaysi sahifa qaysi rolga ko'rinishi **bazadan** boshqariladi, deploysiz. Maqsad:
-yangi bo'lim serverga chiqarilgach avval FAQAT super admin ko'radi, tekshirilgandan
-keyin super admin uni boshqa rollarga ochadi.
+Sahifa qaysi rolga ko'rinishi bazadan boshqariladi — to'liq hujjat **`sections` skill'ida**
+(`.claude/skills/sections/SKILL.md`).
 
-```
-src/lib/sections.ts               REGISTR (kod): key, href, label, exact, allowRoles, core
-SectionAccess (Postgres)          RUXSAT (super admin o'zgartiradi): visibility + roles[]
-services/sectionAccess.ts         canAccess / allowedSectionKeys / requireSection
-/dashboard/sections               boshqaruv UI (faqat SUPER_ADMIN)
-```
-
-⚠️ **YANGI SAHIFA QO'SHSANGIZ IKKI QADAM MAJBURIY:**
-1. `lib/sections.ts` → `SECTIONS` ga qator (+ `Sidebar.tsx` → `ICONS` ga ikonka);
-2. sahifa boshida `await requireSection("<key>")`.
-
-Registrsiz sahifa menyuda umuman ko'rinmaydi; `requireSection`siz esa menyudan
-yashiringan bo'lsa ham URL orqali ochilaveradi.
-
-⚠️ **Menyu va qorovul — endi BITTA manba.** Ilgari ikkita edi (`Sidebar.tsx` →
-`NAV.roles` va sahifadagi `requireRole`) va ular allaqachon ajralib ketgan edi:
-`/dashboard/notifications` menyuda ikki rolga ko'rinardi, lekin manzilni qo'lda
-yozgan **istalgan rol** sahifani ochardi. `Sidebar` endi rol mantiqini umuman
-bilmaydi — `layout.tsx` `allowedSectionKeys(user)` ni hisoblab prop qilib beradi.
-
-⚠️ **Qator yo'q = `SUPER_ONLY`** (fail-closed). Shuning uchun yangi bo'lim hech
-narsa sozlanmasa ham avtomatik yashirin. Buning teskari tomoni: **migratsiyada
-mavjud bo'limlarning qatorlarini yozish MAJBURIY**, aks holda ertasiga super
-admindan boshqa hech kim hech narsani ko'rmaydi.
-
-⚠️ **`SectionDef.allowRoles` — koddagi QATTIQ CHEGARA**, bazadagi sozlama uni
-kengaytira olmaydi (`setSectionAccess` yozishda, `canAccessWith` o'qishda filtrlaydi).
-Super admin `/dashboard/users` ni kuzatuvchiga ocholmaydi. Bu "eng past rol"
-(ierarxiya) EMAS, aynan TO'PLAM — loyihadagi 6 rol chiziqli tartibda emas.
-⚠️ Migratsiyada admin bo'limlari `EVERYONE` emas, aniq `ROLES` ro'yxati bilan
-yozilgan: `EVERYONE` "allowRoles doirasidagi hamma" degani, ya'ni kelajakda kimdir
-`allowRoles`ni kengaytirsa bo'lim jimgina ko'proq odamga ochilib ketardi.
-
-⚠️ **SUPER_ADMIN har doim hamma bo'limni ko'radi** — rejimdan qat'i nazar. Busiz u
-`/dashboard/sections` ni o'zidan yopib, boshqaruv panelini butunlay yo'qotishi mumkin
-bo'lardi. Yon ta'siri: super admin menyusida "Bildirishnomalar" ham paydo bo'ldi
-(ilgari u faqat IJROCHI/MODERATOR ga ko'rinardi) — bu ataylab, chunki ish tartibi
-super admin ochilmagan bo'limni OLDIN ko'rishini talab qiladi.
-
-⚠️ **`/dashboard` — `core: true` + `hidden: true`**: u faqat KIRISH MARSHRUTI,
-menyu bandi EMAS. `app/page.tsx` tizimga kirgan foydalanuvchini o'sha yerga
-yo'naltiradi, shuning uchun u hech qachon yopilmasligi kerak — aks holda odam
-kirgan zahoti "sahifa topilmadi"ga tushardi. Lekin marshrutning O'ZI hech narsa
-ko'rsatmaydi: ruxsatga qarab `panel` (vizual panel) yoki `firstOpenSectionHref()`
-(odatda `hisobot`) ga uzatadi.
-
-⚠️ **Vizual panel — alohida `panel` bo'limi, `core` EMAS.** 1.10.0 da u
-to'g'ridan-to'g'ri `core` marshrutda edi va shu sabab serverga chiqarilgan zahoti
-HAMMA rolga ochilib ketgan edi (foydalanuvchi topdi, 2026-09-05) — aynan
-`SectionAccess` oldini olishi kerak bo'lgan holat. Saboq: **`core` — "hamma
-ko'radi" degani EMAS, "marshrut yopilmaydi" degani.** Ko'rinishi boshqariladigan
-har qanday MAZMUN `core` marshrutda emas, o'z bo'limida yashashi kerak.
-
-⚠️ **Ruxsat yo'qda `notFound()`, `throw` EMAS.** Next.js production'da xato
-XABARINI o'chiradi (faqat `digest` qoladi), ya'ni `error.tsx` da "Ruxsat yo'q"ni
-matn bo'yicha ajratib bo'lmasdi — dev'da ishlab, serverda ishlamasdi. Ko'rinish
-`app/dashboard/not-found.tsx` da; matn ataylab bo'limning borligini oshkor qilmaydi.
-
-⚠️ **Kesh — `cache()` (so'rov ichida), `unstable_cache` EMAS.** Ruxsat o'zgarishi
-60 soniyalik TTL kutmasligi kerak. Saqlashdan keyin `revalidatePath("/dashboard",
-"layout")` — Sidebar layoutda quriladi.
-
-⚠️ **`SectionDef.hiddenForSohas`** — soha bo'yicha qattiq chegara (2026-09-23): imtiyoz
-Direksiya va Davlat aktivlari agentligi xodimlariga ko'rinmaydi. Faqat tashkilotga bog'langan
-rollarga (Ijrochi, Moderator) va faqat BARCHA tashkilotlari shu sohalarda bo'lsa qo'llanadi.
-
-⚠️ **Bo'limni yashirish uning API route'ini yashirmaydi.** Yangi bo'limning har bir
-`route.ts` va server action'i ham `requireSection(key)` bilan boshlanishi kerak.
-Middleware buni bajara olmaydi (edge, Prisma yo'q) — himoya sahifa/route darajasida.
+⚠️ **YANGI SAHIFA QO'SHSANGIZ IKKI QADAM MAJBURIY:** `lib/sections.ts` → `SECTIONS` ga qator
+(+ `Sidebar.tsx` → `ICONS`) va sahifa boshida `await requireSection("<key>")`. Qator yo'q =
+`SUPER_ONLY` (fail-closed), shuning uchun migratsiyada mavjud bo'limlar qatori yozilishi shart.
+⚠️ **Bo'limni yashirish uning API route'ini yashirmaydi** — har bir `route.ts` va server
+action ham `requireSection(key)` bilan boshlanadi.
 
 ### Tasdiqlash workflow — IKKI BOSQICH (`assignment.ts` + `CategoryChangeRequest`)
 ```
@@ -331,136 +215,13 @@ body ichida** keladi (404 emas). Qamrov ~4%, 14 hududga tarqalgan. **Kategoriyag
 ta'sir qilmaydi.** To'liq hujjat — **`kommunal` skill'ida**
 (`.claude/skills/kommunal/SKILL.md`).
 
-### Kadastr ma'lumotlari: `cad_data` — API 2 ning O'RNINI bosdi (2026-09-06)
+### Kadastr ma'lumotlari va API tuzoqlari
 
-Asosiy ma'lumot endi `cad_data` dan olinadi (`integrations/cadData.ts`). Yagona kirish
-nuqtasi — **`integrations/propertyBase.ts` → `fetchBase(cadNumber, tin)`**: `CADDATA_*`
-sozlangan bo'lsa yangi API, aks holda eski API 2. Chaqiruvchilar ikkalasini qo'lda
-tanlamaydi.
-
-**Nima uchun ko'chirildi** (jonli o'lchov, 200 obyekt): koordinata qamrovi
-**28% → 95%**, ustiga cheklov (hibs/xatlov) ma'lumoti qo'shildi. Maydon, tuman kodi,
-eski kadastr va nom mosligi — **100%** (117 obyektda tekshirilgan).
-
-⚠️ **STIR (`?tin=`) MAJBURIY va EGASIGA MOS kelishi shart.** Mos kelmasa
-`[2108] "Ushbu obyekt ko'rsatilgan tashkilotga tegishli emas"`. Uchta oqibati bor:
-1. Har bir chaqiruvchi obyektning tashkiloti STIRini bilishi kerak. `PropertyBaseJob`
-   ga `stir` qo'shilgan (`syncSource.ts` fan-out'da beradi); `checkPropertyStatus`
-   uni bazadan (`source.stir`) oladi.
-2. **Balansdan chiqqan obyektning YANGI egasini aniqlash yangi API bilan MUMKIN EMAS** —
-   biz u yerda aynan egani qidiramiz, ya'ni STIRni oldindan bilmaymiz. Shuning uchun
-   `syncSource.ts` dagi holder-lookup ATAYLAB eski API 2 da qoldirilgan. **API 2 ni
-   sozlamadan olib tashlamang** — u `fetchBase()` ning zaxira zanjirida ham
-   ishlatiladi (`cad_data` topmasa: eski kadastr → API 2 → API 2 + eski kadastr;
-   xato bo'lsa ASOSIY manbaning sababi qaytariladi).
-3. `2108` amalda "balansdan chiqqan" signali, lekin unga qarab AVTOMATIK
-   `removedFromBalance` qilinmaydi — bu qaror API 1 ning ro'yxati bo'yicha qabul
-   qilinadi (yolg'on ijobiy natijaning oldini olish).
-
-⚠️ **Javob shakli BUTUNLAY boshqacha** — ichma-ich (`data.object` / `data.land` /
-`data.address`), API 2 esa yassi edi. `lib/area.ts` **IKKALA shaklni ham** tushunadi
-(`asNewShape()` + `normalize()`) va bu VAQTINCHALIK emas: yangi API obyektlarning
-~2–4% iga `404`/`2108` qaytaradi, ularning `rawApi2` si eski shaklda qoladi.
-
-Maydon mosligi (jonli tasdiqlangan):
-
-| API 2 (yassi) | `cad_data` (ichma-ich) |
-|---|---|
-| `cad_number_old` | `old_cad_number` |
-| `object_area_p` | `object.object_pl_obfull` |
-| `object_area` | `object.pl_obzd` |
-| `object_area_u` | `object.object_pl_polezfull` → `outer[].outer_pl_polezfull` → `outer[].liters[].liter_pl_polezfull` |
-| `land_area` | `land.area` |
-| `object_rooms` | `object.rooms` |
-| `district_id` | **`address.district.soato`** |
-| `subjects[0]` | `hosts[0]` (`tin`/`fname`) |
-| `address` (tayyor satr) | `address.{region,district,mahalla,street,house_number}` — qurish kerak |
-
-⚠️ **`address.district.code` ("10:04") EMAS, `soato` ("1726290")** — aynan `soato`
-API 2 ning `district_id` si bilan bir xil (117 obyektda 100%). `code` ni olsak
-`District` jadvalining butun kaliti buzilardi.
-⚠️ `land.area_z`/`area_b` MAPPING QILINMAYDI — ma'nosi hujjatlashtirilmagan
-(eski shakldagi `_i`/`_b`/`_z` suffikslari bilan bir xil sabab).
-
-⚠️ **`0` ham "qiymat yo'q"** — yangi shaklda ham. Birinchi o'lchovda `??`
-ishlatilgani uchun 17 ta "farq" chiqqan edi; `positive()` bilan 100% mos keldi.
-
-### Koordinata — `geometry` (kadastr poligoni)
-
-`cad_data` javobida **`geometry`** bor: `Polygon`, **EPSG:3857** (Web Mercator, metrda).
-`lib/geo.ts` → `pickCadastreCoords()` uni WGS84 ga o'giradi va poligonning markazini
-(centroid) qaytaradi. Kutubxona kerak emas — formula qisqa (`mercatorToWgs84`).
-
-⚠️ `crs.properties.name` TEKSHIRILADI: `EPSG:3857` bo'lmasa `null` qaytadi.
-Boshqa proyeksiyani "taxmin qilib" o'girish xaritaga jimgina tasodifiy nuqta chizardi.
-⚠️ **USTUVORLIK: kadastr poligoni > auksion nuqtasi** (`coordSource` ustuni:
-`CADASTRE` / `AUCTION`). Kadastr koordinatasi obyektning O'Z chegarasidan olinadi va
-qamrovi ancha keng; auksion nuqtasi esa faqat savdoga chiqqan obyektlarda bo'ladi.
-⚠️ Ikkalasi ham `refreshAuction` blokidan TASHQARIDA va faqat YANGI qiymat
-bo'lganda yoziladi — hech qachon `null` ga qaytarilmaydi (bino joyidan ko'chmaydi).
-⚠️ Xarita ostidagi izoh `MapData.bySource` ga qarab o'zgaradi — qattiq
-yozib qo'yilgan "faqat auksionga chiqqan obyektlarda" matni ko'chishdan keyin
-YOLG'ON bo'lib qolgan bo'lardi.
-
-Ko'chishdan oldin tekshirish: `prisma/probe-cad-data-2026-09-06.ts` (bazaga hech narsa
-yozmaydi, namunada qamrov va maydon mosligini o'lchaydi).
-
-### API tuzoqlari (real ma'lumotdan)
-- **API 2:** `cad_number_old` yo'q bo'lsa `""` qaytadi, `null` emas — tozalanmasa fallback bo'sh
-  kadastr bilan chaqiriladi.
-- **API 2 throttling:** HTTP **200** + `{code: 90000, "Message throttled out"}`. 429 emas! Shuning uchun
-  `httpJson`'da `shouldRetry` bor — yangi API qo'shsangiz, u rate-limitni body ichida bildiradimi tekshiring.
-- **API 3:** `success:true` bo'lsa ham `lot_number`/`order_id` `null` bo'lishi mumkin (`"Муаммоли"`).
-  Shuning uchun "savdoda" kategoriyasi haqiqiy `lotNumber` talab qiladi.
-- **API 4:** parametr o'qilmasa `result` o'ramisiz `{result_msg:"Xatolik", result_code:0}` qaytadi —
-  ya'ni `result_code === 0` muvaffaqiyat kafolati emas, `result.order` borligini ham tekshirish shart.
-- **API 2 maydonlari:** `area` ← **binoning umumiy maydoni**, `buildingArea` ← `object_area_u`
-  (**foydali maydon**). Ikkalasi ham `src/lib/area.ts` orqali o'qiladi — **yagona joy**:
-  `totalBuildingArea()` / `usefulArea()`.
-  ⚠️ **Umumiy maydon zanjiri:** `object_area_p` → `object_area` → `land_area` → `land_area_i`
-  (foydalanuvchi qoidasi, 2026-07-31). **`0` ham "qiymat yo'q"** deb qaraladi — jonli API
-  bo'sh maydonni `null` emas, `0` qilib qaytaradi, shuning uchun oddiy `??` YETARLI EMAS.
-  Jonli o'lchov (5500 obyekt): 3026 `object_area_p`, 68 `object_area`, **2333 `land_area`**,
-  70 `land_area_i`, faqat 3 tasida hammasi 0. Ya'ni obyektlarning ~44% shu zanjirga tayanadi.
-  ⚠️ **Yorliq manbaga bog'liq:** qiymat `land_area`/`land_area_i` dan olinsa obyekt aslida
-  bino emas, shuning uchun obyekt sahifasida **"Umumiy maydoni"** deb yoziladi (aks holda
-  "Binoning umumiy maydoni"). Qoida `totalAreaLabel()` da; `totalBuildingAreaWithSource()`
-  qiymat bilan birga manbani ham qaytaradi.
-  ⚠️ **Foydali maydonga (`object_area_u`) YER zanjiri QO'LLANMAYDI** — atayin: `vacantArea`
-  (= foydali − ijarada) shunga tayanadi, unga `land_area` qo'shilsa dashboarddagi
-  "Bo'sh maydon" ustunlari ham o'zgarib ketadi. 2528 obyektda `object_area_u = 0`.
-  ⚠️ **Lekin YANGI shaklda bino ichidagi zanjir bor** (`newUsefulArea`, 2026-09-06):
-  `object.object_pl_polezfull` jamlanmasi `0` bo'lsa `outer[].outer_pl_polezfull` va
-  `outer[].liters[].liter_pl_polezfull` yig'indisiga tushiladi — bu YER emas, o'sha
-  foydali maydonning bino/liter darajasidagi nusxasi. Jonli o'lchov (2026-09-06):
-  jamlanma `0` bo'lgan 2981 obyektning hech birida bino bloklarida ham qiymat yo'q,
-  ya'ni bu real yer uchastkalari va `vacantArea = 0` to'g'ri (eski API 2 ~9% ida
-  soxta qiymat berardi — migratsiyada "Bo'sh maydon" shu sabab ~6% kamaydi).
-  ⚠️ **`isLandOnly` yangi shaklda** endi `object` bloki + `outer[]`/`liters[]` bo'sh
-  bo'lishi VA `land.{area,area_u,area_z,area_b}` dan birortasi > 0 bo'lishini talab
-  qiladi — binosi ham, yeri ham yo'q "bo'sh" obyekt yer uchastkasi deb belgilanmaydi.
-  ⚠️ Shartnoma maydoni foydali maydondan katta bo'lsa (obyekt aslida yer uchastkasi) — ikkala ustun
-  ham `land_area` dan olinadi. Real ma'lumotda 84 holatdan 81 tasi shu bilan tuzaldi, 13 tasida
-  `land_area` ham yetarli emas. `Property.vacantArea` = `GREATEST(foydali − ijarada, 0)` ustun sifatida
-  saqlanadi (Prisma ikki ustunni solishtira olmaydi, filtr uchun kerak).
-  ⚠️ Obyekt sahifasida (`/dashboard/objects/[...cad]`) "Binoning umumiy maydoni"/"Foydali maydon"
-  `Property.area`/`buildingArea` emas, `rawApi2`dan — lekin **AYNAN o'sha `lib/area.ts`
-  funksiyalari** bilan (DB ustuni faqat zaxira). Ilgari sahifa o'z mantiqini yozgan va `??`
-  ishlatgani uchun `0` ni "bor" deb qabul qilardi — ro'yxatda 294 m², sahifada 0 m² chiqishi
-  mumkin edi. Endi ikkalasi bitta manbadan. Karta ostidagi "Barcha kadastr ma'lumotlari"
-  kengaytmasi (`CadastreRawData.tsx`) barcha `land_area*`/`object_area*` maydonlarini xom holda
-  ko'rsatadi — suffikslar (`_i`, `_b`, `_f`, `_z`, `_d`, `_bd`, `_nz`, `_legal`) ma'nosi jonli javobda
-  hujjatlashtirilmagan, shuning uchun taxmin qilib nomlanmagan.
-- **Kadastr raqamlarida `/` bor** (`10:11:01:01:01:5030/03`) — obyekt sahifasi catch-all
-  `/dashboard/objects/[...cad]`, URL qurish faqat `src/lib/cadastre.ts` orqali.
-- Xom javoblar `ObjectStatusCheck.rawResponse` va `Property.rawApi2` da saqlanadi — **shuni saqlashda
-  davom eting**: mantiq o'zgarsa API'ni qayta chaqirmasdan qayta hisoblash mumkin (7 daqiqa → 2 soniya).
-- **API 4 (`order`) maydonlari:** `start_price` va `auction_date` bor, lekin **maydon yo'q** — aksincha
-  API 6 (ijara) dan farqli, `auction_date` jonli javobda ISO **emas**, `"DD.MM.YYYY HH:mm:ss"` formatida
-  (`parseApi4Date`, `auction.ts`). Maydon `details[key="hudud_kvm_2"]` da keladi va ko'pincha toza son
-  emas — erkin matn: `"Huquqiy hujjatga asosan 1048,93 (Amalda 1112,23)"` yoki
-  `"Umumiy maydoni: 47,0 kv.m."` (real ma'lumotda ~48% holat). `parseAreaText()` ikkita raqam bo'lsa
-  **"Amalda"** (haqiqiy o'lchangan) qiymatini ustuvor oladi — foydalanuvchi tasdiqlagan tanlov.
+`cad_data` (API 2 o'rnida, STIR majburiy), koordinata, maydon zanjiri (`lib/area.ts`) va
+API 2/3/4 tuzoqlari — to'liq hujjat **`kadastr` skill'ida** (`.claude/skills/kadastr/SKILL.md`).
+⚠️ Kadastr raqamida `/` bor — URL faqat `src/lib/cadastre.ts` orqali. Xom javoblar
+(`ObjectStatusCheck.rawResponse`, `Property.rawApi2`) saqlanishda davom etsin. API 2 ni
+sozlamadan olib tashlamang (zaxira va holder-lookup unga tayanadi).
 
 ## Kategoriyalar (12 ta, `src/lib/categories.ts` + `prisma/seed.ts`)
 
@@ -510,36 +271,13 @@ ro'yxatga havola. `/dashboard/objects?category=12` da "Maydon" ustuni "Bo'sh may
 (Excel eksporti) bir xil funksiyani chaqiradi (`buildWhere()` bilan bir xil printsip); ustun
 qo'shsangiz/o'zgartirsangiz ikkalasi ham avtomatik yangilanadi.
 
-### Tuman (District) kesimi
+### Hisobot va dashboard statistikasi
 
-⚠️ **Kalit — NOM emas, `District.code` (API 2 `district_id`).** Jonli 5441 obyektda tekshirilgan:
-bitta nom hech qachon ikki kodga tegishli emas, bitta kod hech qachon ikki hududda uchramaydi —
-lekin bitta kodning NOMI ikki xil yozilishi mumkin ("Buxoro sh." / "Buxoro shahar"). Shuning uchun
-`resolveDistrictId()` (`services/districts.ts`) kod bo'yicha upsert qiladi, nomni har safar yangilaydi.
-"Urganch" va "Urganch tumani" — bu **turli kodlar** (shahar va tuman), dublikat emas.
-
-Tuman API 2 bilan birga keladi, ya'ni faqat `refreshBase` yoqilgan sinxronizatsiyada yangilanadi
-(`syncPropertyBase` va `checkPropertyStatus`). 205 tuman, 5443 obyektdan 5441 tasi bog'langan.
-
-**Dashboard:** `?tuman=<regionId>` — bitta hudud qatorini ochadi va **IKKALA jadvalda ham**
-(kategoriyalar + ijara shartnomalari) o'sha hududning tumanlarini ko'rsatadi. Bitta parametr,
-ikkita toggle — qaysi jadvaldan ochsangiz ham ikkalasi birga ochiladi.
-Ma'lumot: `computeDistrictStats` (kategoriyalar, `RegionCategoryRow`) va `computeDistrictRentStats`
-(ijara, `RegionStat`) — ikkalasi ham keshlanmaydi. Tuman qatorlari hudud qatori bilan **bir xil
-ustunlarni** ishlatadi, chunki bir xil tuzilma qaytaradi va bitta komponentdan render bo'ladi
-(`CategoryTableRow` / `RentTableRow`).
-⚠️ `stats.ts` → `groupTotalsRows()` — hudud va tuman darajasidagi umumiy jamlanma (obyekt, ijara,
-shartnoma, maydon, summa) BITTA parametrlangan so'rovdan keladi; `toRegionStat()` ikkalasini ham
-`RegionStat`ga aylantiradi.
-⚠️ `RegionCategoryRow.regionId` tuman kesimida **tuman id'sini** saqlaydi — u "guruh identifikatori",
-qat'iy hudud emas.
-⚠️ `stats.ts`dagi `categoryCountRows()`/`rentBreakdownRows()` — hudud va tuman kesimining IKKALASI
-ham shu ikki funksiyani chaqiradi (guruh ustuni parametr). Yangi ustun qo'shsangiz bir joyda
-o'zgartirasiz; SQL'ni takrorlab yozmang.
-
-**Obyektlar:** `?district=<District.id>` filtri (`buildWhere`), jadvalda "Tuman" ustuni, obyekt
-sahifasida "Tuman" maydoni, Excel eksportida ustun. Tuman tanlagichi faqat **hudud tanlanganda**
-ko'rinadi — aks holda 205 ta variant bitta ro'yxatga tushib ketardi.
+Tuman/soha kesimi, `StatsScope` (rol doirasi), kategoriyadan tashqari ustunlar, `hududiy=1`,
+`landSplit`, vizual panel, xarita va kunlik snapshot — to'liq hujjat **`hisobot` skill'ida**
+(`.claude/skills/hisobot/SKILL.md`). Dashboard soni yoki havolasiga tegsangiz o'sha skill'ni oching.
+⚠️ Asosiy qoida: jadvaldagi son va bosilganda ochiladigan ro'yxat BITTA mezondan (`buildWhere()`)
+kelishi shart; raw SQL faqat `Prisma.sql` bilan parametrlangan.
 
 ### Kommunal jadvali va ro'yxat ko'rinishi
 
@@ -589,302 +327,10 @@ ko'rsatadi (jonli javobda ~66 maydon). Diagnostika vositasi — **bazaga hech na
 obyektni yangilash uchun obyekt sahifasidagi "API orqali yangilash" yoki Sinxronizatsiya
 ishlatiladi. `API2_BASE_URL` sozlanmagan bo'lsa ogohlantirish chiqadi.
 
-### Manba (soha) kesimi — `?soha=`
-⚠️ `OrganizationSource`da **ikkita nom** bor, aralashtirmang:
-- **`name` = SOHA (guruh)** — "Ijara markazi", "Davlat aktivlari agentligi",
-  "Bino va mol-mulklarni vaqtinchalik saqlash direksiyasi". Barcha filtrlar SHU bo'yicha
-  guruhlaydi, shuning uchun bitta sohaning hamma yozuvida harfma-harf bir xil bo'lishi shart.
-- **`orgName` = to'liq rasmiy tashkilot nomi** — faqat ko'rsatish uchun.
+### Balansga olinganlar — `/dashboard/balans`
 
-Ilgari ikkalasi bitta maydon edi va `seed.ts` uzun rasmiy nomlarni `name`ga yozardi — natijada
-toza o'rnatishda 1 ta emas, 14 ta "soha" paydo bo'lardi va filtr butunlay buzilardi (bazada
-qo'lda "Ijara markazi" deb tuzatilgani uchun bilinmay kelgan). Seed endi `name`ni **hech qachon
-qayta yozmaydi** (admin UI'da qayta nomlagan bo'lishi mumkin), faqat `orgName`ni yangilaydi;
-upsert kaliti — **STIR** (endi global unikal, `@@unique([regionId, stir])` emas: `regionId`
-NULL bo'lganda Postgres NULL'larni farqli deb hisoblab dublikatni o'tkazib yuborardi).
-
-**Respublika darajasidagi manba** — `regionId = null` (Agentlik, Direksiya). Ularning obyektlari
-istalgan hududda bo'lishi mumkin, shuning uchun hudud **kadastr raqamining birinchi bo'lagidan**
-aniqlanadi (`Region.cadastrePrefix`, 2419 jonli obyektda 100% mos tekshirilgan):
-`10`=Toshkent sh. `11`=Toshkent v. `12`=Sirdaryo `13`=Jizzax `14`=Samarqand `15`=Farg'ona
-`16`=Namangan `17`=Andijon `18`=Qashqadaryo `19`=Surxondaryo `20`=Buxoro `21`=Navoiy
-`22`=Xorazm `23`=Qoraqalpog'iston.
-⚠️ Prefiks noma'lum bo'lsa obyekt **o'tkazib yuboriladi** (log'ga yoziladi), tasodifiy hududga
-yozilmaydi — butun dashboard hudud kesimida qurilgan.
-⚠️ `triggerRegionSync()` hududsiz manbalarni ham qo'shadi (`OR: [{regionId}, {regionId: null}]`)
-va `SyncSourceJob.filterRegionId` orqali fan-out'da faqat mos prefiksli kadastrlarni oladi —
-API 1 tashkilotning BARCHA kadastrlarini qaytargani uchun filtr shu bosqichda bo'lishi shart.
-`syncSource.ts`da `totalCount` `cadastres.length` emas, **`jobs.length`** bilan oshiriladi
-(filtrlangan kadastr leaf job bermaydi — aks holda run hech qachon yakunlanmasdi).
-
-Bir xil `soha` query param **uch joyda** ishlatiladi va bir xil mezonni bildiradi:
-- `/dashboard?soha=` → `getDashboardStats(soha)` (umumiy = param yo'q)
-- `/dashboard/objects?soha=` → `buildWhere()` → `{ source: { name: soha } }`
-- `/api/export/dashboard-categories?soha=` → o'sha statistika
-
-Dashboard'dagi barcha drill-down havolalar `objHref()` orqali quriladi — u `soha`ni avtomatik
-qo'shadi, shuning uchun yangi havola qo'shsangiz **`objHref()` ishlating**, qo'lda URL yozmang.
-⚠️ `stats.ts`dagi raw SQL'lar `Prisma.sql` bilan **parametrlangan** (`$queryRawUnsafe` emas) —
-`soha` foydalanuvchi kiritadigan qiymat. Yangi so'rov qo'shsangiz shu uslubni saqlang.
-⚠️ Hudud kesimida filtr **JOIN shartida** (`LEFT JOIN ... AND ${srcCond}`), `WHERE`da emas — aks
-holda o'sha manbada obyekti yo'q hudud jadvaldan butunlay tushib qolardi (0 o'rniga yo'qoladi).
-Kesh kaliti `dashboard-stats-v8` + argument, ya'ni har bir soha o'z keshiga ega.
-
-### Dashboard doirasi — `StatsScope` (2026-07-30)
-Statistika funksiyalari (`computeDashboardStats`, `computeDistrictStats`,
-`computeDistrictRentStats`, `computeDistrictStatsByRegion`) endi **bitta `StatsScope` obyekti**
-qabul qiladi — ilgari `sourceName?: string` edi:
-```ts
-{ sourceName?: string;      // foydalanuvchi TANLAYDIGAN soha filtri (manba tugmalari)
-  sourceIds?: string[]|null } // ROL doirasi (userSourceScope), foydalanuvchi o'zgartira olmaydi
-```
-Ikkalasi **AND** bilan birikadi. `sourceIds: []` (biriktirilmagan foydalanuvchi) ⇒ SQL sharti
-`FALSE`, ya'ni hamma joyda 0. Qiymatlar `Prisma.join` bilan parametrlanadi.
-
-⚠️ **Doirani uzatishni unutmang** — `getDashboardStats(scope)` kesh kaliti argumentdan
-quriladi, ya'ni uzatilmasa cheklangan foydalanuvchiga boshqa birovning keshlangan natijasi
-qaytishi mumkin. Ikkala Excel eksporti ham (`dashboard-categories`, `dashboard-rent`) doirani
-qo'llaydi — aks holda moderator ekranda o'z tashkilotini ko'rib turib, eksport orqali butun
-bazani yuklab olardi.
-
-**Hududiy boshqarmaga biriktirilgan foydalanuvchi** (masalan "Ijara markazi — Andijon") uchun
-hudud jadvali bitta qatordan iborat bo'lardi, shuning uchun uning hududi **tumanlar kesimida
-avtomatik ochiladi** (`dashboard/page.tsx` → `autoTuman`). Yopish uchun `?tuman=none`.
-Respublika darajasidagi tashkilot yoki bir nechta hudud bo'lsa — avtomatik ochilmaydi.
-Manba tugmalari ham cheklanadi: faqat o'z tashkilotlarining sohalari ko'rsatiladi.
-⚠️ `computeDistrictStatsByRegion()` butunlay bo'sh hudud guruhlarini tashlaydi — aks holda
-bitta tashkilotga cheklangan foydalanuvchining Excel eksportida 14 hudud × 205 tuman nol
-qator chiqardi (cheklovsiz foydalanuvchida har bir hududda obyekt bor, natija o'zgarmaydi).
-
-**Ekranda ham shu printsip** (`dashboard/page.tsx` → `catRows`/`rentRows`): doira cheklangan
-bo'lsa (`scopeIds !== null`) obyekti yo'q hudud qatorlari yashiriladi, va **bitta hudud qolganda
-"J A M I" qatori ham ko'rsatilmaydi** (u o'sha yagona qatorning aynan nusxasi bo'lardi —
-`showCatTotals`/`showRentTotals`). Cheklovsiz foydalanuvchida rasmiy hisobot shakli (14 hudud +
-JAMI) o'zgarmaydi. Tashkilotda obyekt bo'lmasa jadval bo'sh qolmaydi — tushuntirish qatori chiqadi.
-
-⚠️ **`computeDashboardStats()`dagi `inefficient` (Bo'sh turgan) soni `byCategoryRaw`dan (code=11)
-olinadi, `Property.isInefficient` ustunidan ALOHIDA so'rov bilan EMAS.** Ilgari alohida
-`prisma.property.count({isInefficient:true})` so'rovi bor edi — bir xil `Promise.all` ichida bo'lsa
-ham, u `byCategoryRaw`dan mustaqil so'rov bo'lgani uchun worker faol sinxronlanayotganda ikkisi
-orasida bitta obyekt yangilanib qolsa, tepadagi karta pastdagi jadvaldan bir necha songa farq qilib
-qolardi (poyga holati — `isInefficient` ustuni o'zi buzilmagan bo'lsa ham ko'rinadi). Effektiv
-kategoriya=11 sharti `computeIsInefficient()` bilan matematik teng (`manualCategoryCode` faqat
-9/10/null, `integrationCategoryCode` faqat 1–7/null bo'ladi), shuning uchun bitta so'rovdan olish
-xavfsiz. Yangi dashboard agregat qo'shsangiz shu naqshni saqlang: bir xil hisoblanadigan ikki son
-hech qachon ikkita alohida so'rovdan kelmasin.
-⚠️ **Kat 3/4 "Ijara shartnoma soni"** — `rentContractCount` (API 5) EFFEKTIV kategoriyadan emas,
-`hasPrivatizationLot`/`hasRentLot` bayroqlaridan taqsimlanadi (foydalanuvchi tasdiqlagan qoida):
-obyekt xususiylashtirish lotida bo'lsa (ijara lotida ham bo'lsa ham) — kat 3 ga; **faqat** ijara
-lotida bo'lsa — kat 4 ga. Ikkalasida ham lot yo'q bo'lsa (masalan faqat ijara shartnomasi, lot yo'q)
-hech qaysi ustunga qo'shilmaydi. SQL: `SUM(cnt) FILTER (WHERE priv)` / `SUM(cnt) FILTER (WHERE rentlot
-AND NOT priv)` (`stats.ts` → `rentRaw`).
-
-⚠️ **Kat 1/3/4/7 "Ijaraga berilgan obyektlar soni"** — yuqoridagi "Ijara shartnoma soni" bilan
-ARALASHTIRMANG: bu yerda **obyektlar soni** (`COUNT(*)`), u yerda **shartnomalar yig'indisi**
-(`SUM(cnt)`). Kat 3/4 taqsimoti bir xil qoida (priv → kat 3, faqat rentlot → kat 4). Kat 1 (Sotilgan,
-bo'lib to'lash) va kat 7 (Savdoga chiqarish jarayonida) — effektiv kategoriya (`cat = 1` / `cat = 7`)
-bo'yicha, lot bayrog'iga bog'liq emas. SQL: `privLotRentedObjects`, `rentLotOnlyRentedObjects`,
-`cat1RentedObjects`, `cat7RentedObjects` (`stats.ts` → `rentRaw`).
-
-⚠️ **Kategoriyaga bog'liq bo'lmagan qo'shimcha ustunlar** — `buildDashboardColumns()`ning natijasi
-EMAS (u faqat 1–12 kategoriya ustunlarini beradi), balki `dashboard/page.tsx` va
-`/api/export/dashboard-categories`da **qo'lda**, aniq joyga qo'shiladi:
-- **"Auksion savdolarida (Xususiy. va Ijara)"** — kat 4 ("Savdoda ijara") ustunidan DARHOL KEYIN
-  joylashadi. `hasPrivatizationLot` **YOKI** `hasRentLot` (`rentBreakdown.onAnyAuction` — kat 3/4
-  BIRLASHMASI, kesishma EMAS). ⚠️ Foydalanuvchi buni ikki bosqichda aniqlashtirdi: avval "bir
-  vaqtda ikkalasida ham" (kesishma, 44 ta) deb so'ralgan va shunday qilingan, keyin "ikkalasiga ham
-  tegishli bo'lsa faqat bittasini qo'sh" deb tuzatilgan — bu birlashma (AND emas, OR) ekanini
-  bildiradi: kat3 (525) + kat4 (69) − kesishma (44) = 550. Ro'yxat filtri:
-  `PropertyFilters.onAnyAuction` → `{ OR: [{ hasPrivatizationLot: true }, { hasRentLot: true }] }`.
-- **"Ijaraga berilgan obyektlar"** — kat 6 ("Ijara shartnomasi bor") ustunidan DARHOL KEYIN
-  joylashadi. Qiymati: `counts["5"] + counts["6"]` — ya'ni FAQAT effektiv kategoriyasi 5 yoki 6
-  bo'lgan obyektlar (`rentBreakdown.onlyFreeOrPaidCategory`). ⚠️ Kat 5/6 ustunlarining o'z "Soni"si
-  (`free.count`/`paid.count`) bundan FARQ QILADI — ular XUSUSIYAT bo'yicha (savdodagi/sotilgan
-  obyekt ham kirishi mumkin), bu yangi ustun esa faqat SOF kat 5/6 obyektlarini sanaydi
-  (foydalanuvchi aniq talab qilgan: "boshqa kategoriyalar... ularni qo'shma"). Ro'yxat filtri:
-  `PropertyFilters.hasRentContract` → effektiv kategoriya `OR` (5 yoki 6), `rentContractCount`ga
-  emas (aks holda kat 3/4dagi ijara shartnomali obyektlar ham kirib ketardi).
-- **"To'liq ijara berilgan"** — jadval OXIRIDA, "Jami" ustuniga o'xshab: shartnoma bor (tekin
-  foydalanish yoki pullik) VA `vacantArea = 0`. Ro'yxat filtri: `PropertyFilters.fullyRented`.
-
-Barchasi `stats.ts` → `RegionCategoryRow.rentBreakdown`da hisoblanadi. Excel eksportida
-(`route.ts` → `exportCols`) kategoriya ustunlari va bu ikkitasi **BITTA** massivga (`ExportCol[]`)
-yig'iladi, so'ng kenglik/sarlavha/qiymat sikllari shu bitta massiv ustidan yuradi — 3 ta alohida
-siklda `colIdx`ni mustaqil hisoblashdan ko'ra xavfsizroq (kategoriyalardan biri izohga
-olinganda/qo'shilganda — masalan kat 8 — barcha sikllar avtomatik izchil qoladi).
-
-Aniqlash qoidalari (`classification.ts` → `deriveAuctionCategory`, tartib muhim):
-1. `order_statuses_id === 6` **yoki lot holati "Сотилган"** (`isSoldLotStatus`, 2026-10-09 —
-   buyurtma holati kechikib o'tadi, jonli 5 ta) ⇒ sotilgan; `term_payment === 1` ⇒ kat 1, aks holda kat 2
-   (⚠️ mezon `term_payment`, `details.tulov_muddati` **emas** — u sotuv bo'lib to'lash bo'lsa ham bo'sh keladi)
-2. **API 6 da faol ijara loti** topilsa ⇒ kat 4 (Savdoda ijara). Bu kat 4 ning ASOSIY mezoni —
-   API 4 dagi `group_name` real ma'lumotda hech qachon "ijaraga berish" bo'lmagan, va API 3/4
-   ijara lotini umuman ko'rmasligi mumkin (shuning uchun `found` shartidan oldin tekshiriladi).
-3. **haqiqiy** lot bor, sotilmagan **va lot ochiq** ⇒ kat 3 (Savdoda xususiylashtirish).
-   ⚠️ `isLotOpen()` (2026-10-09, foydalanuvchi qarori) — OQ RO'YXAT: lot holati
-   "...arizalarni qabul qilish" VA savdo sanasi bugun yoki keyin. Boshqa hamma holat
-   (sotilmadi, to'xtatildi, bekor qilindi, yakunlandi, komissiyaga topshirildi, sanasiz
-   "Савдода") kat 3 dan CHIQADI → ijara shartnomasi bo'lsa 5/6, aks holda 11. Sabab: API 3
-   OXIRGI buyurtmani qaytaradi, tugagan bo'lsa ham (jonli: 793 tadan ~124 ta). Mezon davijara
-   "taklif etilayotgan" bilan AYNAN bir xil — farq faqat obyekt/lot (bitta lot 2 kadastrda).
-   `hasPrivatizationLot` ham shu shart bilan (`checkPropertyStatus.ts`); `AuctionLot` yozuvi
-   saqlanaveradi (tarix). Bayroq sync paytida hisoblanadi — savdo kuni o'tgach keyingi
-   sync'gacha (kuniga bir marta) kat 3 da turadi.
-4. lot yo'q, API 3 `status_name` ∈ {`Экспертиза`, `Баҳолашда`, `Хатловда`} ⇒ kat 7
-5. ijara shartnomasi bor ⇒ jami summa 0 ? kat 5 : kat 6
-- **Ustuvorlik:** auksion > ijara > boshqa
-
-⚠️ **`lot_number: 0` — lot YO'Q degani.** `lotStr()` uni null'ga aylantiradi; oddiy `String()` ishlatilsa
-`"0"` truthy bo'lib, obyekt noto'g'ri "savdoda" kategoriyasiga tushadi (bir marta 92 ta obyektni buzgan).
-
-Kategoriya kodini o'zgartirishdan oldin `manualCategoryCode` ishlatilganini tekshiring.
-
-## Boshqaruv paneli — vizual panel + xarita (2026-09-05)
-
-`/dashboard` — **vizual xulosa** (kartalar, grafiklar, xarita). Rasmiy hisobot shakli
-(uchta jadval) `/dashboard/hisobot` ga ko'chdi. Ikkalasi bir xil
-`resolveDashboardScope()` (`app/dashboard/scope.ts`) va bir xil `getDashboardStats()`
-dan oziqlanadi — ekrandagi sonlar hech qachon ajralib qolmaydi.
-
-⚠️ **`SourceFilter` ga `basePath` propi MAJBURIY** — ilgari `/dashboard` qattiq
-yozilgan edi va hisobotdagi manba tugmasi foydalanuvchini vizual panelga otib yuborardi.
-
-Yangi umumiy qatlam: `lib/format.ts` (`nf`/`km`/`pct1`/`money` — **yagona joy**,
-ilgari hisobot ichida lokal edi) · `lib/chartColors.ts` · `lib/geo.ts` ·
-`components/{ui,charts,map}` · `services/{trends,map,snapshots}.ts`.
-
-⚠️ **Matn SERVERDA formatlanadi.** `toLocaleString("uz-UZ")` Node'da `1 167`,
-brauzerda `1,167` beradi — client grafik komponentiga tayyor SATR uzatiladi
-(`countLabel`/`pctLabel`/`label`), son emas. Aks holda gidratsiya buziladi.
-
-⚠️ **Recharts'da `isAnimationActive={false}` HAR BIR seriyada.** React 19 dev
-rejimida ikki marta render bo'ladi va animatsiya yoqiq bo'lsa halqa/ustunlar bo'sh
-`<g>` bo'lib qoladi (donutda aynan shu bo'lgan). `cx`/`cy` ham foiz emas, SON.
-
-⚠️ **Panel "Kategoriya taqsimoti" — hisobotning JAMI qatori bilan AYNAN bir xil**
-(2026-09-12, foydalanuvchi talabi: "izoh qo'shma, xuddi hisobotdagidek chiqar").
-Sonlar `buildDashboardColumns()` ning "Soni" sub-ustunlari yig'indisi, ya'ni
-3/4/5/6/12 XUSUSIYAT bo'yicha va kartalar yig'indisi jamidan katta. Shu sabab halqa
-diagramma olib tashlandi (bo'laklar kesishardi) — o'rniga `CategoryBars` (ustunlar).
-Ilgari halqa effektiv kategoriya taqsimotini ko'rsatardi va hisobotdan farq qilardi
-(kat 3: 546 ↔ 631, kat 12 umuman yo'q edi). Havola sonning o'zi bilan bir mezonda:
-bitta "Soni" → hisobot katagining havolasi (`category=N` + `qsExtra`); `landSplit`
-kat 1–4 (Yer+Bino — effektiv kategoriyadan sanaladi) → `effectiveCategory=N`.
-
-### Xarita — `services/map.ts` + `components/map/`
-
-Koordinata `Property.lat/lng` da (`coordSource`, `coordsAt`). ⚠️ Manbasi —
-`ObjectStatusCheck.rawResponse.$.api4`, ya'ni **auksion LOTINING nuqtasi**, kadastr
-chegarasi emas; qamrov ~31% (faqat auksionga chiqqan obyektda bor). Ikkalasi ham
-xarita sarlavhasida OCHIQ yoziladi.
-
-⚠️ **Koordinata `refreshAuction` blokidan TASHQARIDA yoziladi** — bino auksion
-tugagani uchun joyidan ko'chmaydi, ya'ni lot topilmasa `null` ga qaytarilmasligi kerak.
-⚠️ **Standart Leaflet markeri ISHLATILMAYDI** — `marker-icon.png` `/obyektlar`
-sub-path ostida 404 beradi. O'rniga ichki SVG'li `L.divIcon` pin (`components/map/pin.ts` →
-`pinIcon()`, davijara.uz xaritasidagi shakl, 2026-09-12) — rasm fayli kerak emas.
-Obyekt sahifasida ("Kategoriya biriktirish" ustida) kichik xarita — `ObjectLocationMap.tsx`:
-bitta pin, g'ildirak-zoom o'chiq, o'rami `MapSection.tsx` → `ObjectMapSection` (2026-09-22).
-⚠️ Hover kattalashtirish ICHKI `svg`da (`globals.css` → `.dm-pin`): marker elementining
-o'z `transform`ini Leaflet joylashtirish uchun ishlatadi.
-⚠️ `ssr:false` Server Component ichida build xatosi beradi — oraliq `"use client"`
-o'ram (`MapSection.tsx`) shu uchun bor.
-Tile manzili `MAP_TILE_URL` env orqali (standarti OSM); `tileerror` da ogohlantirish
-chiqadi, nuqtalar baribir chiziladi.
-
-### Balansga olinganlar — `/dashboard/balans` (2026-09-28, KPI)
-
-Oy bo'yicha balansga olingan obyektlar, hududlar × soha. Sana — **`Property.balanceDate`**:
-kadastrdagi huquq ro'yxatdan o'tgan ENG OXIRGI sana (`land.legal[].date` /
-`outer[].legal[].date`), `lib/balance.ts` → `balanceRegDate()`.
-⚠️ **`createdAt` EMAS** — u tizim obyektni ko'rgan kun: jonli o'lchovda sentyabrda
-"yaratilgan" 241 obyektdan 185 tasining huquqi ancha oldin ro'yxatdan o'tgan edi.
-⚠️ Migratsiyadagi SQL to'ldirish JS funksiyasi bilan AYNAN bir xil (6093 obyektda 0 farq);
-mavjud bo'lmagan sana ikkalasida ham tashlanadi. **Eski API 2 shaklida** (`cad_data` topmagan
-obyektlar) — `registration_date` (+ `registration_number`, `documents[]` DD.MM.YYYY, `owner`),
-faqat huquq yozuvlari UMUMAN bo'lmasa (migratsiya `20260929120000_balance_transfer`; lokal:
-sanasizlar 101 → 45). Yozuvchilar `undefined` bo'lsa ustunga TEGMAYDI.
-Obyekt sahifasida alohida **"Balansga olinganlik"** kartasi (`balanceRegRecord()`): sana
-(DB ustuni), huquq turi yoki ro'yxat raqami, oldingi egasi, asos hujjatlar — sana bo'lmasa
-ham qolgan ma'lumot ko'rsatiladi.
-- Hudud — obyekt JOYLASHGAN hudud (`regionId`), respublika tashkilotlari ham kiradi, shuning
-  uchun havolalarda `hududiy=1` YO'Q (rasmiy hisobot jadvalidan farqli — ataylab).
-- Sonlar `buildWhere()` bilan (`services/balance.ts`), ro'yxat filtri `balansFrom`/`balansTo`
-  (ikkala chegara kiradi) — son va ro'yxat ajralmaydi. Eksportda "Balansga olingan sana" ustuni.
-- Tashkilotlar orasida o'tkazish huquqni qayta ro'yxatdan o'tkazadi — qabul qiluvchida yangi sana
-  (foydalanuvchi qarori: ichki o'tkazish ham "balansga olingan" sanaladi).
-- Jadval: hududlar × to'rt ustun — yil boshidan tanlangan kungacha, tanlangan kunning oyi
-  (to'liq oy), o'tgan oy, tanlangan kun
-  (`?kun=YYYY-MM-DD`, standart bugun, Toshkent; eski `?oy=` ham qabul qilinadi).
-  Tanlagich `balans/DatePicker.tsx` — o'zbekcha, brauzer `input type=date` emas.
-- Standart manba — "Ijara markazi" (hisobot kabi), "Hammasi" — `?soha=__all__`.
-  "Sanasi aniqlanmagan" kartasi → ro'yxat `balansNone=1` (`balanceUnknown`, bir xil `buildWhere`).
-
-⚠️ **O'tkazilgan obyekt yangi egasiga KO'CHIRILADI** (`syncPropertyBase.ts` →
-`isTransferredHere()`, 2026-09-28). Ilgari `upsert`ning `update` qismi `sourceId`ni
-o'zgartirmasdi: eski ega obyektni "balansdan chiqarilgan" deb belgilar, yangi egada u hech
-qachon paydo bo'lmasdi — barcha statistikadan yo'qolardi (jonli: `10:11:40:01:01:0127/0005`,
-Ijara markazi → Direksiya). Shart: eski egada `removedFromBalance` YOKI kadastrdagi
-`hosts[0].tin` = yangi tashkilot STIRi. Shartsiz ko'chirilmaydi — ulushli egalikda obyekt
-ikki tashkilot orasida har kuni o'tib-qaytib yurardi. Qolib ketganlar keyingi to'liq
-sinxronizatsiyada o'zi tuzaladi.
-⚠️ **Ko'chirish bilan BITTA tranzaksiyada `BalanceTransfer` yoziladi** (2026-09-29) — obyekt
-eski egasining "Balansdan chiqarilgan" ro'yxatida QOLADI (foydalanuvchi talabi).
-`buildWhere()` → `wantsRemoved`: `removedFromBalance` YOKI `transfers.some`; bu rejimda
-soha/tashkilot filtri o'tkazilganlar uchun ESKI egaga (`fromSource`) qo'llanadi, umumiy
-`soha`/`sourceId` sharti qo'shilmaydi. Ro'yxat/eksportda `removedView()` sana va yangi egani
-o'tkazish yozuvidan oladi. 1.17.1 dan keyin (tarix jadvalisiz) o'tkazilganlar tiklanmaydi.
-
-### Kunlik snapshot — `services/snapshots.ts` + `DashboardSnapshot`
-
-`Property` ning statistika ustunlari har sinxronizatsiyada ustidan yoziladi, ya'ni
-"kecha nechta obyekt bo'sh turgan edi" degan savolga bazada javob yo'q. Snapshot shu
-bo'shliqni to'ldiradi.
-
-- Gran **`(day, sourceId, regionId)`** — birlamchi kalitning O'ZI, NULL yo'q. Barcha
-  kesimlar (rol doirasi, soha, hudud) shundan YIG'INDI bilan tiklanadi.
-- ⚠️ `soha` (nom) ustuni ATAYLAB yo'q: `OrganizationSource.name` admin UI'da qayta
-  nomlanishi mumkin → tarix ikkiga bo'linardi. JOIN joriy nomni beradi.
-- Cron `QUEUE.DASHBOARD_SNAPSHOT`, **`0 2 * * *` Asia/Tashkent — kunlik sync (03:00)
-  dan OLDIN**: sync o'rtasidagi o'lchov yarim yangilangan holatni yozib, trendda
-  soxta sakrash berardi. Faol `SyncRun` bo'lsa o'tkazib yuboriladi (log'ga yoziladi).
-- Qo'lda olish: `/dashboard/sync` → "Kunlik snapshot olish" (navbatga qo'yilmaydi,
-  DARHOL bajariladi — worker o'chiq bo'lsa ham birinchi kun ma'lumot yozilsin).
-- ⚠️ **Tarixni backfill qilib BO'LMAYDI.** `< 2` kun bo'lsa grafik UMUMAN
-  ko'rsatilmaydi (`MIN_DAYS`) — bitta nuqtadan chiqadigan tekis chiziq "hech narsa
-  o'zgarmadi" degan yolg'on xulosa berardi.
-- ⚠️ Bu faylni **worker ham import qiladi** (`tsx`, Next'siz). Yozish yo'li faqat
-  xom SQL ishlatadi va `unstable_cache` ga tegmaydi — kesh o'rami (`getKpiHistory`)
-  Next so'rov konteksti tashqarisida chaqirilsa yiqiladi.
-
-⚠️ **Hodisaviy trendlar** (`services/trends.ts`) snapshotga bog'liq EMAS va birinchi
-kundanoq ishlaydi — manbasi `RentContract.contractDate` / `AuctionLot.auctionDate`.
-`AuctionLot` har sinxronizatsiyada qayta yoziladi, ya'ni auksion trendi haqiqiy tarix
-emas — grafik ostida shu ochiq yoziladi.
-
-### ⚠️ Hudud havolalarida `hududiy=1` MAJBURIY
-
-Hudud va tuman qatorlari respublika darajasidagi tashkilotlarni ("Markaziy apparat")
-o'z ichiga OLMAYDI — ular alohida qatorda hisoblanadi. Lekin ularning obyektlari
-kadastr prefiksi orqali oddiy hududlarga tarqalgan, ya'ni oddiy `?region=<id>`
-havolasi ularni QAYTA olib kirardi va ro'yxatdagi son jadvaldagidan katta chiqardi
-(jonli o'lchov: Toshkent sh. — 47 ↔ 71, 24 ta obyekt Agentlik markaziy apparatiniki).
-
-- Ta'rif **yagona joyda**: `stats.ts` → `NATIONAL_SOURCE` (`recentPaymentCutoff()`
-  naqshi). `nationalOrgRows()` ham, `buildWhere()` ham shundan oziqlanadi.
-- Ro'yxat filtri: `PropertyFilters.regionBoundSource` → URL'da `hududiy=1`.
-- Hisobotda havolalar `regionScope()` / `districtScope()` orqali quriladi — qo'lda
-  `region=...` yozmang.
-- ⚠️ **JAMI qatoriga va `tashkilot=<id>` qatoriga QO'SHILMAYDI** — birinchisi butun
-  doira bo'yicha, ikkinchisi aynan o'sha tashkilot bo'yicha.
-
-### ⚠️ `landSplit` sohalarda grafik BUTUNLAY binolar bo'yicha
-
-"Davlat aktivlari agentligi"/"Direksiya" tanlanganda hududlar reytingi jami ham,
-bo'sh turgan ham, ikkala havolasi ham binolardan quriladi
-(`landSplit.total.building` va `rentBreakdown.vacant.buildingCount`, `&isLand=0`).
-Ilgari ustun balandligi `r.inefficient` (yer + bino) dan olinib havola `&isLand=0`
-bilan ochilardi: Andijonda ustun **256**, ro'yxat **9** ta obyekt berardi.
+To'liq hujjat **`balans` skill'ida** (`.claude/skills/balans/SKILL.md`): `balanceDate`,
+obyekt sahifasidagi karta, jadval ustunlari va tashkilotlar orasida o'tkazish (`BalanceTransfer`).
 
 ## Ijara imtiyozi — ПҚ-3782 (`/dashboard/imtiyoz`) — 2026-09-02
 
@@ -904,33 +350,11 @@ To'liq hujjat — **`auksion` skill'ida** (`.claude/skills/auksion/SKILL.md`):
 API tuzoqlari, sinxronlash mexanikasi, o'lchangan tezlik raqamlari va filtr.
 Shu quyi tizimga tegsangiz o'sha skill'ni oching.
 
-## davijara.uz uchun API — `/api/davijara/privatization` (2026-10-09)
+## davijara.uz uchun API — `/api/davijara/privatization`
 
-davijara.uz (shu domen ildizidagi ommaviy sayt) xususiylashtirish savdosidagi obyektlarni
-**shu yerdan** oladi — API 3/4 zanjirini qayta yurgizmaydi. Route:
-`src/app/api/davijara/privatization/route.ts`.
-
-- ⚠️ **Sessiyasiz, middleware'dan ISTISNO** (`matcher` → `api/davijara/`). Himoya — route
-  ichida: `x-davijara-token` == `DAVIJARA_API_TOKEN` (`timingSafeEqual`). Token sozlanmagan
-  bo'lsa **503** — yo'l hech qachon ochiq qolmaydi. Bo'sh satr ham "sozlanmagan" (`env.ts`).
-- Qaysi obyektlar: `hasPrivatizationLot` + `removedFromBalance = false` + `auctionGroupName`
-  **ijara EMAS** (null — kat 3 bilan bir xil, xususiylashtirish). Guruh sharti shart:
-  `hasPrivatizationLot` guruhga qaramay yoziladi.
-- Soha: standart **"Ijara markazi"** (davijara — Markaz sayti; foydalanuvchi talabi 09.10) —
-  dashboard jadvalidagi "Savdoda xususiy." ustuni shu soha tanlanganda ko'rsatadigan to'plam.
-  `?soha=<nom>` boshqa soha, `?soha=all` barchasi. Soha admin UI'da qayta nomlansa,
-  route'dagi `DEFAULT_SOHA` ham o'zgartirilsin.
-- `hasPrivatizationLot` 1.22.1 dan boshlab AYNAN davijara mezoni (`isLotOpen`: ariza qabul
-  qilinmoqda + sana oldinda). `lotStatus`/`auctionDate` baribir beriladi.
-- Bitta lot bir nechta kadastrda kelishi mumkin (API 3 da alohida aktiv yozuvlari bitta
-  buyurtmaga bog'langan, masalan bino + "MULKIY MAJMUA") — davijara `lotNumber` bo'yicha
-  birlashtiradi.
-- ⚠️ **Javob ommaviy saytga chiqadi** — `select` da shaxsiy ma'lumot ham, STIR ham YO'Q.
-  Maydon qo'shsangiz shu qoidani saqlang.
-- davijara uni OMMAVIY manzildan chaqiradi: `https://davijara.uz/obyektlar/api/davijara/privatization`.
-  ⚠️ `127.0.0.1:3000` EMAS: bu ilova chekka serverda (`markazsrv`), davijara esa `markaz` da —
-  u yerdagi :3000 boshqa ilova (09.10.2026 deploy'dan keyin shu sabab 0 chiqqan);
-  token davijara'ning `shared/.env` → `PRIVATIZATION_API_TOKEN` bilan bir xil.
+To'liq hujjat **`davijara-api` skill'ida** (`.claude/skills/davijara-api/SKILL.md`).
+⚠️ **Javob ommaviy saytga chiqadi** — `select` da shaxsiy ma'lumot ham, STIR ham BO'LMASIN.
+Yo'l middleware'dan istisno, himoya route ichida (token sozlanmagan bo'lsa 503).
 
 ## Ishlash tartibi — MUHIM
 

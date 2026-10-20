@@ -211,6 +211,10 @@ export async function fetchOrderDetails(
         orders?: RawAuctionOrder[];
       };
       if (data.result_code !== 0) {
+        // ⚠️ Buyurtma bu akkauntniki emas (yoki yo'q) — xato EMAS, "topilmadi".
+        // Busiz u 3 marta backoff bilan qayta so'ralardi va akkauntlarni birma-bir
+        // sinash (`rentAuctionEvents.ts`) birinchi begona akkauntda to'xtab qolardi.
+        if (/buyurtmasi aniqlanmadi/i.test(data.result_msg ?? "")) return { status: "not_found" };
         throw new Error(`get-order xatosi (buyurtma ${orderId}): ${data.result_msg ?? data.result_code}`);
       }
 

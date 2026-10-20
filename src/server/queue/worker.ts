@@ -23,6 +23,7 @@ import { imtiyozConfigured } from "@/server/integrations/imtiyoz";
 import { auctionConfigured } from "@/server/integrations/auctionOrders";
 import { syncAuctionOrders, currentYearStart } from "@/server/services/auctionOrders";
 import { syncAuctionOrderDetails } from "@/server/services/auctionOrderDetails";
+import { pollRentAuctionEvents } from "@/server/services/rentAuctionEvents";
 
 const leafOpts: PgBoss.WorkOptions = {
   batchSize: env.WORKER_CONCURRENCY,
@@ -262,6 +263,35 @@ async function main() {
     { currentYear: true },
     { tz: "Asia/Tashkent" },
   );
+
+  // ── Ijara auksioni hodisalari (online-ijara `auction_logs`) ──
+  //
+  // ⚠️ Har DAQIQADA. Job xato tashlamaydi: tashqi baza vaqtincha yo'q bo'lsa retry
+  // kerak emas — keyingi daqiqa o'zi qayta o'qiydi (kursor surilmagan). Bir xil xato
+  // log'ni har daqiqada to'ldirmasin — faqat xabar o'zgarganda yoziladi.
+  let lastRentEventsError = "";
+  await boss.work(QUEUE.RENT_AUCTION_EVENTS, async () => {
+    try {
+      const r = await pollRentAuctionEvents();
+      lastRentEventsError = "";
+      if (!r) return;
+      if (r.initialized) {
+        console.log("[rent-events] kursor o'rnatildi — shu paytdan keyingi hodisalar o'qiladi");
+      } else if (r.events > 0) {
+        console.log(
+          `[rent-events] ${r.events} hodisa, ${r.orders} buyurtma → ${r.properties} obyekt qayta tekshiruvga` +
+            (r.unresolved ? `, obyekti topilmadi ${r.unresolved}` : "") +
+            (r.lookups ? `, get-order ${r.lookups}` : "") +
+            (r.orphanEvents ? `, auctions'da yo'q ${r.orphanEvents}` : ""),
+        );
+      }
+    } catch (err) {
+      const m = msg(err);
+      if (m !== lastRentEventsError) console.warn("[rent-events] o'qilmadi:", m);
+      lastRentEventsError = m;
+    }
+  });
+  await boss.schedule(QUEUE.RENT_AUCTION_EVENTS, "* * * * *", {}, { tz: "Asia/Tashkent" });
 
   console.log(
     `🚀 Worker (pg-boss) ishga tushdi. batchSize=${env.WORKER_CONCURRENCY}, poll=${env.WORKER_POLL_SECONDS}s. Queue'lar: ${Object.values(QUEUE).join(", ")}`,

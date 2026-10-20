@@ -7,6 +7,17 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.23.0
+
+- Ijara auksioni lotlari deyarli real vaqtda: worker har daqiqada online-ijara bazasidagi
+  `auction_logs` (`e-auction_push`) hodisalarini o'qiydi va o'zgargan buyurtmaning obyektini
+  auksion + ijara bo'yicha qayta tekshiradi ("Savdoda ijara", ijara lotlari, ijara shartnomasi).
+  Xususiylashtirish (kat 3) kunlik sync'da qoladi — online-ijara jadvallarida u yo'q.
+  Yangi jadval `ExternalCursor` (migratsiya `20261020120000_external_cursor`).
+- Auksion reyestri tafsilotlari: begona akkauntdagi buyurtma ("buyurtmasi aniqlanmadi")
+  endi xato emas, "topilmadi" — har kecha 3 marta qayta so'ralmaydi.
+- `CLAUDE.md` ning katta bo'limlari `.claude/skills/` ga ko'chirildi (matn o'zgarishsiz).
+
 ## 1.22.1
 
 - "Savdoda xususiylashtirish" mezoni davijara.uz bilan bir xil: faqat "arizalarni qabul qilish"
