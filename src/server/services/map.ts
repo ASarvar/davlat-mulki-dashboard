@@ -1,7 +1,6 @@
 import { unstable_cache } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { sourceWhere, type StatsScope } from "./stats";
-import { REGION_CENTER, type Coords } from "@/lib/geo";
 
 /**
  * Xarita ma'lumoti.
@@ -20,8 +19,31 @@ export interface MapPoint {
   /** Effektiv kategoriya (rang uchun). */
   cat: number;
   name: string | null;
+  /**
+   * Hudud va tuman — `MapData.regions` / `MapData.districts` dagi INDEKS (-1 = yo'q).
+   * ⚠️ ID satri emas: ~6 600 nuqtada ikkita cuid payload'ni ~330 KB oshirardi.
+   */
+  r: number;
+  d: number;
 }
 
+export interface MapRegion {
+  id: string;
+  name: string;
+}
+
+export interface MapDistrict {
+  id: string;
+  name: string;
+  /** `MapData.regions` dagi indeks. */
+  r: number;
+}
+
+/**
+ * Hudud pufakchasi — `PropertyMap` ning "hudud" rejimi uchun. ⚠️ Panelda bu rejim
+ * 2026-10-21 dan beri YO'Q (foydalanuvchi talabi, o'rniga xarita filtri) — tip
+ * `PropertyMap` qayta ishlatilishi uchun qoldirildi, `getMapData()` uni qaytarmaydi.
+ */
 export interface RegionBubble {
   regionId: string;
   name: string;
@@ -33,12 +55,15 @@ export interface RegionBubble {
 
 export interface MapData {
   points: MapPoint[];
-  bubbles: RegionBubble[];
+  /** Xarita filtri uchun — faqat nuqtasi bor hududlar, `Region.sortOrder` bo'yicha. */
+  regions: MapRegion[];
+  /** Faqat nuqtasi bor tumanlar, nomi bo'yicha. */
+  districts: MapDistrict[];
   /** Doiradagi jami obyektlar (qamrovni foizda ko'rsatish uchun). */
   total: number;
   /** Koordinatasi bor obyektlar. */
   withCoords: number;
-  /** Respublika darajasidagi tashkilotlarning obyektlari — xaritada ko'rsatilmaydi. */
+  /** Koordinatasi yo'q obyektlar — xaritada ko'rsatilmaydi. */
   nationalHidden: number;
   /**
    * Koordinata QAYSI manbadan kelgani (`Property.coordSource`).
@@ -56,7 +81,7 @@ export interface MapData {
 async function computeMapData(scope: StatsScope = {}): Promise<MapData> {
   const where = sourceWhere(scope);
 
-  const [total, rows, regionAgg, regions, nationalHidden] = await Promise.all([
+  const [total, rows, regions, nationalHidden] = await Promise.all([
     prisma.property.count({ where }),
     prisma.property.findMany({
       where: { ...where, lat: { not: null }, lng: { not: null } },
@@ -67,22 +92,41 @@ async function computeMapData(scope: StatsScope = {}): Promise<MapData> {
         lng: true,
         name: true,
         regionId: true,
+        districtId: true,
         coordSource: true,
         integrationCategoryCode: true,
         manualCategoryCode: true,
       },
     }),
-    prisma.property.groupBy({
-      by: ["regionId"],
-      where,
-      _count: { _all: true },
+    prisma.region.findMany({
+      select: { id: true, name: true },
+      orderBy: { sortOrder: "asc" },
     }),
-    prisma.region.findMany({ select: { id: true, name: true, cadastrePrefix: true } }),
-    // ⚠️ Respublika darajasidagi tashkilot obyektlari hudud pufakchasiga KIRADI
-    // (ularning `regionId` si kadastr prefiksidan aniqlangan haqiqiy hudud), lekin
-    // koordinatasi yo'qlari umuman ko'rsatilmaydi — shuni sanaymiz.
+    // Koordinatasi yo'qlar — xarita ustidagi qamrov izohi uchun.
     prisma.property.count({ where: { ...where, lat: null } }),
   ]);
+
+  // Filtr ro'yxatlari — faqat xaritada nuqtasi bor hudud/tumanlar (bo'sh tanlov bo'lmasin).
+  const usedRegionIds = new Set(rows.map((r) => r.regionId));
+  const mapRegions: MapRegion[] = regions
+    .filter((g) => usedRegionIds.has(g.id))
+    .map((g) => ({ id: g.id, name: g.name }));
+  const regionIdx = new Map(mapRegions.map((g, i) => [g.id, i]));
+
+  const usedDistrictIds = [...new Set(rows.map((r) => r.districtId).filter((x): x is string => !!x))];
+  const districtRows = usedDistrictIds.length
+    ? await prisma.district.findMany({
+        where: { id: { in: usedDistrictIds } },
+        select: { id: true, name: true, regionId: true },
+        orderBy: { name: "asc" },
+      })
+    : [];
+  const mapDistricts: MapDistrict[] = districtRows.map((d) => ({
+    id: d.id,
+    name: d.name,
+    r: regionIdx.get(d.regionId) ?? -1,
+  }));
+  const districtIdx = new Map(mapDistricts.map((d, i) => [d.id, i]));
 
   const points: MapPoint[] = rows.map((r) => ({
     id: r.id,
@@ -92,44 +136,9 @@ async function computeMapData(scope: StatsScope = {}): Promise<MapData> {
     lng: Math.round(r.lng! * 1e5) / 1e5,
     cat: r.integrationCategoryCode ?? r.manualCategoryCode ?? 11,
     name: r.name,
+    r: regionIdx.get(r.regionId) ?? -1,
+    d: r.districtId ? (districtIdx.get(r.districtId) ?? -1) : -1,
   }));
-
-  // Bo'sh turgan (effektiv kategoriya 11) — pufakcha rangi uchun.
-  const vacantAgg = await prisma.property.groupBy({
-    by: ["regionId"],
-    where: { ...where, integrationCategoryCode: null, manualCategoryCode: null },
-    _count: { _all: true },
-  });
-  const vacantByRegion = new Map(vacantAgg.map((r) => [r.regionId, r._count._all]));
-
-  // Nuqtalar o'rtachasi — `REGION_CENTER` da yo'q hudud uchun ZAXIRA markaz.
-  // ⚠️ Busiz yangi hudud qo'shilganda pufakcha JIMGINA yo'qolardi.
-  const sums = new Map<string, { lat: number; lng: number; n: number }>();
-  for (const r of rows) {
-    const cur = sums.get(r.regionId) ?? { lat: 0, lng: 0, n: 0 };
-    sums.set(r.regionId, { lat: cur.lat + r.lat!, lng: cur.lng + r.lng!, n: cur.n + 1 });
-  }
-
-  const bubbles: RegionBubble[] = [];
-  for (const agg of regionAgg) {
-    const reg = regions.find((g) => g.id === agg.regionId);
-    if (!reg) continue;
-    let center: Coords | undefined = reg.cadastrePrefix ? REGION_CENTER[reg.cadastrePrefix] : undefined;
-    if (!center) {
-      const s = sums.get(reg.id);
-      if (s && s.n > 0) center = { lat: s.lat / s.n, lng: s.lng / s.n };
-    }
-    if (!center) continue; // markazi ham, nuqtasi ham yo'q — chizib bo'lmaydi
-    bubbles.push({
-      regionId: reg.id,
-      name: reg.name,
-      lat: center.lat,
-      lng: center.lng,
-      total: agg._count._all,
-      vacant: vacantByRegion.get(agg.regionId) ?? 0,
-    });
-  }
-  bubbles.sort((a, b) => b.total - a.total);
 
   const bySource = { cadastre: 0, auction: 0, other: 0 };
   for (const r of rows) {
@@ -138,11 +147,21 @@ async function computeMapData(scope: StatsScope = {}): Promise<MapData> {
     else bySource.other++;
   }
 
-  return { points, bubbles, total, withCoords: points.length, nationalHidden, bySource };
+  return {
+    points,
+    regions: mapRegions,
+    districts: mapDistricts,
+    total,
+    withCoords: points.length,
+    nationalHidden,
+    bySource,
+  };
 }
 
 // ⚠️ Doira argument sifatida — kesh kaliti rol doirasini ham qamraydi.
-export const getMapData = unstable_cache(computeMapData, ["dashboard-map-v1"], {
+// ⚠️ `-v3`: `MapData` shakli o'zgardi (r/d qo'shildi, bubbles olib tashlandi) — eski kesh
+// yozuvi yangi kodga tushmasin.
+export const getMapData = unstable_cache(computeMapData, ["dashboard-map-v3"], {
   tags: ["dashboard"],
   revalidate: 60,
 });

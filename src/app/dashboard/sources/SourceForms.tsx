@@ -4,6 +4,7 @@ import { useActionState } from "react";
 import { Plus, Save, Trash2 } from "lucide-react";
 import { sourceScopeLabel } from "@/lib/sourceLabel";
 import { createSourceAction, updateSourceAction, deleteSourceAction, type SourceState } from "./actions";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 export function CreateSourceForm({
   regions,
@@ -20,14 +21,14 @@ export function CreateSourceForm({
         <label className="mb-1 text-xs text-muted-foreground">Hudud</label>
         {/* Bo'sh = respublika darajasi (Agentlik, Direksiya) — obyektlari kadastr
             raqamidan tegishli hududga taqsimlanadi. */}
-        <select name="regionId" defaultValue="" className="w-48 rounded-md border border-slate-300 px-2 py-1.5 text-sm">
-          <option value="">Respublika</option>
-          {regions.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </select>
+        <Dropdown
+          name="regionId"
+          ariaLabel="Hudud"
+          defaultValue=""
+          options={[{ value: "", label: "Respublika" }, ...regions.map((r) => ({ value: r.id, label: r.name }))]}
+          size="sm"
+          className="w-48"
+        />
       </div>
       <div className="flex flex-col">
         <label className="mb-1 text-xs text-muted-foreground">Soha</label>

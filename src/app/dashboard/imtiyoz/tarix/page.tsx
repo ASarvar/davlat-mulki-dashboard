@@ -7,6 +7,7 @@ import { RESULT_SHORT, type ImtiyozResultCode } from "@/lib/imtiyoz";
 import { listChecks } from "@/server/services/imtiyoz/audit";
 import { Pagination } from "@/components/Pagination";
 import { cn } from "@/lib/utils";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 /**
  * Imtiyoz tekshiruvlari tarixi (audit jurnali).
@@ -126,15 +127,21 @@ export default async function ImtiyozHistoryPage({ searchParams }: { searchParam
         </div>
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Natija</label>
-          <select name="resultCode" defaultValue={resultCode} className={`${inputCls} w-52`}>
-            <option value="">Barchasi</option>
-            {RESULT_OPTIONS.map((code) => (
-              <option key={code} value={code}>
-                {RESULT_SHORT[code]}
-                {code.startsWith("INCONCLUSIVE_") ? ` (${code.replace("INCONCLUSIVE_", "").toLowerCase()})` : ""}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            name="resultCode"
+            ariaLabel="Natija"
+            defaultValue={resultCode}
+            options={[
+              { value: "", label: "Barchasi" },
+              ...RESULT_OPTIONS.map((code) => ({
+                value: code,
+                label:
+                  RESULT_SHORT[code] +
+                  (code.startsWith("INCONCLUSIVE_") ? ` (${code.replace("INCONCLUSIVE_", "").toLowerCase()})` : ""),
+              })),
+            ]}
+            className="w-52"
+          />
         </div>
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Sanadan</label>

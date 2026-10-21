@@ -294,7 +294,7 @@ Oddiy GET forma (client JS faqat qulaylik uchun). Tuzilishi: asosiy qator (Kadas
 Tashkilot, Hudud) + "Qo'shimcha" ochiladigan bo'lim (Tuman, Kategoriya, Samaradorlik).
 Barcha `select`lar o'zgarishi bilan darhol yuboriladi; matn maydoni Enter/tugma kutadi.
 
-⚠️ **1. Kaskad filtrlarda ota o'zgarsa, BOLA tozalanishi shart** (`submitResetting`).
+⚠️ **1. Kaskad filtrlarda ota o'zgarsa, BOLA tozalanishi shart** (`Dropdown` → `resetOnChange`).
 Soha → tashkilot va hudud → tuman juftliklari `buildWhere()`da **AND** bilan birikadi, ya'ni
 eski bola qiymati yangi ota bilan qolib ketsa natija jimgina **bo'sh** chiqadi va sababi
 ekranda ko'rinmaydi.
@@ -418,6 +418,9 @@ nginx: `location ^~ /obyektlar { proxy_pass http://127.0.0.1:3000; }` — `proxy
 **path yo'q** (prefiks saqlanadi). Batafsil — `deploy/nginx.example.conf`, `DEPLOY.md` §1.5.
 
 - Izohlar va UI matni — **o'zbek tilida**.
+- **Native `<select>` ISHLATILMAYDI** — `components/ui/Dropdown.tsx` (ochilgan ro'yxati ilova
+  uslubida, 2026-10-21). Formada `name` (yashirin input), `required`, `submitOnChange`,
+  kaskad uchun `resetOnChange`, guruhlar uchun `option.group`.
 - Ma'lumot yo'qotadigan amallar (o'chirish) UI'da **bloklanadi**, sababi tugma yonida ko'rsatiladi
   (masalan: obyekti bor manbani o'chirib bo'lmaydi — "Faol" belgisini oling).
 - Dashboard aggregatlari `unstable_cache` (tag `dashboard`, 60s TTL) — worker alohida jarayon

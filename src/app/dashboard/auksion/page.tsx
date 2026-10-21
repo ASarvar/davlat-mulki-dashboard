@@ -14,6 +14,7 @@ import { SyncPanel } from "./SyncPanel";
 import { getAuctionSyncStatus } from "./actions";
 import { OrderRow, type OrderView } from "./OrderRow";
 import type { AuctionOrder } from "@prisma/client";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
@@ -208,36 +209,33 @@ export default async function AuksionPage({ searchParams }: { searchParams: Prom
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Hudud</span>
-          <select name="hudud" defaultValue={f.region ?? ""} className={`${inputCls} max-w-[190px]`}>
-            <option value="">Hammasi</option>
-            {facets.regions.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            name="hudud"
+            ariaLabel="Hudud"
+            defaultValue={f.region ?? ""}
+            options={[{ value: "", label: "Hammasi" }, ...facets.regions.map((r) => ({ value: r, label: r }))]}
+            className="w-48"
+          />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Holati</span>
-          <select name="holat" defaultValue={f.statusId?.toString() ?? ""} className={`${inputCls} max-w-[210px]`}>
-            <option value="">Hammasi</option>
-            {facets.statuses.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            name="holat"
+            ariaLabel="Holati"
+            defaultValue={f.statusId?.toString() ?? ""}
+            options={[{ value: "", label: "Hammasi" }, ...facets.statuses.map((s) => ({ value: String(s.id), label: s.label }))]}
+            className="w-52"
+          />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Turi</span>
-          <select name="tur" defaultValue={f.groupName ?? ""} className={`${inputCls} max-w-[210px]`}>
-            <option value="">Hammasi</option>
-            {facets.groups.map((g) => (
-              <option key={g} value={g}>
-                {g}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            name="tur"
+            ariaLabel="Turi"
+            defaultValue={f.groupName ?? ""}
+            options={[{ value: "", label: "Hammasi" }, ...facets.groups.map((g) => ({ value: g, label: g }))]}
+            className="w-52"
+          />
         </label>
         <label className="flex flex-col gap-1">
           <span className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">Auksion sanasi</span>

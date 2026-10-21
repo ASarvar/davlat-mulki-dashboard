@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { sourceScopeLabel } from "@/lib/sourceLabel";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 type Mode = "single" | "multi" | "none";
 
@@ -57,23 +58,17 @@ export function SourcePicker({
     return (
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">Tashkilot</label>
-        <select
+        <Dropdown
           name="sourceId"
+          ariaLabel="Tashkilot"
           required
           defaultValue={initialSourceId ?? ""}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-        >
-          <option value="">Tanlang...</option>
-          {groups.map(([soha, list]) => (
-            <optgroup key={soha} label={soha}>
-              {list.map((s) => (
-                <option key={s.id} value={s.id}>
-                  {optionLabel(s)}
-                </option>
-              ))}
-            </optgroup>
-          ))}
-        </select>
+          options={[
+            { value: "", label: "Tanlang..." },
+            ...groups.flatMap(([soha, list]) => list.map((s) => ({ value: s.id, label: optionLabel(s), group: soha }))),
+          ]}
+          className="w-full"
+        />
         <p className="mt-1 text-xs text-muted-foreground">
           Ijrochi faqat shu tashkilotning obyektlarini ko&apos;radi.
         </p>

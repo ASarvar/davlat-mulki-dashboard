@@ -4,12 +4,10 @@ import { requireSection } from "@/server/services/sectionAccess";
 import { listSources, listSourceNames } from "@/server/services/sources";
 import { CreateSourceForm, SourceRow } from "./SourceForms";
 import { withBase } from "@/lib/basePath";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-
-const selectCls =
-  "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-cobalt focus:ring-2 focus:ring-cobalt/20";
 
 export default async function SourcesPage({ searchParams }: { searchParams: Promise<SP> }) {
   await requireSection("sources");
@@ -65,25 +63,23 @@ export default async function SourcesPage({ searchParams }: { searchParams: Prom
       >
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Hudud</label>
-          <select name="region" defaultValue={regionId ?? ""} className={`${selectCls} w-52`}>
-            <option value="">Barchasi</option>
-            {regions.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            name="region"
+            ariaLabel="Hudud"
+            defaultValue={regionId ?? ""}
+            options={[{ value: "", label: "Barchasi" }, ...regions.map((r) => ({ value: r.id, label: r.name }))]}
+            className="w-52"
+          />
         </div>
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Soha (manba)</label>
-          <select name="soha" defaultValue={soha ?? ""} className={`${selectCls} w-56`}>
-            <option value="">Barchasi</option>
-            {sohaList.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            name="soha"
+            ariaLabel="Soha (manba)"
+            defaultValue={soha ?? ""}
+            options={[{ value: "", label: "Barchasi" }, ...sohaList.map((n) => ({ value: n, label: n }))]}
+            className="w-56"
+          />
         </div>
         <button
           type="submit"

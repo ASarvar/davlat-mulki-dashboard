@@ -7,6 +7,15 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.25.0
+
+- Boshqaruv paneli xaritasiga filtr: kategoriya (tugmalar, sanoq bilan), hudud va tuman —
+  faqat xaritaga ta'sir qiladi, tanlangan obyektlarga avtomatik yaqinlashadi. "Hududlar"
+  (pufakchalar) rejimi olib tashlandi; qamrov izohi sarlavha qatoriga, o'ng tomonga ko'chdi.
+- Xarita to'liq ekranda g'ildirak bilan Ctrl'siz kattalashadi.
+- Barcha ochiladigan ro'yxatlar (filtrlar va formalar) ilova uslubidagi yangi tanlagichga
+  almashtirildi.
+
 ## 1.24.2
 
 - Obyekt sahifasidagi xarita: "Google Maps" va "Yandex Maps" tugmalari (obyekt koordinatasida

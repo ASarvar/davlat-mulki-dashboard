@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { Save, Send, Plus, X, ImagePlus } from "lucide-react";
 import { ASSIGNABLE_CATEGORIES, assignFormLabel } from "@/lib/categories";
 import { assignCategoryAction, type AssignState } from "../actions";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 // Server bilan bir xil chegaralar (documents.ts → MAX_IMAGE_ATTACHMENTS/MAX_IMAGE_UPLOAD_BYTES).
 // Client komponent bo'lgani uchun server modulidan import qilinmaydi — qiymatlar shu yerda takrorlanadi.
@@ -76,14 +77,17 @@ export function AssignCategoryForm({ cadNumber, isRequest }: { cadNumber: string
 
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">Kategoriya</label>
-        <select name="categoryCode" required className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm">
-          <option value="">Tanlang...</option>
-          {ASSIGNABLE_CATEGORIES.map((c) => (
-            <option key={c.code} value={c.code}>
-              {assignFormLabel(c)}
-            </option>
-          ))}
-        </select>
+        <Dropdown
+          name="categoryCode"
+          ariaLabel="Kategoriya"
+          required
+          defaultValue=""
+          options={[
+            { value: "", label: "Tanlang..." },
+            ...ASSIGNABLE_CATEGORIES.map((c) => ({ value: String(c.code), label: assignFormLabel(c) })),
+          ]}
+          className="w-full"
+        />
       </div>
 
       <div>

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Search, RotateCcw, SlidersHorizontal, X, ChevronDown } from "lucide-react";
 import { CATEGORIES, CAT_REMOVED_FROM_BALANCE, REMOVED_FROM_BALANCE_LABEL } from "@/lib/categories";
 import { formatNumber } from "@/lib/utils";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 const selectCls =
   "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-cobalt focus:ring-2 focus:ring-cobalt/20";
@@ -82,19 +83,6 @@ export function ObjectFilters({
     advancedValues.length > 0 ||
     chips.length > 0;
 
-  /**
-   * Ota filtr o'zgarganda BOLA filtrni tozalab yuboradi.
-   * ⚠️ Busiz: soha "Ijara markazi"dan "Direksiya"ga almashtirilsa, eski `tashkilot`
-   * (Andijon Ijara markazi) ham yuborilardi — ikkalasi AND bilan birikib natija bo'sh
-   * chiqardi, sababi esa ekranda ko'rinmasdi. Hudud → tuman juftligida ham xuddi shunday.
-   */
-  const submitResetting = (form: HTMLFormElement | null, childName: string) => {
-    if (!form) return;
-    const child = form.elements.namedItem(childName);
-    if (child instanceof HTMLSelectElement) child.value = "";
-    form.requestSubmit();
-  };
-
   return (
     <form
       method="get"
@@ -123,57 +111,47 @@ export function ObjectFilters({
 
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Soha (manba)</label>
-          <select
+          <Dropdown
             name="soha"
+            ariaLabel="Soha (manba)"
             defaultValue={current.soha ?? ""}
-            onChange={(e) => submitResetting(e.currentTarget.form, "tashkilot")}
-            className={`${selectCls} w-52`}
-          >
-            <option value="">Barchasi</option>
-            {sohaList.map((n) => (
-              <option key={n} value={n}>
-                {n}
-              </option>
-            ))}
-          </select>
+            submitOnChange
+            resetOnChange={["tashkilot"]}
+            options={[{ value: "", label: "Barchasi" }, ...sohaList.map((n) => ({ value: n, label: n }))]}
+            className="w-52"
+          />
         </div>
 
         {/* Tashkilot ro'yxati tanlangan SOHAGA bog'liq — soha tanlanmasa ko'rinmaydi. */}
         {orgs.length > 1 ? (
           <div className="flex flex-col">
             <label className="mb-1 text-xs font-medium text-muted-foreground">Tashkilot</label>
-            <select
+            <Dropdown
               name="tashkilot"
+              ariaLabel="Tashkilot"
               defaultValue={current.tashkilot ?? ""}
-              onChange={(e) => e.currentTarget.form?.requestSubmit()}
-              className={`${selectCls} w-48`}
-            >
-              <option value="">Barchasi</option>
-              {orgs.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+              submitOnChange
+              options={[{ value: "", label: "Barchasi" }, ...orgs.map((o) => ({ value: o.id, label: o.label }))]}
+              className="w-48"
+            />
           </div>
         ) : null}
 
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Hudud</label>
-          <select
+          <Dropdown
             name="region"
+            ariaLabel="Hudud"
             defaultValue={current.region ?? ""}
-            onChange={(e) => submitResetting(e.currentTarget.form, "district")}
-            className={`${selectCls} w-48`}
-          >
-            {showMyRegionsToggle ? <option value="mine">Faqat mening tashkilotlarim</option> : null}
-            <option value="">Barchasi</option>
-            {regions.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
+            submitOnChange
+            resetOnChange={["district"]}
+            options={[
+              ...(showMyRegionsToggle ? [{ value: "mine", label: "Faqat mening tashkilotlarim" }] : []),
+              { value: "", label: "Barchasi" },
+              ...regions.map((r) => ({ value: r.id, label: r.name })),
+            ]}
+            className="w-48"
+          />
         </div>
 
         <button
@@ -228,19 +206,14 @@ export function ObjectFilters({
         {districts.length > 0 ? (
           <div className="flex flex-col">
             <label className="mb-1 text-xs font-medium text-muted-foreground">Tuman</label>
-            <select
+            <Dropdown
               name="district"
+              ariaLabel="Tuman"
               defaultValue={current.district ?? ""}
-              onChange={(e) => e.currentTarget.form?.requestSubmit()}
-              className={`${selectCls} w-48`}
-            >
-              <option value="">Barchasi</option>
-              {districts.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
+              submitOnChange
+              options={[{ value: "", label: "Barchasi" }, ...districts.map((d) => ({ value: d.id, label: d.name }))]}
+              className="w-48"
+            />
           </div>
         ) : (
           <p className="pb-2 text-xs text-muted-foreground">Tuman bo&apos;yicha filtrlash uchun avval hududni tanlang.</p>
@@ -248,38 +221,36 @@ export function ObjectFilters({
 
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Kategoriya</label>
-          <select
+          <Dropdown
             name="category"
+            ariaLabel="Kategoriya"
             defaultValue={current.category ?? ""}
-            onChange={(e) => e.currentTarget.form?.requestSubmit()}
-            className={`${selectCls} w-56`}
-          >
-            <option value="">Barchasi</option>
-            {CATEGORIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {c.short}
-              </option>
-            ))}
-            {/* Haqiqiy kategoriya emas — `Property.removedFromBalance` bayrog'i bo'yicha
-                filtr. Faqat adminga ko'rsatiladi (server tomonda ham tekshiriladi). */}
-            {canSeeRemoved ? (
-              <option value={CAT_REMOVED_FROM_BALANCE}>{REMOVED_FROM_BALANCE_LABEL}</option>
-            ) : null}
-          </select>
+            submitOnChange
+            options={[
+              { value: "", label: "Barchasi" },
+              ...CATEGORIES.map((c) => ({ value: String(c.code), label: c.short })),
+              // Haqiqiy kategoriya emas — `Property.removedFromBalance` bayrog'i bo'yicha
+              // filtr. Faqat adminga ko'rsatiladi (server tomonda ham tekshiriladi).
+              ...(canSeeRemoved ? [{ value: String(CAT_REMOVED_FROM_BALANCE), label: REMOVED_FROM_BALANCE_LABEL }] : []),
+            ]}
+            className="w-56"
+          />
         </div>
 
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Samaradorlik</label>
-          <select
+          <Dropdown
             name="inefficient"
+            ariaLabel="Samaradorlik"
             defaultValue={current.inefficient ?? ""}
-            onChange={(e) => e.currentTarget.form?.requestSubmit()}
-            className={`${selectCls} w-40`}
-          >
-            <option value="">Barchasi</option>
-            <option value="1">Samarasiz</option>
-            <option value="0">Samarali</option>
-          </select>
+            submitOnChange
+            options={[
+              { value: "", label: "Barchasi" },
+              { value: "1", label: "Samarasiz" },
+              { value: "0", label: "Samarali" },
+            ]}
+            className="w-40"
+          />
         </div>
       </div>
 

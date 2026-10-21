@@ -9,12 +9,10 @@ import { ROLE_LABEL } from "@/lib/roles";
 import { CreateUserForm } from "./CreateUserForm";
 import { UserRow } from "./UserRow";
 import { withBase } from "@/lib/basePath";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 type SP = Record<string, string | string[] | undefined>;
 const str = (v: string | string[] | undefined) => (Array.isArray(v) ? v[0] : v);
-
-const selectCls =
-  "rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm outline-none transition focus:border-cobalt focus:ring-2 focus:ring-cobalt/20";
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<SP> }) {
   const actor = await requireSection("users");
@@ -76,25 +74,23 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       >
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Soha</label>
-          <select name="soha" defaultValue={soha ?? ""} className={`${selectCls} w-64`}>
-            <option value="">Barchasi</option>
-            {sohaOptions.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            name="soha"
+            ariaLabel="Soha"
+            defaultValue={soha ?? ""}
+            options={[{ value: "", label: "Barchasi" }, ...sohaOptions.map((s) => ({ value: s, label: s }))]}
+            className="w-64"
+          />
         </div>
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Rol</label>
-          <select name="role" defaultValue={role ?? ""} className={`${selectCls} w-52`}>
-            <option value="">Barchasi</option>
-            {roleFilterOptions.map((r) => (
-              <option key={r} value={r}>
-                {ROLE_LABEL[r]}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            name="role"
+            ariaLabel="Rol"
+            defaultValue={role ?? ""}
+            options={[{ value: "", label: "Barchasi" }, ...roleFilterOptions.map((r) => ({ value: r, label: ROLE_LABEL[r] }))]}
+            className="w-52"
+          />
         </div>
         <button
           type="submit"

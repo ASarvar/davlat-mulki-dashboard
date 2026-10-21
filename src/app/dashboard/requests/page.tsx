@@ -8,6 +8,7 @@ import { objectHref } from "@/lib/cadastre";
 import { withBase } from "@/lib/basePath";
 import { RequestRow, UtilityWarning, type RequestUtility } from "./RequestRow";
 import { recentPaymentCutoff } from "@/server/services/stats";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 /**
  * Obyektning kommunal bayroqlarini ko'rsatish uchun tayyorlaydi.
@@ -128,37 +129,37 @@ export default async function RequestsPage({ searchParams }: { searchParams: Pro
         </div>
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Kategoriya</label>
-          <select name="category" defaultValue={categoryStr ?? ""} className={`${selectCls} w-48`}>
-            <option value="">Barchasi</option>
-            {ASSIGNABLE_CATEGORIES.map((c) => (
-              <option key={c.code} value={c.code}>
-                {assignFormLabel(c)}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            name="category"
+            ariaLabel="Kategoriya"
+            defaultValue={categoryStr ?? ""}
+            options={[
+              { value: "", label: "Barchasi" },
+              ...ASSIGNABLE_CATEGORIES.map((c) => ({ value: String(c.code), label: assignFormLabel(c) })),
+            ]}
+            className="w-48"
+          />
         </div>
         <div className="flex flex-col">
           <label className="mb-1 text-xs font-medium text-muted-foreground">Holat (tarixda)</label>
-          <select name="status" defaultValue={statusRaw ?? ""} className={`${selectCls} w-44`}>
-            <option value="">Barchasi</option>
-            {STATUS_OPTIONS.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            name="status"
+            ariaLabel="Holat"
+            defaultValue={statusRaw ?? ""}
+            options={[{ value: "", label: "Barchasi" }, ...STATUS_OPTIONS.map((s) => ({ value: s.value, label: s.label }))]}
+            className="w-44"
+          />
         </div>
         {regions.length > 0 ? (
           <div className="flex flex-col">
             <label className="mb-1 text-xs font-medium text-muted-foreground">Hudud</label>
-            <select name="region" defaultValue={regionId ?? ""} className={`${selectCls} w-52`}>
-              <option value="">Barchasi</option>
-              {regions.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              name="region"
+              ariaLabel="Hudud"
+              defaultValue={regionId ?? ""}
+              options={[{ value: "", label: "Barchasi" }, ...regions.map((r) => ({ value: r.id, label: r.name }))]}
+              className="w-52"
+            />
           </div>
         ) : null}
         <div className="flex flex-col">

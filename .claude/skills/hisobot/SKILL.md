@@ -240,6 +240,20 @@ o'ram (`MapSection.tsx`) shu uchun bor.
 Tile manzili `MAP_TILE_URL` env orqali (standarti OSM); `tileerror` da ogohlantirish
 chiqadi, nuqtalar baribir chiziladi.
 
+**Xarita filtri (2026-10-21, `MapExplorer.tsx`)** — kategoriya (tugmalar, sanoq bilan),
+hudud → tuman. ⚠️ FAQAT xaritaga ta'sir qiladi (foydalanuvchi tanlovi) — client'da,
+server so'rovisiz. Kategoriya = pin rangi (`MapPoint.cat`, effektiv), dashboard
+jadvalidagi 3/4/5/6/12 ustunlaridan farq qilishi mumkin. `MapPoint.r`/`d` — `MapData.regions`/
+`districts` dagi INDEKS (cuid emas — payload). Hudud almashsa tuman tozalanadi; soha
+almashsa `key` orqali butun filtr. Filtr o'zgarganda `PropertyMap` `focusKey` bo'yicha
+ko'rinadigan nuqtalarga yaqinlashadi (`fitBounds`). "Hududlar" rejimi (pufakchalar)
+olib tashlangan — `MapData` da `bubbles` yo'q. Hudud/tuman tanlagichi native `<select>`
+EMAS, `components/ui/Dropdown.tsx` (ochilgan ro'yxat ilova uslubida, `z-[1100]` —
+Leaflet ustida). Qamrov izohi sarlavha bilan bir qatorda.
+To'liq ekranda g'ildirak Ctrl'siz kattalashtiradi (sahifa aylanmaydi), oddiy holatda —
+faqat Ctrl bilan.
+Kesh kaliti `dashboard-map-v3` (shakl o'zgarganda oshiring).
+
 ### Kunlik snapshot — `services/snapshots.ts` + `DashboardSnapshot`
 
 `Property` ning statistika ustunlari har sinxronizatsiyada ustidan yoziladi, ya'ni

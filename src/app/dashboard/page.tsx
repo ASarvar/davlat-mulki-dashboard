@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 import {
   LineChart,
@@ -27,7 +26,7 @@ import { AreaBalance } from "@/components/charts/AreaBalance";
 import { RentTrendChart } from "@/components/charts/RentTrendChart";
 import { KpiHistoryChart } from "@/components/charts/KpiHistoryChart";
 import { EmptyState } from "@/components/ui/EmptyState";
-import { MapSection } from "@/components/map/MapSection";
+import { MapExplorer } from "@/components/map/MapExplorer";
 import { env } from "@/lib/env";
 import { BASE_PATH } from "@/lib/basePath";
 import { SourceFilter } from "./SourceFilter";
@@ -64,13 +63,6 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     getMapData(scope),
     getKpiHistory(scope),
   ]);
-
-  // Xarita rejimi URL'da — server-render, havolasi ulashsa bo'ladi.
-  const mapMode: "nuqta" | "hudud" = str(sp.xarita) === "hudud" ? "hudud" : "nuqta";
-  const mapHref = (m: "nuqta" | "hudud") => {
-    const parts = [sohaParam, m === "hudud" ? "xarita=hudud" : ""].filter(Boolean);
-    return `/dashboard${parts.length ? `?${parts.join("&")}` : ""}`;
-  };
 
   // Drill-down havolalari manba filtrini olib yuradi (hisobotdagi `objHref()` bilan bir xil).
   const sohaParam = soha ? `soha=${encodeURIComponent(soha)}` : "";
@@ -365,39 +357,20 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
       {/* Xarita */}
       <Card className="mt-4 overflow-hidden">
-        <div className="flex flex-wrap items-start justify-between gap-3 p-4 pb-3 md:p-5 md:pb-3">
-          <div>
+        {/* Sarlavha va qamrov izohi BIR QATORDA (foydalanuvchi talabi, 2026-10-21): izoh
+            o'ngda va faqat matn kengligida (`flex-1` EMAS); tor ekranda sarlavha ostiga tushadi.
+            ⚠️ Qamrov cheklovi DOIM ko'rinadi — yashirilsa xaritadagi bo'shliq
+            "obyekt yo'q" deb tushunilardi. "Hududlar" rejimi (pufakchalar) 2026-10-21 da
+            olib tashlandi (foydalanuvchi talabi) — o'rniga xarita filtrida hudud/tuman. */}
+        <div className="flex flex-wrap items-center gap-x-8 gap-y-3 p-4 pb-3 md:flex-nowrap md:p-5 md:pb-3">
+          <div className="shrink-0">
             <h3 className="text-sm font-semibold" style={{ color: "var(--navy)" }}>
               Obyektlar xaritasi
             </h3>
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              {mapMode === "hudud"
-                ? "Hududlar kesimi — barcha obyektlar"
-                : "Obyektlarning joylashuvi"}
-            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">Obyektlarning joylashuvi</p>
           </div>
-          {/* Rejim URL'da saqlanadi — sahifa yangilanganda ham qoladi, havolasi ulashiladi. */}
-          <div className="inline-flex overflow-hidden rounded-lg border border-border bg-muted text-[12.5px] font-medium">
-            <Link
-              href={mapHref("nuqta")}
-              className={`px-3.5 py-1.5 transition-colors ${mapMode === "nuqta" ? "bg-card text-[color:var(--navy)] shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-            >
-              Xarita
-            </Link>
-            <Link
-              href={mapHref("hudud")}
-              className={`px-3.5 py-1.5 transition-colors ${mapMode === "hudud" ? "bg-card text-[color:var(--navy)] shadow-sm" : "text-slate-500 hover:text-slate-700"}`}
-            >
-              Hududlar
-            </Link>
-          </div>
-        </div>
-
-        {/* ⚠️ Qamrov cheklovi DOIM ko'rinadi — yashirilsa xaritadagi bo'shliq
-            "obyekt yo'q" deb tushunilardi. */}
-        {mapMode === "nuqta" ? (
           <div
-            className="mx-4 mb-3 flex gap-2 rounded-lg border px-3 py-2 text-xs md:mx-5"
+            className="ml-auto flex min-w-0 gap-2 rounded-lg border px-3 py-2 text-xs"
             style={{ background: "var(--gold-lighter)", borderColor: "var(--gold-light)", color: "#7a5f28" }}
           >
             <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -427,19 +400,19 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
                   .
                 </>
               )}{" "}
-              Qolgan {nf(mapData.nationalHidden)} obyekt xaritada ko&apos;rsatilmagan —{" "}
-              <Link href={mapHref("hudud")} className="underline">
-                «Hududlar» rejimida
-              </Link>{" "}
-              ular ham hisobga olinadi.
+              Qolgan {nf(mapData.nationalHidden)} obyektda koordinata yo&apos;q, ular xaritada
+              ko&apos;rsatilmagan.
             </span>
           </div>
-        ) : null}
+        </div>
 
-        <MapSection
-          points={mapMode === "nuqta" ? mapData.points : []}
-          bubbles={mapMode === "hudud" ? mapData.bubbles : []}
-          mode={mapMode}
+        {/* Filtr (kategoriya/hudud/tuman) faqat xaritaga ta'sir qiladi — `MapExplorer` izohi.
+            `key` — soha almashganda filtr holati tozalansin (hudud indekslari o'zgaradi). */}
+        <MapExplorer
+          key={soha ?? "all"}
+          points={mapData.points}
+          regions={mapData.regions}
+          districts={mapData.districts}
           tileUrl={env.MAP_TILE_URL}
           tileAttribution={env.MAP_TILE_ATTRIBUTION}
           basePath={BASE_PATH}

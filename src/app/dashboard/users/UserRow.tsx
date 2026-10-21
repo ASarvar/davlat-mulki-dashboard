@@ -6,6 +6,7 @@ import type { Role } from "@prisma/client";
 import { ASSIGNABLE_ROLES, ROLE_LABEL, sourceMode } from "@/lib/roles";
 import { updateUserAction, resetPasswordAction, deleteUserAction, type UserFormState } from "./actions";
 import { SourcePicker, type SourceOption } from "./SourcePicker";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 export interface UserRowData {
   id: string;
@@ -89,20 +90,19 @@ export function UserRow({
         ) : (
           <form action={updAction} className="flex flex-wrap items-center gap-2">
             <input type="hidden" name="userId" value={user.id} />
-            <select
+            <Dropdown
               name="role"
+              ariaLabel="Rol"
               value={role}
-              onChange={(e) => setRole(e.target.value as Role)}
-              className="rounded-md border border-slate-300 px-2 py-1 text-sm"
-            >
-              {/* Joriy rol super admin bo'lsa uni ham ko'rsatamiz (super admin ko'radi) */}
-              {user.role === "SUPER_ADMIN" ? <option value="SUPER_ADMIN">Super admin</option> : null}
-              {roleChoices.map((r) => (
-                <option key={r.value} value={r.value}>
-                  {r.label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => setRole(v as Role)}
+              options={[
+                // Joriy rol super admin bo'lsa uni ham ko'rsatamiz (super admin ko'radi)
+                ...(user.role === "SUPER_ADMIN" ? [{ value: "SUPER_ADMIN", label: "Super admin" }] : []),
+                ...roleChoices.map((r) => ({ value: r.value as string, label: r.label })),
+              ]}
+              size="sm"
+              className="w-44"
+            />
 
             <div className="min-w-[200px]">
               <SourcePicker

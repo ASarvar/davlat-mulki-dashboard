@@ -20,6 +20,11 @@ export interface PropertyMapProps {
   tileAttribution: string;
   /** Obyekt sahifasi manzilini qurish uchun (production'da `/obyektlar`). */
   basePath: string;
+  /**
+   * Filtr kaliti (`MapExplorer`). O'zgarganda xarita ko'rinadigan nuqtalarga
+   * yaqinlashadi; nuqta qolmasa — butun respublika. Birinchi chizishda ishlamaydi.
+   */
+  focusKey?: string;
 }
 
 /**
@@ -41,6 +46,7 @@ export interface PropertyMapProps {
  * ko'rsatma chiqadi. `preventDefault()` SHART: Ctrl+g'ildirak — brauzerning
  * o'z sahifa-zoom'i, u to'xtatilmasa butun sahifa kattalashib ketardi.
  * Shu sabab listener `{ passive: false }` bilan qo'shiladi.
+ * To'liq ekranda esa sahifa aylanmaydi — u yerda g'ildirak Ctrl'siz kattalashtiradi.
  *
  * ⚠️ To'liq ekranda `invalidateSize()` MAJBURIY — Leaflet konteyner o'lchamini
  * keshlaydi, usiz tile'lar eski o'lchamda qolib, xarita yarmi kulrang chiqadi.
@@ -52,6 +58,7 @@ export function PropertyMap({
   tileUrl,
   tileAttribution,
   basePath,
+  focusKey,
 }: PropertyMapProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -82,6 +89,11 @@ export function PropertyMap({
 
     let hintTimer: ReturnType<typeof setTimeout> | undefined;
     const onWheel = (e: WheelEvent) => {
+      // To'liq ekranda sahifa aylanmaydi — g'ildirak Ctrl'siz kattalashtiradi.
+      if (document.fullscreenElement === wrapRef.current) {
+        if (!map.scrollWheelZoom.enabled()) map.scrollWheelZoom.enable();
+        return;
+      }
       if (e.ctrlKey || e.metaKey) {
         e.preventDefault(); // brauzerning sahifa-zoom'i ishga tushmasin
         if (!map.scrollWheelZoom.enabled()) map.scrollWheelZoom.enable();
@@ -139,7 +151,12 @@ export function PropertyMap({
   useEffect(() => {
     let t: ReturnType<typeof setTimeout>;
     const onFsChange = () => {
-      setIsFull(document.fullscreenElement === wrapRef.current);
+      const full = document.fullscreenElement === wrapRef.current;
+      setIsFull(full);
+      setShowHint(false);
+      // To'liq ekranda g'ildirak Ctrl'siz kattalashtiradi, chiqqanda — yana faqat Ctrl bilan.
+      if (full) mapRef.current?.scrollWheelZoom.enable();
+      else mapRef.current?.scrollWheelZoom.disable();
       clearTimeout(t);
       t = setTimeout(() => {
         mapRef.current?.invalidateSize();
@@ -231,6 +248,23 @@ export function PropertyMap({
     layerRef.current = cluster;
   }, [mode, points, bubbles, basePath]);
 
+  // Filtr o'zgarganda — ko'rinadigan nuqtalarga yaqinlashish. ⚠️ Qatlam effektidan
+  // KEYIN e'lon qilingan: React effektlarni shu tartibda bajaradi.
+  const lastFocusRef = useRef(focusKey);
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || focusKey === lastFocusRef.current) return;
+    lastFocusRef.current = focusKey;
+    if (points.length === 0) {
+      map.setView([UZ_CENTER.lat, UZ_CENTER.lng], UZ_ZOOM);
+      return;
+    }
+    map.fitBounds(L.latLngBounds(focusPoints(points).map((p) => [p.lat, p.lng] as [number, number])), {
+      padding: [40, 40],
+      maxZoom: 15,
+    });
+  }, [focusKey, points]);
+
   return (
     // ⚠️ To'liq ekranda o'lcham FOIZ emas, `vw`/`vh` bilan beriladi. `h-full`
     // (height:100%) ota elementning aniq balandligini talab qiladi; to'liq ekran
@@ -297,4 +331,29 @@ export function PropertyMap({
       </div>
     </div>
   );
+}
+
+/**
+ * Yaqinlashish uchun nuqtalar — chetdagi (xato koordinatali) nuqtalarsiz.
+ *
+ * ⚠️ Nima uchun: ba'zi obyektlarning koordinatasi o'z hududidan yuzlab km uzoqda
+ * (jonli: Toshkent v. tanlanganda xarita Shardara tomonga cho'zilgan). Hamma nuqtaga
+ * `fitBounds` qilinsa, bitta shunday nuqta butun ko'rinishni buzadi. Mediana markazdan
+ * `max(150 km, 3 × mediana masofa)` dan uzoqlari CHEGARANI hisoblashda tashlanadi —
+ * xaritada esa ular ko'rinaveradi. Katta hududlarda (Qoraqalpog'iston) mediana masofa
+ * katta, ya'ni chegara ham kengayadi.
+ */
+function focusPoints(points: MapPoint[]): MapPoint[] {
+  if (points.length < 3) return points;
+  const median = (xs: number[]) => {
+    const s = [...xs].sort((a, b) => a - b);
+    return s[Math.floor(s.length / 2)];
+  };
+  const cLat = median(points.map((p) => p.lat));
+  const cLng = median(points.map((p) => p.lng));
+  const kx = 111 * Math.cos((cLat * Math.PI) / 180);
+  const dist = points.map((p) => Math.hypot((p.lat - cLat) * 111, (p.lng - cLng) * kx));
+  const limit = Math.max(150, 3 * median(dist));
+  const kept = points.filter((_, i) => dist[i] <= limit);
+  return kept.length > 0 ? kept : points;
 }

@@ -10,20 +10,18 @@ import {
   takeSnapshotAction,
   type SyncState,
 } from "./actions";
-
-const selectCls = "w-full rounded-md border border-slate-300 px-3 py-2 text-sm";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 function SohaSelect({ sohaList }: { sohaList: string[] }) {
   if (sohaList.length < 2) return null; // bitta sohada tanlashning ma'nosi yo'q
   return (
-    <select name="sourceName" defaultValue="" className={`mb-3 ${selectCls}`}>
-      <option value="">Barcha soha</option>
-      {sohaList.map((n) => (
-        <option key={n} value={n}>
-          {n}
-        </option>
-      ))}
-    </select>
+    <Dropdown
+      name="sourceName"
+      ariaLabel="Soha"
+      defaultValue=""
+      options={[{ value: "", label: "Barcha soha" }, ...sohaList.map((n) => ({ value: n, label: n }))]}
+      className="mb-3 w-full"
+    />
   );
 }
 
@@ -92,14 +90,14 @@ export function SyncControls({
         {lockedRegionId ? (
           <input type="hidden" name="regionId" value={lockedRegionId} />
         ) : (
-          <select name="regionId" required className={`mb-3 ${selectCls}`}>
-            <option value="">Hududni tanlang...</option>
-            {regions.map((r) => (
-              <option key={r.id} value={r.id}>
-                {r.name}
-              </option>
-            ))}
-          </select>
+          <Dropdown
+            name="regionId"
+            ariaLabel="Hudud"
+            required
+            defaultValue=""
+            options={[{ value: "", label: "Hududni tanlang..." }, ...regions.map((r) => ({ value: r.id, label: r.name }))]}
+            className="mb-3 w-full"
+          />
         )}
         <SohaSelect sohaList={sohaList} />
 
@@ -128,23 +126,21 @@ export function SyncControls({
           </p>
 
           <div className="mb-3 grid gap-3 sm:grid-cols-2">
-            <select name="regionId" defaultValue="" className={selectCls}>
-              <option value="">Barcha hudud</option>
-              {regions.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.name}
-                </option>
-              ))}
-            </select>
+            <Dropdown
+              name="regionId"
+              ariaLabel="Hudud"
+              defaultValue=""
+              options={[{ value: "", label: "Barcha hudud" }, ...regions.map((r) => ({ value: r.id, label: r.name }))]}
+              className="w-full"
+            />
             {sohaList.length >= 2 ? (
-              <select name="sourceName" defaultValue="" className={selectCls}>
-                <option value="">Barcha soha</option>
-                {sohaList.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
+              <Dropdown
+                name="sourceName"
+                ariaLabel="Soha"
+                defaultValue=""
+                options={[{ value: "", label: "Barcha soha" }, ...sohaList.map((n) => ({ value: n, label: n }))]}
+                className="w-full"
+              />
             ) : null}
           </div>
 

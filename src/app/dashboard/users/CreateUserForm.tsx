@@ -6,6 +6,7 @@ import type { Role } from "@prisma/client";
 import { ASSIGNABLE_ROLES, sourceMode } from "@/lib/roles";
 import { createUserAction, type UserFormState } from "./actions";
 import { SourcePicker, type SourceOption } from "./SourcePicker";
+import { Dropdown } from "@/components/ui/Dropdown";
 
 export function CreateUserForm({
   sources,
@@ -42,18 +43,14 @@ export function CreateUserForm({
       </div>
       <div>
         <label className="mb-1 block text-sm font-medium text-slate-700">Rol</label>
-        <select
+        <Dropdown
           name="role"
+          ariaLabel="Rol"
           value={role}
-          onChange={(e) => setRole(e.target.value as Role)}
-          className="w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-        >
-          {roleOptions.map((r) => (
-            <option key={r.value} value={r.value}>
-              {r.label} — {r.desc}
-            </option>
-          ))}
-        </select>
+          onChange={(v) => setRole(v as Role)}
+          options={roleOptions.map((r) => ({ value: r.value, label: `${r.label} — ${r.desc}` }))}
+          className="w-full"
+        />
       </div>
 
       <SourcePicker mode={sourceMode(role)} sources={sources} />
