@@ -7,6 +7,13 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.24.2
+
+- Obyekt sahifasidagi xarita: "Google Maps" va "Yandex Maps" tugmalari (obyekt koordinatasida
+  ochiladi) va to'liq ekran rejimi (brauzer ruxsat bermasa — butun oyna bo'ylab, Esc bilan chiqish).
+- Tashqi (online-ijara) bazaga ulanishlar 3 ta bilan cheklandi — u bazaning `max_connections`
+  limitiga hissa qo'shmaslik uchun.
+
 ## 1.24.1
 
 - Auksion `get-order`: "buyurtma aniqlanmadi" javobi kirill yozuvida ham taniladi (serverda shunday

@@ -792,6 +792,28 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ c
                   {COORD_SOURCE_LABEL[p.coordSource ?? ""] ?? "Koordinata"} · {p.lat.toFixed(5)},{" "}
                   {p.lng.toFixed(5)}
                 </p>
+                {/* Tashqi xaritalar — `withBase()` KERAK EMAS (tashqi domen). Yandex `pt` da
+                    tartib teskari: avval uzunlik (lng), keyin kenglik (lat). */}
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  <a
+                    href={`https://www.google.com/maps/search/?api=1&query=${p.lat},${p.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-slate-200"
+                  >
+                    <MapPin className="h-4 w-4" style={{ color: "#4285F4" }} />
+                    Google Maps
+                  </a>
+                  <a
+                    href={`https://yandex.uz/maps/?pt=${p.lng},${p.lat}&z=17&l=map`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center gap-2 rounded-lg bg-slate-100 px-3 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-slate-200"
+                  >
+                    <MapPin className="h-4 w-4" style={{ color: "#FC3F1D" }} />
+                    Yandex Maps
+                  </a>
+                </div>
               </>
             ) : (
               <p className="text-sm text-muted-foreground">

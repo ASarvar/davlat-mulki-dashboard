@@ -12,8 +12,9 @@ import { AUCTION_GROUP_RENT } from "@/server/services/classification";
  *
  * ⚠️ Yo'l `middleware.ts` matcher'ida ISTISNO qilingan — himoya shu yerda:
  * `x-davijara-token` == `DAVIJARA_API_TOKEN`. Token sozlanmagan bo'lsa 503
- * (ochiq qolib ketmaydi). Production'da davijara uni hostdan chaqiradi:
- * `http://127.0.0.1:3000/obyektlar/api/davijara/privatization`.
+ * (ochiq qolib ketmaydi). Production'da davijara uni ommaviy manzildan chaqiradi:
+ * `https://davijara.uz/obyektlar/api/davijara/privatization` — davijara boshqa
+ * serverda (`markaz`), u yerdagi 127.0.0.1:3000 bu ilova EMAS.
  *
  * ── Qaysi obyektlar ──
  * `hasPrivatizationLot` (sotilmagan, loti bor) va `auctionGroupName` IJARA EMAS.
