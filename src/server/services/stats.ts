@@ -176,12 +176,17 @@ type RentRow = {
  *  - `sourceName` — foydalanuvchi TANLAYDIGAN soha filtri (dashboard'dagi manba tugmalari)
  *  - `sourceIds`  — ROL doirasi (`userSourceScope()`), foydalanuvchi o'zgartira olmaydi.
  *                   `null`/`undefined` = cheklovsiz, `[]` = hech narsa ko'rinmaydi.
+ *  - `regionId`   — foydalanuvchi TANLAYDIGAN hudud filtri (boshqaruv panelidagi sticky
+ *                   panel, 2026-10-21). `Property.regionId` bo'yicha — respublika darajasidagi
+ *                   tashkilotlarning shu hududdagi obyektlari ham kiradi, ya'ni obyektlar
+ *                   ro'yxatidagi `?region=` (hududiy=1 siz) bilan aynan bir xil mezon.
  * ⚠️ Ikkalasini aralashtirmang: sohani foydalanuvchi almashtiradi, `sourceIds` esa
  * xavfsizlik chegarasi — u har doim qo'llanishi shart.
  */
 export interface StatsScope {
   sourceName?: string;
   sourceIds?: string[] | null;
+  regionId?: string;
 }
 
 /**
@@ -206,6 +211,7 @@ export function sourceCond(scope: StatsScope, alias: Prisma.Sql = Prisma.empty):
   if (scope.sourceIds != null) {
     parts.push(Prisma.sql`${alias}"sourceId" IN (${Prisma.join(scope.sourceIds)})`);
   }
+  if (scope.regionId) parts.push(Prisma.sql`${alias}"regionId" = ${scope.regionId}`);
   return parts.reduce((a, b) => Prisma.sql`${a} AND ${b}`);
 }
 
@@ -214,6 +220,7 @@ export function sourceWhere(scope: StatsScope): Prisma.PropertyWhereInput {
   const and: Prisma.PropertyWhereInput[] = [{ removedFromBalance: false }];
   if (scope.sourceName) and.push({ source: { name: scope.sourceName } });
   if (scope.sourceIds != null) and.push({ sourceId: { in: scope.sourceIds } });
+  if (scope.regionId) and.push({ regionId: scope.regionId });
   return { AND: and };
 }
 

@@ -10,7 +10,15 @@ import {
   Banknote,
 } from "lucide-react";
 import { canAccess, firstOpenSectionHref, requireSection } from "@/server/services/sectionAccess";
-import { buildDashboardColumns, getDashboardStats } from "@/server/services/stats";
+import {
+  buildDashboardColumns,
+  computeDistrictRentStats,
+  computeDistrictStats,
+  getDashboardStats,
+  type RegionCategoryRow,
+  type RegionStat,
+} from "@/server/services/stats";
+import { prisma } from "@/lib/prisma";
 import { getRentContractTrend, trendYear } from "@/server/services/trends";
 import { getMapData } from "@/server/services/map";
 import { getKpiHistory, MIN_DAYS } from "@/server/services/snapshots";
@@ -30,6 +38,7 @@ import { MapExplorer } from "@/components/map/MapExplorer";
 import { env } from "@/lib/env";
 import { BASE_PATH } from "@/lib/basePath";
 import { SourceFilter } from "./SourceFilter";
+import { DashboardFilterBar } from "./DashboardFilterBar";
 import { resolveDashboardScope } from "./scope";
 
 type SP = Record<string, string | string[] | undefined>;
@@ -57,17 +66,37 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     user,
     str(sp.soha) || undefined,
   );
-  const [s, rentTrend, mapData, kpiHistory] = await Promise.all([
-    getDashboardStats(scope),
-    getRentContractTrend(scope),
-    getMapData(scope),
-    getKpiHistory(scope),
+  // ── Hudud filtri (sticky panel, 2026-10-21) ─────────────────────────────
+  // ⚠️ BUTUN panelga ta'sir qiladi: doiraga `regionId` qo'shiladi va barcha agregatlar
+  // (kartalar, grafiklar, trend, snapshot, xarita) `sourceCond()`/`sourceWhere()` orqali
+  // uni o'zi qo'llaydi — har bir so'rovda alohida yozilmaydi.
+  // Noma'lum id e'tiborsiz qoldiriladi (eski havola/qo'lda yozilgan URL).
+  const regions = await prisma.region.findMany({
+    select: { id: true, name: true },
+    orderBy: { sortOrder: "asc" },
+  });
+  const regionRaw = str(sp.region);
+  const regionId = regions.some((r) => r.id === regionRaw) ? regionRaw : undefined;
+  const panelScope = regionId ? { ...scope, regionId } : scope;
+
+  const [s, rentTrend, mapData, kpiHistory, districtCats, districtRent] = await Promise.all([
+    getDashboardStats(panelScope),
+    getRentContractTrend(panelScope),
+    getMapData(panelScope),
+    getKpiHistory(panelScope),
+    // Hudud tanlanganda reyting va maydon grafiklari TUMANLAR kesimida (bitta hudud
+    // ustuni ma'nosiz bo'lardi) — hisobotdagi tuman ochish bilan bir xil funksiyalar.
+    regionId ? computeDistrictStats(regionId, panelScope) : Promise.resolve([] as RegionCategoryRow[]),
+    regionId ? computeDistrictRentStats(regionId, panelScope) : Promise.resolve([] as RegionStat[]),
   ]);
 
-  // Drill-down havolalari manba filtrini olib yuradi (hisobotdagi `objHref()` bilan bir xil).
+  // Drill-down havolalari manba VA hudud filtrini olib yuradi (hisobotdagi `objHref()`
+  // bilan bir xil). ⚠️ `region=` `hududiy=1` SIZ — kartadagi son respublika darajasidagi
+  // tashkilotlarning shu hududdagi obyektlarini ham o'z ichiga oladi (`StatsScope.regionId`).
   const sohaParam = soha ? `soha=${encodeURIComponent(soha)}` : "";
+  const regionParam = regionId ? `region=${regionId}` : "";
   const objHref = (qs = "") => {
-    const parts = [qs, sohaParam].filter(Boolean);
+    const parts = [qs, sohaParam, regionParam].filter(Boolean);
     return `/dashboard/objects${parts.length ? `?${parts.join("&")}` : ""}`;
   };
 
@@ -118,9 +147,15 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // ⚠️ Respublika darajasidagi tashkilotlar qatorlari hudud EMAS (`regionId` da
   // `OrganizationSource.id` turadi) — hududlar reytingiga qo'shilmaydi.
   const nationalIds = new Set(s.nationalOrgIds);
-  const regionRows = s.byRegion.filter((r) => !nationalIds.has(r.regionId));
+  // Hudud tanlanganda reyting/maydon birligi — TUMAN (bo'sh tumanlar tashlanadi), aks holda hudud.
+  // `RegionStat`/`RegionCategoryRow` shakli ikkalasida bir xil, shuning uchun pastdagi kod umumiy.
+  const regionRows = regionId
+    ? districtRent.filter((r) => r.total > 0)
+    : s.byRegion.filter((r) => !nationalIds.has(r.regionId));
+  const unitKey = regionId ? "district" : "region";
+  const unitWord = regionId ? "Tumanlar" : "Hududlar";
 
-  const catByRegion = new Map(s.byRegionCategory.map((r) => [r.regionId, r]));
+  const catByRegion = new Map((regionId ? districtCats : s.byRegionCategory).map((r) => [r.regionId, r]));
 
   // ⚠️ `landSplit` sohalarida (Agentlik / Direksiya) reyting BUTUNLAY binolar
   // bo'yicha quriladi — soni ham, jami ham, havolalar ham. Ilgari ustun balandligi
@@ -142,8 +177,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         vacant,
         used: Math.max(total - vacant, 0),
         total,
-        vacantHref: objHref(`region=${r.regionId}&hududiy=1&inefficient=1${landQs}`),
-        totalHref: objHref(`region=${r.regionId}&hududiy=1${landQs}`),
+        vacantHref: objHref(`${unitKey}=${r.regionId}&hududiy=1&inefficient=1${landQs}`),
+        totalHref: objHref(`${unitKey}=${r.regionId}&hududiy=1${landQs}`),
       };
     })
     .sort((a, b) => b.total - a.total);
@@ -199,24 +234,31 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <div>
-      {/* Sarlavha + manba kesimi */}
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-xl font-bold tracking-tight" style={{ color: "var(--navy)" }}>
-            Boshqaruv paneli
-          </h1>
-          <p className="mt-1 text-[13px] text-muted-foreground">
-            Davlat mulki obyektlaridan foydalanish samaradorligi
-            {soha ? ` — ${soha}` : ""}
-          </p>
-        </div>
-        <SourceFilter
-          names={sohaList}
-          activeKey={activeSourceKey}
-          showOwn={showOwn}
-          basePath="/dashboard"
-        />
-      </div>
+      {/* Sarlavha + manba + hudud — STICKY (foydalanuvchi talabi, 2026-10-21). */}
+      <DashboardFilterBar
+        regions={regions}
+        regionId={regionId}
+        title={
+          <div>
+            <h1 className="text-xl font-bold tracking-tight" style={{ color: "var(--navy)" }}>
+              Boshqaruv paneli
+            </h1>
+            <p className="mt-1 text-[13px] text-muted-foreground">
+              Davlat mulki obyektlaridan foydalanish samaradorligi
+              {soha ? ` — ${soha}` : ""}
+            </p>
+          </div>
+        }
+        source={
+          <SourceFilter
+            names={sohaList}
+            activeKey={activeSourceKey}
+            showOwn={showOwn}
+            basePath="/dashboard"
+            extraQs={regionParam}
+          />
+        }
+      />
 
       {/* Asosiy ko'rsatkichlar */}
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-3 xl:grid-cols-6">
@@ -310,7 +352,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       {/* Hududlar reytingi — to'liq kenglik */}
       <div className="mt-4">
         <ChartCard
-          title="Hududlar reytingi"
+          title={`${unitWord} reytingi`}
           subtitle={
             landSplit
               ? "Binolar soni — bo'sh turganlar ulushi bilan (yer uchastkalari kirmaydi)"
@@ -340,7 +382,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <ChartCard
           title="Ijaradagi maydon"
-          subtitle={`Hududlar kesimida, ming m² — jami ${nf(areaBalance.reduce((a, r) => a + r.rented, 0), 1)}`}
+          subtitle={`${unitWord} kesimida, ming m² — jami ${nf(areaBalance.reduce((a, r) => a + r.rented, 0), 1)}`}
           footnote="Maydon bir nechta kategoriyaga tarqalgani uchun bu grafikda ro'yxatga havola yo'q — mos keladigan yagona filtr mavjud emas."
         >
           <AreaBalance data={areaBalance} series="rented" />
@@ -348,7 +390,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
         <ChartCard
           title="Bo'sh maydon"
-          subtitle={`Hududlar kesimida, ming m² — jami ${nf(areaBalance.reduce((a, r) => a + r.vacant, 0), 1)}`}
+          subtitle={`${unitWord} kesimida, ming m² — jami ${nf(areaBalance.reduce((a, r) => a + r.vacant, 0), 1)}`}
           footnote="&laquo;Bo'sh turgan&raquo; obyektlarning foydali maydoni. Havola yo'q — yuqoridagi grafik bilan bir xil sabab."
         >
           <AreaBalance data={areaBalance} series="vacant" />
@@ -356,7 +398,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
       </div>
 
       {/* Xarita */}
-      <Card className="mt-4 overflow-hidden">
+      {/* `isolate` — Leaflet ichki z-index'lari (400–1000) sticky panel ustiga chiqmasin. */}
+      <Card className="mt-4 isolate overflow-hidden">
         {/* Sarlavha va qamrov izohi BIR QATORDA (foydalanuvchi talabi, 2026-10-21): izoh
             o'ngda va faqat matn kengligida (`flex-1` EMAS); tor ekranda sarlavha ostiga tushadi.
             ⚠️ Qamrov cheklovi DOIM ko'rinadi — yashirilsa xaritadagi bo'shliq
@@ -409,7 +452,8 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         {/* Filtr (kategoriya/hudud/tuman) faqat xaritaga ta'sir qiladi — `MapExplorer` izohi.
             `key` — soha almashganda filtr holati tozalansin (hudud indekslari o'zgaradi). */}
         <MapExplorer
-          key={soha ?? "all"}
+          key={`${soha ?? "all"}|${regionId ?? ""}`}
+          lockedRegion={!!regionId}
           points={mapData.points}
           regions={mapData.regions}
           districts={mapData.districts}

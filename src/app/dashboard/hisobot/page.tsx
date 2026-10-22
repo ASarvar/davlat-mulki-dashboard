@@ -14,6 +14,9 @@ import {
   ChevronRight,
   ChevronDown,
   Droplets,
+  Gavel,
+  KeyRound,
+  FileSignature,
 } from "lucide-react";
 import { prisma } from "@/lib/prisma";
 import { userSourceScope } from "@/lib/authz";
@@ -557,6 +560,16 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
     0,
   );
 
+  // "Savdoda xususiylashtirish" (kat 3) va "Savdoda ijara" (kat 4) kartalari — jadvaldagi
+  // 3/4-ustunlarning JAMI'si bilan AYNAN bir xil: o'sha `COLUMNS` getterlari yig'iladi
+  // (maydon kichik ustunlaridan tashqari). landSplit'da ular Yer + Bino, aks holda "Soni".
+  // ⚠️ Effektiv kategoriyadan EMAS (`counts["3"]`) — 3/4 ustunlar xususiyatdan sanaladi
+  // (`hasPrivatizationLot` / `hasRentLot`), ro'yxat havolasi ham shu mezonda.
+  const columnCount = (code: number) =>
+    COLUMNS.find((c) => c.code === code)?.subs.filter((sub) => !sub.area).reduce((a, sub) => a + sumSub(sub), 0) ?? 0;
+  const privatizationTotal = columnCount(3);
+  const rentLotTotal = columnCount(4);
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
@@ -589,7 +602,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4  md:grid-cols-3 xl:grid-cols-5">
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3 2xl:grid-cols-6">
         <StatCard
           label="Jami obyektlar"
           value={s.total}
@@ -614,6 +627,31 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
           }
           icon={Layers}
           tone="cobalt"
+        />
+        <StatCard
+          label="Savdoda xususiylashtirish"
+          value={privatizationTotal}
+          icon={Gavel}
+          tone="green"
+          href={objHref("category=3")}
+        />
+        <StatCard
+          label="Savdoda ijara"
+          value={rentLotTotal}
+          icon={KeyRound}
+          tone="amber"
+          href={objHref("category=4")}
+        />
+        {/* ⚠️ Mezon — `rentContractCount > 0` (tekin ham, pullik ham), ijara jadvalidagi
+            "Ijaraga berilgan" JAMI bilan bir xil son (`s.totals.rentedObjects`). 6-ustun
+            ("Ijara shartnomasi bor" kategoriyasi) EMAS — u faqat pullik (`rentTotalSum > 0`).
+            Ro'yxat havolasi ham shu mezonda: `hasAnyRentContract`, `hasRentContract` EMAS. */}
+        <StatCard
+          label="Ijara shartnomasi bor"
+          value={s.totals.rentedObjects}
+          icon={FileSignature}
+          tone="navy"
+          href={objHref("hasAnyRentContract=1")}
         />
       </div>
 

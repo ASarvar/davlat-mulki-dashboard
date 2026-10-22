@@ -144,7 +144,7 @@ export interface KpiPoint {
  *
  * ⚠️ `sourceCond()` bu yerda ISHLATILMAYDI — u `Property` ustunlariga (`removedFromBalance`)
  * tayanadi, snapshotda esa o'sha cheklov YOZISH paytida allaqachon qo'llangan.
- * Qolgan ikki o'lchov (soha nomi va rol doirasi) esa aynan bir xil mantiqda birikadi.
+ * Qolgan o'lchovlar (soha nomi, rol doirasi, hudud) esa aynan bir xil mantiqda birikadi.
  */
 function snapshotCond(scope: StatsScope): Prisma.Sql {
   if (scope.sourceIds != null && scope.sourceIds.length === 0) return Prisma.sql`FALSE`;
@@ -158,6 +158,8 @@ function snapshotCond(scope: StatsScope): Prisma.Sql {
   if (scope.sourceIds != null) {
     parts.push(Prisma.sql`s."sourceId" IN (${Prisma.join(scope.sourceIds)})`);
   }
+  // Snapshot (manba, hudud) juftligi bo'yicha yozilgani uchun hudud filtri tarixda ham ishlaydi.
+  if (scope.regionId) parts.push(Prisma.sql`s."regionId" = ${scope.regionId}`);
   return parts.reduce((a, b) => Prisma.sql`${a} AND ${b}`);
 }
 

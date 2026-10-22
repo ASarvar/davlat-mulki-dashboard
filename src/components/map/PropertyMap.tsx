@@ -25,6 +25,8 @@ export interface PropertyMapProps {
    * yaqinlashadi; nuqta qolmasa — butun respublika. Birinchi chizishda ishlamaydi.
    */
   focusKey?: string;
+  /** Birinchi chizishda ham nuqtalarga yaqinlashish (panelda hudud tanlanganda). */
+  fitOnMount?: boolean;
 }
 
 /**
@@ -59,6 +61,7 @@ export function PropertyMap({
   tileAttribution,
   basePath,
   focusKey,
+  fitOnMount = false,
 }: PropertyMapProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const boxRef = useRef<HTMLDivElement | null>(null);
@@ -250,19 +253,37 @@ export function PropertyMap({
 
   // Filtr o'zgarganda — ko'rinadigan nuqtalarga yaqinlashish. ⚠️ Qatlam effektidan
   // KEYIN e'lon qilingan: React effektlarni shu tartibda bajaradi.
-  const lastFocusRef = useRef(focusKey);
+  // `fitOnMount` da boshlang'ich qiymat yo'q — birinchi effektning o'zi yaqinlashtiradi.
+  const lastFocusRef = useRef(fitOnMount ? undefined : focusKey);
   useEffect(() => {
     const map = mapRef.current;
     if (!map || focusKey === lastFocusRef.current) return;
-    lastFocusRef.current = focusKey;
-    if (points.length === 0) {
-      map.setView([UZ_CENTER.lat, UZ_CENTER.lng], UZ_ZOOM);
+    const firstFit = lastFocusRef.current === undefined;
+    const fit = () => {
+      if (points.length === 0) {
+        map.setView([UZ_CENTER.lat, UZ_CENTER.lng], UZ_ZOOM);
+        return;
+      }
+      map.fitBounds(L.latLngBounds(focusPoints(points).map((p) => [p.lat, p.lng] as [number, number])), {
+        padding: [40, 40],
+        maxZoom: 15,
+      });
+    };
+    if (!firstFit) {
+      lastFocusRef.current = focusKey;
+      fit();
       return;
     }
-    map.fitBounds(L.latLngBounds(focusPoints(points).map((p) => [p.lat, p.lng] as [number, number])), {
-      padding: [40, 40],
-      maxZoom: 15,
+    // ⚠️ Birinchi chizishda konteyner o'lchami hali o'lchanmagan bo'lishi mumkin (yuqoridagi
+    // "O'LCHAMNI KUZATISH" izohi) — nol o'lcham bilan `fitBounds` noto'g'ri zoom beradi.
+    // Shuning uchun bir kadr kutib, avval qayta o'lchatamiz. Kalit kadr ICHIDA yoziladi —
+    // dev'dagi StrictMode effektni ikki marta ishga tushirib, birinchisini bekor qiladi.
+    const raf = requestAnimationFrame(() => {
+      lastFocusRef.current = focusKey;
+      map.invalidateSize();
+      fit();
     });
+    return () => cancelAnimationFrame(raf);
   }, [focusKey, points]);
 
   return (

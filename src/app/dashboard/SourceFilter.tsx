@@ -29,12 +29,18 @@ export function SourceFilter({
   activeKey,
   showOwn = false,
   basePath,
+  extraQs = "",
 }: {
   names: string[];
   activeKey: string;
   showOwn?: boolean;
   /** Havolalar quriladigan sahifa manzili (masalan `/dashboard/hisobot`). */
   basePath: string;
+  /**
+   * Manba almashganda SAQLANADIGAN boshqa parametrlar (masalan `region=...` —
+   * boshqaruv panelidagi hudud filtri). Usiz manba tugmasi hudud tanlovini jimgina tashlardi.
+   */
+  extraQs?: string;
 }) {
   // Bitta manba bo'lsa tanlashning ma'nosi yo'q — ko'rsatmaymiz.
   if (names.length < 2 && !showOwn) return null;
@@ -47,10 +53,14 @@ export function SourceFilter({
     return 0;
   });
 
+  const href = (soha?: string) => {
+    const qs = [soha ? `soha=${encodeURIComponent(soha)}` : "", extraQs].filter(Boolean).join("&");
+    return qs ? `${basePath}?${qs}` : basePath;
+  };
   const items: { key: string; label: string; href: string }[] = [
-    ...(showOwn ? [{ key: OWN_SOHA, label: "Mening tashkilotim", href: basePath }] : []),
-    ...ordered.map((n) => ({ key: n, label: n, href: `${basePath}?soha=${encodeURIComponent(n)}` })),
-    { key: ALL_SOHA, label: "Hammasi", href: `${basePath}?soha=${ALL_SOHA}` },
+    ...(showOwn ? [{ key: OWN_SOHA, label: "Mening tashkilotim", href: href() }] : []),
+    ...ordered.map((n) => ({ key: n, label: n, href: href(n) })),
+    { key: ALL_SOHA, label: "Hammasi", href: href(ALL_SOHA) },
   ];
 
   return (

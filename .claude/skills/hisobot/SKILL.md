@@ -110,6 +110,14 @@ bo'lsa (`scopeIds !== null`) obyekti yo'q hudud qatorlari yashiriladi, va **bitt
 `showCatTotals`/`showRentTotals`). Cheklovsiz foydalanuvchida rasmiy hisobot shakli (14 hudud +
 JAMI) o'zgarmaydi. Tashkilotda obyekt bo'lmasa jadval bo'sh qolmaydi — tushuntirish qatori chiqadi.
 
+Hisobot kartalari (2026-10-21 dan 6 ta): Jami, Bo'sh turgan, Bo'sh turgan maydoni, **Savdoda
+xususiylashtirish**, **Savdoda ijara** va **Ijara shartnomasi bor**. Savdo kartalari `COLUMNS` dagi
+3/4-ustun getterlarini (maydon kichik ustunisiz) yig'adi — ya'ni jadvaldagi JAMI bilan va
+`?category=3/4` ro'yxati bilan aynan bir xil (xususiyat mezoni, effektiv kategoriya EMAS).
+"Ijara shartnomasi bor" — `s.totals.rentedObjects` (`rentContractCount > 0`, tekin+pullik), ijara
+jadvalining "Ijaraga berilgan" JAMI'si; havola `hasAnyRentContract=1`. ⚠️ 6-ustun (kategoriya
+"Ijara shartnomasi bor") bilan ADASHTIRMANG — u faqat pullik.
+
 ⚠️ **`computeDashboardStats()`dagi `inefficient` (Bo'sh turgan) soni `byCategoryRaw`dan (code=11)
 olinadi, `Property.isInefficient` ustunidan ALOHIDA so'rov bilan EMAS.** Ilgari alohida
 `prisma.property.count({isInefficient:true})` so'rovi bor edi — bir xil `Promise.all` ichida bo'lsa
@@ -193,6 +201,18 @@ Kategoriya kodini o'zgartirishdan oldin `manualCategoryCode` ishlatilganini teks
 (uchta jadval) `/dashboard/hisobot` ga ko'chdi. Ikkalasi bir xil
 `resolveDashboardScope()` (`app/dashboard/scope.ts`) va bir xil `getDashboardStats()`
 dan oziqlanadi — ekrandagi sonlar hech qachon ajralib qolmaydi.
+
+**Panel hudud filtri (2026-10-21)** — `DashboardFilterBar.tsx`: sarlavha + Manba + Hudud,
+STICKY (mobil'da `top-[60px]` — Sidebar paneli ostida, yopishganda sarlavha yashiriladi).
+`?region=` → `StatsScope.regionId` → `sourceCond()`/`sourceWhere()`/`snapshotCond()` — ya'ni
+kartalar, kategoriya, trend, KPI tarixi va xarita BIR joydan filtrlanadi. ⚠️ `Property.regionId`
+bo'yicha, respublika tashkilotlarining shu hududdagi obyektlari HAM kiradi — shuning uchun
+karta havolalari `region=` ni `hududiy=1` SIZ oladi (son = ro'yxat). Hudud tanlanganda
+reyting va maydon grafiklari TUMANLAR kesimida (`computeDistrictStats/RentStats`, ular
+respublika tashkilotlarini chiqaradi → havola `district=…&hududiy=1`). `SourceFilter`
+`extraQs` bilan hudud tanlovini saqlaydi. Xarita: `lockedRegion` (o'z hudud tanlagichi
+yashirin) + `fitOnMount` (birinchi chizishda hududga yaqinlashadi). Hisobot sahifasiga
+bu filtr QO'SHILMAGAN (u yerda hudud — jadval qatorlari).
 
 ⚠️ **`SourceFilter` ga `basePath` propi MAJBURIY** — ilgari `/dashboard` qattiq
 yozilgan edi va hisobotdagi manba tugmasi foydalanuvchini vizual panelga otib yuborardi.

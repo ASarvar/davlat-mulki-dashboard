@@ -7,6 +7,16 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.26.0
+
+- Boshqaruv paneliga hudud filtri: kartalar, kategoriya taqsimoti, grafiklar, kunlik dinamika va
+  xarita tanlangan hudud bo'yicha qayta hisoblanadi; reyting va maydon grafiklari tumanlar kesimiga
+  o'tadi, havolalar hududni olib yuradi. Sarlavha, manba va hudud paneli sticky (sahifa bilan birga
+  pastga tushmaydi).
+- Hisobot sahifasiga "Savdoda xususiylashtirish", "Savdoda ijara" va "Ijara shartnomasi bor"
+  kartalari (jadvaldagi JAMI bilan bir xil son, bosilganda o'sha ro'yxat).
+- Hudud tanlangan xarita ochilganda o'sha hududga yaqinlashadi.
+
 ## 1.25.0
 
 - Boshqaruv paneli xaritasiga filtr: kategoriya (tugmalar, sanoq bilan), hudud va tuman —

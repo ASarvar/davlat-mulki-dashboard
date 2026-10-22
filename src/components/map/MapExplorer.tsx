@@ -15,6 +15,11 @@ interface Props {
   tileUrl: string;
   tileAttribution: string;
   basePath: string;
+  /**
+   * Panel darajasida hudud tanlangan (sticky filtr) — nuqtalar allaqachon o'sha hududda.
+   * Xaritaning o'z hudud tanlagichi yashiriladi, tuman tanlagichi esa darhol ochiq.
+   */
+  lockedRegion?: boolean;
 }
 
 // ⚠️ `toLocaleString` EMAS — Node va brauzer turlicha formatlab gidratsiyani buzardi
@@ -34,9 +39,19 @@ const nf = (n: number) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, " ");
  * natija jimgina bo'sh chiqardi (obyektlar filtridagi 1-qoida bilan bir xil).
  * Kategoriya sanoqlari hudud/tuman tanlovini HISOBGA OLADI, kategoriya tanlovini emas.
  */
-export function MapExplorer({ points, regions, districts, tileUrl, tileAttribution, basePath }: Props) {
+export function MapExplorer({
+  points,
+  regions,
+  districts,
+  tileUrl,
+  tileAttribution,
+  basePath,
+  lockedRegion = false,
+}: Props) {
+  // Qulflangan holatda `regions` da bitta hudud (nuqtasi borlar) — uning indeksi 0.
+  const baseRegion = lockedRegion && regions.length === 1 ? 0 : -1;
   const [cats, setCats] = useState<Set<number>>(new Set());
-  const [region, setRegion] = useState(-1);
+  const [region, setRegion] = useState(baseRegion);
   const [district, setDistrict] = useState(-1);
 
   const inArea = useMemo(
@@ -66,10 +81,10 @@ export function MapExplorer({ points, regions, districts, tileUrl, tileAttributi
       return next;
     });
 
-  const filtered = cats.size > 0 || region >= 0 || district >= 0;
+  const filtered = cats.size > 0 || region !== baseRegion || district >= 0;
   const reset = () => {
     setCats(new Set());
-    setRegion(-1);
+    setRegion(baseRegion);
     setDistrict(-1);
   };
   const focusKey = `${region}:${district}:${[...cats].sort((a, b) => a - b).join(",")}`;
@@ -78,17 +93,19 @@ export function MapExplorer({ points, regions, districts, tileUrl, tileAttributi
     <>
       <div className="mx-4 mb-3 space-y-2.5 md:mx-5">
         <div className="flex flex-wrap items-center gap-2">
-          <Dropdown
-            ariaLabel="Hudud"
-            value={region}
-            onChange={(v) => {
-              setRegion(v);
-              setDistrict(-1);
-            }}
-            options={[{ value: -1, label: "Barcha hududlar" }, ...regions.map((g, i) => ({ value: i, label: g.name }))]}
-            size="sm"
-            className="w-48"
-          />
+          {lockedRegion ? null : (
+            <Dropdown
+              ariaLabel="Hudud"
+              value={region}
+              onChange={(v) => {
+                setRegion(v);
+                setDistrict(-1);
+              }}
+              options={[{ value: -1, label: "Barcha hududlar" }, ...regions.map((g, i) => ({ value: i, label: g.name }))]}
+              size="sm"
+              className="w-48"
+            />
+          )}
           <Dropdown
             ariaLabel="Tuman"
             value={district}
@@ -148,6 +165,7 @@ export function MapExplorer({ points, regions, districts, tileUrl, tileAttributi
         tileAttribution={tileAttribution}
         basePath={basePath}
         focusKey={focusKey}
+        fitOnMount={lockedRegion}
       />
     </>
   );
