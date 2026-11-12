@@ -7,6 +7,12 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.27.0
+
+- Yangi rol "Cheklangan kuzatuvchi": menyuda kuzatuvchining bo'limlari ko'rinadi, lekin har
+  bir bo'lim (bosh panel ham) "Texnik ishlar olib borilmoqda" ekranini ochadi. Ma'lumot,
+  eksport va hujjatlar bu rolga yopiq.
+
 ## 1.26.0
 
 - Boshqaruv paneliga hudud filtri: kartalar, kategoriya taqsimoti, grafiklar, kunlik dinamika va

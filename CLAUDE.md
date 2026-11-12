@@ -75,7 +75,7 @@ ish kuni jadvali (`priv-refresh-*`, savdolar 10:00 da) + kunlik 03:00.
 ⚠️ Agentlik va Direksiya sohalari HECH QANDAY avtomatik yangilanishga kirmaydi — faqat qo'lda
 (`MANUAL_ONLY_SOHAS`, `lib/sourceLabel.ts`).
 
-### Rollar (7 ta)
+### Rollar (8 ta)
 - `SUPER_ADMIN` — hammasi.
 - `ADMIN` — super admin bilan bir xil, lekin super adminni ko'rmaydi/boshqarmaydi.
 - `RAHBARIYAT` — **cheklovsiz**; so'rovni **yakuniy tasdiqlaydi** (2-bosqich);
@@ -96,6 +96,12 @@ ish kuni jadvali (`priv-refresh-*`, savdolar 10:00 da) + kunlik 03:00.
   biriktirilmaydi, `userSourceScope()` → `[]`. Obyektlar/hisobot/so'rovlar bo'limlarining
   `allowRoles`i `STAFF_ROLES` (= `ALL_ROLES` − `IMTIYOZ`), ya'ni bazada `EVERYONE` bo'lsa ham
   unga ochilmaydi. Eksport va hujjat route'lari ham `canAccess()` bilan yopilgan.
+- `LIMITED_VIEWER` ("Cheklangan kuzatuvchi", 2026-11-12) — menyuda **kuzatuvchining** bo'limlari
+  ko'rinadi (`MAINTENANCE_MENU_ROLE` → `allowedSectionKeys`), lekin HAR bir sahifa o'rnida
+  "Texnik ishlar olib borilmoqda" ekrani (`dashboard/layout.tsx` → `MaintenanceScreen`).
+  ⚠️ Himoya ekran EMAS: `canAccessWith` bu rolga faqat `core` marshrutni ochadi — barcha
+  bo'lim, API route va eksport yopiq, bazadagi sozlamadan qat'i nazar. `ALL_ROLES` ga
+  ATAYLAB qo'shilmagan (bo'limlar tanlagichida chiqmasin), `userSourceScope()` → `[]`.
 
 ⚠️ Enum `NAZORATCHI` → `IJROCHI` deb qayta nomlangan (migratsiya `20260725120000_rahbariyat_two_stage`).
 Yorliqlar `src/lib/roles.ts` → `ROLE_LABEL` da; kodda rol satrini qo'lda yozmang.

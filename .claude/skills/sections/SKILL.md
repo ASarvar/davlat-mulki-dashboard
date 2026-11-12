@@ -78,6 +78,14 @@ matn bo'yicha ajratib bo'lmasdi — dev'da ishlab, serverda ishlamasdi. Ko'rinis
 Direksiya va Davlat aktivlari agentligi xodimlariga ko'rinmaydi. Faqat tashkilotga bog'langan
 rollarga (Ijrochi, Moderator) va faqat BARCHA tashkilotlari shu sohalarda bo'lsa qo'llanadi.
 
+⚠️ **"Texnik ishlar" roli (`LIMITED_VIEWER`, 2026-11-12)** — `canAccessWith` ning
+ENG BIRINCHI qoidasi: bu rolga faqat `core` ochiq (SUPER_ADMIN tekshiruvidan ham oldin).
+Menyusi esa ko'zgu-rolniki (`lib/roles.ts` → `MAINTENANCE_MENU_ROLE`, hozir `VIEWER`):
+kuzatuvchiga bo'lim ochilsa, bu rol menyusida ham paydo bo'ladi, lekin bosilganda
+`layout.tsx` sahifa o'rniga `MaintenanceScreen` chiqaradi (URL saqlanadi, band yonadi).
+`/dashboard` sahifasi bu rol uchun `null` qaytaradi — aks holda `firstOpenSectionHref`
+hisobotga yo'naltirardi.
+
 ⚠️ **Bo'limni yashirish uning API route'ini yashirmaydi.** Yangi bo'limning har bir
 `route.ts` va server action'i ham `requireSection(key)` bilan boshlanishi kerak.
 Middleware buni bajara olmaydi (edge, Prisma yo'q) — himoya sahifa/route darajasida.

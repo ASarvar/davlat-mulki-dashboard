@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import type { Role, SectionVisibility } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
 import { requireUserOrRedirect, userSourceScope, type SessionUser } from "@/lib/authz";
-import { sourceMode } from "@/lib/roles";
+import { MAINTENANCE_MENU_ROLE, isMaintenanceRole, sourceMode } from "@/lib/roles";
 import { SECTIONS, sectionDef, type SectionDef } from "@/lib/sections";
 
 /**
@@ -61,6 +61,9 @@ const sohasFor = cache(async (id: string, role: Role, sourceId: string | null): 
  * Bo'lim shu foydalanuvchiga ochiqmi.
  *
  * Tartib muhim:
+ *  0. "Texnik ishlar" roli (`LIMITED_VIEWER`) — FAQAT `core` marshrut (`/dashboard`, u
+ *     yerda layout texnik ishlar ekranini chiqaradi). Qolgan hammasi yopiq, bazadagi
+ *     sozlamadan qat'i nazar — sahifalar ham, API route'lar ham, eksport ham.
  *  1. SUPER_ADMIN — HAR DOIM ochiq. Busiz u `/dashboard/sections` ni o'zidan yopib,
  *     boshqaruv panelini butunlay yo'qotib qo'yishi mumkin bo'lardi.
  *  2. `allowRoles` — koddagi qattiq chegara, bazadagi sozlama uni kengaytira olmaydi.
@@ -75,6 +78,7 @@ export function canAccessWith(
   def: SectionDef,
   sohas: string[] | null,
 ): boolean {
+  if (isMaintenanceRole(user.role)) return Boolean(def.core);
   if (user.role === "SUPER_ADMIN") return true;
   if (!def.allowRoles.includes(user.role)) return false;
   if (def.hiddenForSohas && sohas !== null && sohas.every((s) => def.hiddenForSohas!.includes(s))) {
@@ -96,10 +100,18 @@ export async function canAccess(user: SessionUser, key: string): Promise<boolean
   return canAccessWith(access, user, def, sohas);
 }
 
-/** Menyu uchun: shu foydalanuvchiga ochiq bo'limlar kalitlari (registr tartibida). */
+/**
+ * Menyu uchun: shu foydalanuvchiga ochiq bo'limlar kalitlari (registr tartibida).
+ *
+ * ⚠️ "Texnik ishlar" roli uchun menyu KO'ZGU-ROLNIKI (`MAINTENANCE_MENU_ROLE`) — ruxsat
+ * emas, faqat ko'rinish: bo'limlarning o'zi `canAccessWith` da yopiq. Ko'zgu-rol tashkilotga
+ * bog'lanmaydi (`sourceMode` = none), shuning uchun soha cheklovi `null`.
+ */
 export async function allowedSectionKeys(user: SessionUser): Promise<string[]> {
-  const [access, sohas] = await Promise.all([loadAccess(), loadUserSohas(user)]);
-  return SECTIONS.filter((def) => canAccessWith(access, user, def, sohas)).map((d) => d.key);
+  const mirror = MAINTENANCE_MENU_ROLE[user.role];
+  const menuUser = mirror ? { ...user, role: mirror } : user;
+  const [access, sohas] = await Promise.all([loadAccess(), mirror ? Promise.resolve(null) : loadUserSohas(user)]);
+  return SECTIONS.filter((def) => canAccessWith(access, menuUser, def, sohas)).map((d) => d.key);
 }
 
 /**

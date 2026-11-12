@@ -118,7 +118,7 @@ export async function userSourceScope(user: SessionUser): Promise<string[] | nul
     if (u.allSources) return null;
     return u.moderatorSources.map((r) => r.sourceId);
   }
-  return []; // IMTIYOZ — ataylab hech narsa (bo'limga kirolmasa ham, himoya ikki qavat)
+  return []; // IMTIYOZ, LIMITED_VIEWER — ataylab hech narsa (bo'limga kirolmasa ham, himoya ikki qavat)
 }
 
 // Tashkilotga yozish/tasdiqlash ruxsati.

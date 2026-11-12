@@ -29,6 +29,7 @@ enum Role {
   IJROCHI
   VIEWER
   IMTIYOZ // faqat /dashboard/imtiyoz (lib/roles.ts → STAFF_ROLES)
+  LIMITED_VIEWER // menyu = kuzatuvchiniki, har bo'limda "Texnik ishlar" ekrani (lib/roles.ts → MAINTENANCE_MENU_ROLE)
 }
 
 model User {

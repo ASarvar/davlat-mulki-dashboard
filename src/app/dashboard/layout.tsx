@@ -1,8 +1,9 @@
 import { requireUserOrRedirect } from "@/lib/authz";
-import { ROLE_LABEL } from "@/lib/roles";
+import { ROLE_LABEL, isMaintenanceRole } from "@/lib/roles";
 import { getUnreadNotificationCount } from "@/server/services/notifications";
 import { allowedSectionKeys } from "@/server/services/sectionAccess";
 import { Sidebar } from "@/components/Sidebar";
+import { MaintenanceScreen } from "@/components/MaintenanceScreen";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   // ⚠️ Redirect qiladi (xato emas) — eskirgan sessiya login'ga tushsin.
@@ -27,7 +28,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
         allowedKeys={allowedKeys}
       />
       <div className="md:pl-64">
-        <main className="mx-auto  px-4 py-6 md:px-8 md:py-8">{children}</main>
+        {/* ⚠️ "Texnik ishlar" roli — sahifa o'rniga ekran (menyu kuzatuvchiniki, URL saqlanadi,
+            ya'ni bosilgan band menyuda yonib turadi). Ma'lumot himoyasi bu EMAS: bo'limlar va
+            API route'lar bu rolga `canAccessWith` da yopiq — bu faqat ko'rinish. */}
+        <main className="mx-auto  px-4 py-6 md:px-8 md:py-8">
+          {isMaintenanceRole(user.role) ? <MaintenanceScreen /> : children}
+        </main>
       </div>
     </div>
   );

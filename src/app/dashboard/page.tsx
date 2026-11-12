@@ -23,6 +23,7 @@ import { getRentContractTrend, trendYear } from "@/server/services/trends";
 import { getMapData } from "@/server/services/map";
 import { getKpiHistory, MIN_DAYS } from "@/server/services/snapshots";
 import { isLandSplitSoha } from "@/lib/sourceLabel";
+import { isMaintenanceRole } from "@/lib/roles";
 import { nf, km, pct1, money } from "@/lib/format";
 import { BRAND, categoryColor } from "@/lib/chartColors";
 import { KpiCard, Tag } from "@/components/ui/KpiCard";
@@ -58,6 +59,9 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
   // ko'rinishga (rasmiy hisobot) yo'naltiriladi — ya'ni u uchun hech narsa
   // o'zgarmaydi, super admin `/dashboard/sections` dan ochmaguncha.
   const user = await requireSection("dashboard");
+  // "Texnik ishlar" roli — ekranni layout chiqaradi; bu yerda yo'naltirish bo'lsa, u
+  // menyudagi birinchi bo'limga (hisobot) uchib ketardi.
+  if (isMaintenanceRole(user.role)) return null;
   if (!(await canAccess(user, "panel"))) redirect(await firstOpenSectionHref(user));
 
   const sp = await searchParams;
