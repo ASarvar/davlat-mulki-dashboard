@@ -7,6 +7,10 @@ raqam) — ishlash davomida emas. Shu paytgacha to'plangan o'zgarishlar pastdagi
 
 ## Chiqarilmagan
 
+## 1.27.1
+
+- "Cheklangan kuzatuvchi" rolidagi foydalanuvchining menyusida rol nomi ko'rsatilmaydi.
+
 ## 1.27.0
 
 - Yangi rol "Cheklangan kuzatuvchi": menyuda kuzatuvchining bo'limlari ko'rinadi, lekin har
