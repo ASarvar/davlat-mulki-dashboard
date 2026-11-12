@@ -150,7 +150,7 @@ export function Sidebar({
           </div>
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium text-white">{user.name || user.username}</p>
-            <p className="truncate text-[11px] text-white/50">{user.roleLabel}</p>
+            {user.roleLabel ? <p className="truncate text-[11px] text-white/50">{user.roleLabel}</p> : null}
           </div>
           <form action={signOutAction}>
             <button

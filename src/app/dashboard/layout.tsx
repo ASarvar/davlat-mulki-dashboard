@@ -22,7 +22,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
           name: user.name ?? "",
           username: user.username ?? "",
           role: user.role,
-          roleLabel: ROLE_LABEL[user.role] ?? user.role,
+          // "Texnik ishlar" roli o'z nomini ko'rmaydi (foydalanuvchi talabi, 2026-11-12).
+          roleLabel: isMaintenanceRole(user.role) ? "" : (ROLE_LABEL[user.role] ?? user.role),
         }}
         unreadCount={unread}
         allowedKeys={allowedKeys}
